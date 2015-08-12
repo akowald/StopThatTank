@@ -2,7 +2,7 @@ versioninfo
 {
 	"editorversion" "400"
 	"editorbuild" "6818"
-	"mapversion" "43"
+	"mapversion" "44"
 	"formatversion" "100"
 	"prefab" "0"
 }
@@ -20,7 +20,7 @@ viewsettings
 world
 {
 	"id" "1"
-	"mapversion" "43"
+	"mapversion" "44"
 	"classname" "worldspawn"
 	"detailmaterial" "detail/detailsprites"
 	"detailvbsp" "detail.vbsp"
@@ -5023,7 +5023,7 @@ entity
 		"color" "220 30 220"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"comments" "Only used for Setup in STT. When the bomb is out, STT uses its own timer, with length determined by a cvar. You can add or subtract time using this output (Keep in mind capturing any point adds 60s automatically by default): OnTrigger - > team_round_timer - > AddTime - > 60"
+		"comments" "Only used for Setup in STT. When the bomb is out, STT uses its own timer, with length determined by a cvar. You can add or subtract time using this output (Keep in mind capturing any point adds 60s automatically by default): OnTrigger - > stt_overtime_timer - > AddTime - > 60    (Check out the button over there on the wall for more info)"
 		"logicalpos" "[0 4000]"
 	}
 }
@@ -5193,7 +5193,7 @@ entity
 		"color" "220 30 220"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"comments" "Used for the Payload's trigger_hurt, which destroys buildings in its path. Redundant in STT, but you may as well have it so normal Payload works on your map as well."
+		"comments" "Used for the Payload's trigger_hurt, which destroys buildings in its path. Redundant in STT, but you may as well have it so normal Payload works properly on your map as well."
 		"logicalpos" "[4000 7500]"
 	}
 }
@@ -11255,6 +11255,7 @@ entity
 		"color" "220 30 220"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
+		"comments" "Allows the map to tell STT when the Tank needs to be parented. In this map, parenting is enabled when the bridge is fully up, and disabled when the Tank reaches the other side."
 		"logicalpos" "[0 0]"
 	}
 }
@@ -11271,6 +11272,7 @@ entity
 		"color" "220 30 220"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
+		"comments" "Filters out anything but the Payload for the hatch explosion (it works properly in STT). If your map has an ending involving the Payload falling into a hatch, you will want to have a filter like this. That exploit to prematurely blow up hatches with dropped weapons is still around for maps without filters!"
 		"logicalpos" "[0 0]"
 	}
 }
@@ -11676,7 +11678,7 @@ entity
 	"speed" "5"
 	"unlocked_sentence" "0"
 	"unlocked_sound" "0"
-	"wait" "0"
+	"wait" "0.1"
 	connections
 	{
 		"OnPressed" "stt_overtime_timer,AddTime,5,0,-1"
@@ -11772,7 +11774,7 @@ entity
 	"classname" "game_text_tf"
 	"background" "0"
 	"display_to_team" "0"
-	"message" "Hey look, the map noticed that intermission has started!"
+	"message" "Hey look, the map noticed that intermission has started."
 	"targetname" "txt_intermission"
 	"origin" "-91 -27.7939 24.3155"
 	editor
@@ -12874,6 +12876,44 @@ entity
 		"visgroupautoshown" "1"
 		"comments" "Example entity that appears when red team wins. For more info, check out the game_round_win near the Payload cart."
 		"logicalpos" "[0 11000]"
+	}
+}
+entity
+{
+	"id" "7596"
+	"classname" "game_text_tf"
+	"background" "0"
+	"display_to_team" "0"
+	"message" "We're on STT and not Payload, cool!"
+	"targetname" "txt_game_is_stt"
+	"origin" "-91 -28 42"
+	editor
+	{
+		"color" "220 30 220"
+		"visgroupshown" "1"
+		"visgroupautoshown" "1"
+		"comments" "Example entity that displays text when STT is being played. Check out the associated relay for more info."
+		"logicalpos" "[0 3000]"
+	}
+}
+entity
+{
+	"id" "7610"
+	"classname" "logic_relay"
+	"spawnflags" "0"
+	"targetname" "stt_is_enabled"
+	connections
+	{
+		"OnTrigger" "txt_game_is_stt,Display,,0,-1"
+	}
+	"origin" "-174.146 -104 36"
+	editor
+	{
+		"color" "220 30 220"
+		"visgroupshown" "1"
+		"visgroupautoshown" "1"
+		"comments" "This relay is triggered if the game is STT and not PL / PLR. "
+		"logicalpos" "[0 3500]"
 	}
 }
 cameras
