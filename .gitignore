@@ -1,13 +1,3 @@
-# Compiled Object files
-*.slo
-*.lo
-*.o
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-
 Debug*/
 Release*/
 *.suo
