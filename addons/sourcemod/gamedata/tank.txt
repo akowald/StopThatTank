@@ -1,0 +1,339 @@
+"Games"
+{
+	"tf"
+	{
+		"Signatures"
+		{
+			"CTFGameRules::GameModeUsesUpgrades"
+			{
+				"library"		"server"
+				"linux"		"@_ZN12CTFGameRules20GameModeUsesUpgradesEv"
+				"windows"		"\x80\xB9\x2A\x2A\x2A\x2A\x00\x0F\x95\xC0\xC3\xCC\xCC\xCC\xCC\xCC"
+			}
+			"CPathTrack::InputPass"
+			{
+				"library"		"server"
+				"linux"		"@_ZN10CPathTrack9InputPassER11inputdata_t"
+				"windows"		"\x55\x8B\xEC\x8B\x45\x08\xD9\xEE\x56\x57\x51\x8B\xF9\xD9\x1C"
+			}
+			"CTFTankBoss::SetStartingPathTrackNode"
+			{
+				"library"		"server"
+				"linux"		"@_ZN11CTFTankBoss24SetStartingPathTrackNodeEPc"
+				"windows"		"\x55\x8B\xEC\x56\x6A\x00\x68\x2A\x2A\x2A\x2A\x68\x2A\x2A\x2A\x2A\x6A\x00\x6A\x00\x6A\x00"
+			}
+			"CBaseEntity::SetSize"
+			{
+				"library"		"server"
+				"linux"		"@_ZN11CBaseEntity7SetSizeERK6VectorS2_"
+				"windows"		"\x55\x8B\xEC\xFF\x75\x0C\xFF\x75\x08\x51\xE8\x2A\x2A\x2A\x2A\x83\xC4\x2A\x5D\xC2\x08\x00"
+			}
+			"GetItemSchema"
+			{
+				"library"		"server"
+				"linux"		"@_Z13GetItemSchemav"
+				"windows"		"\xA1\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\x56\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x8B\xF0\x83\xC4\x04"
+			}
+			"CEconItemSchema::GetAttributeDefinition"
+			{
+				"library"		"server"
+				"linux"		"@_ZN15CEconItemSchema22GetAttributeDefinitionEi"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x2A\x53\x56\x8B\xD9\x8D\x4D\x2A\x57\xE8\x2A\x2A\x2A\x2A\x8B\x45\x08\x8D\x8B"
+			}
+			"CEconItemSchema::GetAttributeDefinitionByName"
+			{
+				"library"		"server"
+				"linux"		"@_ZN15CEconItemSchema28GetAttributeDefinitionByNameEPKc"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x1C\x53\x8B\xD9\x8B\x0D\x2A\x2A\x2A\x2A\x56\x33\xF6\x89\x5D\xF8\x89\x75\xE4\x89\x75\xE8"
+			}
+			"CAttributeList::SetRuntimeAttributeValue"
+			{
+				"library"		"server"
+				"linux"		"@_ZN14CAttributeList24SetRuntimeAttributeValueEPK28CEconItemAttributeDefinitionf"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x2A\x33\xD2\x53\x8B\xD9\x56\x57\x8B\x73\x2A\x85\xF6\x7E\x2A\x8B\x4D"
+			}
+			"CAttributeList::RemoveAttribute"
+			{
+				"library"		"server"
+				"linux"		"@_ZN14CAttributeList15RemoveAttributeEPK28CEconItemAttributeDefinition"
+				"windows"		"\x55\x8B\xEC\x51\x53\x8B\xD9\x56\x33\xF6\x8B\x43\x2A\x89\x45\x2A\x85\xC0\x7E\x2A\x57\x33\xFF"
+			}
+			"CAttributeManager::ClearCache"
+			{
+				"library"		"server"
+				"linux"		"@_ZN17CAttributeManager10ClearCacheEv"
+				"windows"		"\x55\x8B\xEC\x51\x56\x8B\xF1\x80\x7E\x2A\x00\x0F\x85\x2A\x2A\x2A\x2A\xC7\x46\x2A\x2A\x2A\x2A\x00\x83\x7E\x50\x00"
+			}
+			"CTFPlayer::PlaySpecificSequence"
+			{
+				"library"		"server"
+				"linux"		"@_ZN9CTFPlayer20PlaySpecificSequenceEPKc"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x30\x53\x56\x8B\x75\x08\x57\x56\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x8B\xD8\x83\xFB\xFF\x74\x2A\x8B\x35\x2A\x2A\x2A\x2A\x8B\xCE\x8B\x16\xFF\x52\x2A\x8B\x8F\x2A\x2A\x2A\x2A\x53\x6A\x13\x8B\x01\xFF\x50"
+			}
+			"CTFPlayer::GetEquippedWearableForLoadoutSlot"
+			{
+				"library"		"server"
+				"linux"		"@_ZN9CTFPlayer33GetEquippedWearableForLoadoutSlotEi"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x2A\x8B\xC1\x53\x56\x33\xF6\x89\x45\xF8\x8B\x88\x2A\x2A\x2A\x2A\x57\x89\x4D\xFC"
+			}
+			"CTFPlayer::GetMaxHealth"
+			{
+				"library"		"server"
+				"linux"		"@_ZNK9CTFPlayer12GetMaxHealthEv"
+				"windows"		"\x56\x8B\xF1\xE8\x2A\x2A\x2A\x2A\x6A\x01\x6A\x00\x56\x68\x2A\x2A\x2A\x2A\x50\xE8"
+			}
+			"CTFPlayer::GetMaxAmmo"
+			{
+				"library"		"server"
+				"linux"		"@_ZN9CTFPlayer10GetMaxAmmoEii"
+				"windows"		"\x55\x8B\xEC\x8B\x45\x0C\x56\x57\x8B\xF9\x83\xF8\xFF\x75\x2A\xFF\xB7"
+			}
+			"CBaseTrigger::PointIsWithin"
+			{
+				"library"		"server"
+				"linux"		"@_ZN12CBaseTrigger13PointIsWithinERK6Vector"
+				"windows"		"\x53\x8B\xDC\x83\xEC\x2A\x83\xE4\x2A\x83\xC4\x2A\x55\x8B\x6B\x2A\x89\x6C\x2A\x2A\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\x8B\x43\x2A\x56\x50\x8B\xF1"
+			}
+			"CBaseObject::DoQuickBuild"
+			{
+				"library"		"server"
+				"linux"		"@_ZN11CBaseObject12DoQuickBuildEb"
+				"windows"		"\x55\x8B\xEC\x53\x57\x8B\xF9\x80\xBF\x2A\x2A\x2A\x2A\x00\x74\x2A\x8B\x07\xFF\x90"
+			}
+			"CTFPlayer::Taunt"
+			{
+				"library"		"server"
+				"linux"		"@_ZN9CTFPlayer5TauntE8taunts_ti"
+				"windows"		"\x55\x8B\xEC\x81\xEC\xD4\x00\x00\x00\x53\x56\x57\x8B\xF9\xE8"
+			}
+			"CTFPlayerShared::Heal_Radius"
+			{
+				"library"		"server"
+				"linux"		"@_ZN15CTFPlayerShared11Heal_RadiusEb"
+				"windows"		"\x55\x8B\xEC\x80\x7D\x08\x00\x57\x8B\xF9\x74\x2A\xC6\x87\x2A\x2A\x2A\x2A\x01"
+			}
+			"CTFPlayerShared::RecalculateChargeEffects"
+			{
+				"library"		"server"
+				"linux"		"@_ZN15CTFPlayerShared24RecalculateChargeEffectsEb"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x4C\x53\x8B\xD9\xC7\x45\x2A\x2A\x2A\x2A\x00\x56\xC7\x45\x2A\x2A\x2A\x2A\x00\xC7\x45\x2A\x2A\x2A\x2A\x00\x8B\x8B"
+			}
+			"CTFPlayerShared::Heal"
+			{
+				"library"		"server"
+				"linux"		"@_ZN15CTFPlayerShared4HealEP11CBaseEntityfffbP9CTFPlayer"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x28\xF3\x0F\x10\x05\x2A\x2A\x2A\x2A\x53\x56\x8B\x75"
+			}
+			"CTFPlayerShared::FindHealerIndex"
+			{
+				"library"		"server"
+				"linux"		"@_ZN15CTFPlayerShared15FindHealerIndexEP11CBaseEntity"
+				"windows"		"\x55\x8B\xEC\x53\x56\x57\x8B\xB9\x24\x08\x00\x00\x33\xD2"
+			}
+			"CTFGameStats::Event_LevelInit"
+			{
+				"library"		"server"
+				"linux"		"@_ZN12CTFGameStats15Event_LevelInitEv"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x60\x53\x8B\xD9\x56\x57\x8B\x73\x74\x85\xF6\x74"
+			}
+			"CTFGameStats::IncrementStat"
+			{
+				"library"		"server"
+				"linux"		"@_ZN12CTFGameStats13IncrementStatEP9CTFPlayer12TFStatType_ti"
+				"windows"		"\x55\x8B\xEC\x8B\x45\x08\x8B\x40\x18\x85\xC0\x74\x2A\x0F\xBF\x40\x06\xEB\x2A\x33\xC0\x69\xC0\x64\x04\x00\x00\x8D\x91\x94\x00\x00\x00"
+			}
+			"CTFDroppedWeapon::Create"
+			{
+				"library"		"server"
+				"linux"		"@_ZN16CTFDroppedWeapon6CreateEP9CTFPlayerRK6VectorRK6QAnglePKcPK13CEconItemView"
+				"windows"		"\x55\x8B\xEC\xA1\x2A\x2A\x2A\x2A\x83\xEC\x08\x80\xB8\x2A\x2A\x2A\x2A\x00\x74\x2A\x33\xC0\x8B\xE5\x5D\xC3"
+			}
+			"CTFPlayer::PickupWeaponFromOther"
+			{
+				"library"		"server"
+				"linux"		"@_ZN9CTFPlayer21PickupWeaponFromOtherEPK16CTFDroppedWeapon"
+				"windows"		"\x55\x8B\xEC\x83\xEC\x2A\x56\x8B\x75\x08\x57\x8B\xF9\x81\xC6\x2A\x2A\x2A\x2A\x75\x2A\x5F\x32\xC0\x5E"
+			}
+			"PassServerEntityFilter"
+			{
+				"library"		"server"
+				"linux"		"@_Z22PassServerEntityFilterPK13IHandleEntityS1_"
+				"windows"		"\x55\x8B\xEC\x56\x8B\x75\x0C\x85\xF6\x75\x2A\xB0\x01\x5E\x5D\xC3"
+			}
+			"Patch_PhysicsSimulate"
+			{
+				"library"		"server"
+				"linux"		"\xE8\x2A\x2A\x2A\x2A\x8D\xB4\x26\x00\x00\x00\x00\x80\x7D\x2A\x00"
+				"windows"		"\xFF\x15\x2A\x2A\x2A\x2A\x83\xC4\x0C\x5F\x5E\x8B\xE5\x5D\xC3"
+			}
+			"Patch_UpgradeHistory"
+			{
+				"library"		"server"
+				"windows"		"\xFF\x90\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x85\xC9\x0F\x84\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0"
+			}
+			"Patch_Knockback"
+			{
+				"library"		"server"
+				"linux"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x89\x1C\x24\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\x55\x0C"
+				"windows"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\xCF"
+			}
+			"Patch_Medigun"
+			{
+				"library"		"server"
+				"linux"		"\x80\xBA\x2A\x2A\x2A\x2A\x00\x0F\x85\x2A\x2A\x2A\x2A\x84\xC0\x0F\x84\x2A\x2A\x2A\x2A\x8B\x55\x08\x89\x14\x24"
+				"windows"		"\x80\xB9\x2A\x2A\x2A\x2A\x00\x75\x2A\x84\xC0\x74\x2A\x8B\xCF\xE8\x2A\x2A\x2A\x2A\x83\xF8\x02"
+			}
+			"Patch_Medigun2"
+			{
+				"library"		"server"
+				"linux"		"\x80\xBA\x2A\x2A\x2A\x2A\x00\x0F\x85\x2A\x2A\x2A\x2A\x84\xC0\x0F\x84\x2A\x2A\x2A\x2A\x31\xD2\x8B\x45\x9C"
+				"windows"		"\x80\xB8\x2A\x2A\x2A\x2A\x00\x75\x2A\x0F\xB6\x45\xB4\x33\xD2\x84\xC9\x0F\x45\xC2\x88\x45\xB4\xFF\x75\xB8"
+			}
+			"Patch_RecomputeInternalData"
+			{
+				"library"		"server"
+				"linux"		"\xE8\x2A\x2A\x2A\x2A\x89\x1C\x24\xE8\x2A\x2A\x2A\x2A\x89\x1C\x24\xE8\x2A\x2A\x2A\x2A\x8B\x83\x2A\x2A\x2A\x2A\x83\xF8\x01\x0F\x86"
+				"windows"		"\xE8\x2A\x2A\x2A\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x8B\x86\x2A\x2A\x2A\x2A\x85\xC0\x74"
+			}
+			"Patch_DisableNavMesh"
+			{
+				"library"		"server"
+				"linux"		"\x80\x7D\x8C\x00\x75\x2A\x3D\xCE\xFA\xED\xFE\x74\x2A\x8D\x85"
+				"windows"		"\x80\x7D\xCC\x00\x0F\x85\x2A\x2A\x2A\x2A\x3D\xCE\xFA\xED\xFE\x0F\x85"
+			}
+		}
+		"Addresses"
+		{
+			"Patch_PhysicsSimulate"
+			{
+				"signature"	"Patch_PhysicsSimulate"
+			}
+			"Patch_UpgradeHistory"
+			{
+				"signature"	"Patch_UpgradeHistory"
+			}
+			"Patch_Knockback"
+			{
+				"signature"	"Patch_Knockback"
+			}
+			"Patch_Medigun"
+			{
+				"signature"	"Patch_Medigun"
+			}
+			"Patch_Medigun2"
+			{
+				"signature"	"Patch_Medigun2"
+			}
+			"Patch_RecomputeInternalData"
+			{
+				"signature"	"Patch_RecomputeInternalData"
+			}
+			"Patch_DisableNavMesh"
+			{
+				"signature"	"Patch_DisableNavMesh"
+			}
+		}
+		"Offsets"
+		{
+			"CTFPlayerShared::m_HealingRadius"
+			{
+				"linux"		"2152"
+				"windows"		"2152"
+			}
+			"Patch_PhysicsSimulate"
+			{
+				"linux"		"5"
+				"windows"		"6"
+			}
+			"Patch_UpgradeHistory"
+			{
+				"windows"		"20"
+			}
+			"Patch_Knockback"
+			{
+				"linux"		"7"
+				"windows"		"7"
+			}
+			"Patch_Medigun"
+			{
+				"linux"		"8"
+				"windows"		"7"
+			}
+			"Patch_Medigun2"
+			{
+				"linux"		"8"
+				"windows"		"7"
+			}
+			"Patch_DisableNavMesh"
+			{
+				"linux"		"4"
+				"windows"		"5"
+			}
+			"Payload_Knockback"
+			{
+				"linux"		"113" // SHORT JNO
+				"windows"		"113" // SHORT JNO
+			}
+			"Payload_Medigun"
+			{
+				"linux"		"129" // NEAR JNO
+				"windows"		"113" // SHORT JNO
+			}
+			"Payload_Medigun2"
+			{
+				"linux"		"129" // NEAR JNO
+				"windows"		"113" // SHORT JNO
+			}
+			"Payload_DisableNavMesh"
+			{
+				"linux"		"113" // SHORT JNO
+				"windows"		"129" // NEAR JNO
+			}
+			"CBaseEntity::GetBaseEntity"
+			{
+				"linux"		"6"
+				"windows"		"5"
+			}
+			"CBaseEntity::ShouldTransmit"
+			{
+				"linux"		"19"
+				"windows"		"18"
+			}
+			"CCaptureFlag::PickUp"
+			{
+				"linux"		"259"
+				"windows"		"221"
+			}
+			"CBasePlayer::EquipWearable"
+			{
+				"linux"		"427"
+				"windows"		"426"
+			}
+			"CBasePlayer::RemoveWearable"
+			{
+				"linux"		"428"
+				"windows"		"427"
+			}
+			"CObjectTeleporter::TeleporterReceive"
+			{
+				"linux"		"407"
+				"windows"		"393"
+			}
+			"CTFWeaponBase::GetMaxClip1"
+			{
+				"linux"		"320"
+				"windows"		"314"
+			}
+			"CAttributeManager::OnAttributeValuesChanged"
+			{
+				"linux"		"14"
+				"windows"		"13"
+			}
+			"CTFCompoundBow::LaunchGrenade"
+			{
+				"linux"		"480"
+				"windows"		"470"
+			}
+		}
+	}
+}

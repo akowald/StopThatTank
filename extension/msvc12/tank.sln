@@ -1,0 +1,19 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tank", "tank.vcxproj", "{B3E797CF-4E77-4C9D-B8A8-7589B6902206}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug - TF2|Win32 = Debug - TF2|Win32
+		Release - TF2|Win32 = Release - TF2|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B3E797CF-4E77-4C9D-B8A8-7589B6902206}.Debug - TF2|Win32.ActiveCfg = Debug - TF2|Win32
+		{B3E797CF-4E77-4C9D-B8A8-7589B6902206}.Debug - TF2|Win32.Build.0 = Debug - TF2|Win32
+		{B3E797CF-4E77-4C9D-B8A8-7589B6902206}.Release - TF2|Win32.ActiveCfg = Release - TF2|Win32
+		{B3E797CF-4E77-4C9D-B8A8-7589B6902206}.Release - TF2|Win32.Build.0 = Release - TF2|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
