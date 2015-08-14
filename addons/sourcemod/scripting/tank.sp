@@ -41,7 +41,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.3"
+#define PLUGIN_VERSION 				"1.3.1"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -489,6 +489,7 @@ Handle g_hCvarLavaPush;
 Handle g_hCvarUpdatesPanel;
 Handle g_hCvarOfficialServer;
 Handle g_hCvarNavMesh;
+Handle g_hCvarTags;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -710,6 +711,7 @@ Handle g_hCvarTournament;
 Handle g_cvar_redTeamName;
 Handle g_cvar_blueTeamName;
 Handle g_hCvarLOSMode;
+Handle g_cvar_sv_tags;
 // Class restriction global variables
 Handle g_hCvarClassLimits[MAX_TEAMS][10];
 Handle g_hCvarTournamentClassLimits[10];
@@ -990,6 +992,8 @@ public void OnPluginStart()
 {
 	Tank_PrintLicense();
 
+	CreateConVar("tank_version", PLUGIN_VERSION, "Stop that Tank! Version", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+
 	g_hCvarEnabled = CreateConVar("tank_enabled", "1", "0/1 - Enable or disable gamemode.");
 	g_hCvarGameDesc = CreateConVar("tank_game_description", "1", "0/1 - Enable or disable overriding the game description with the SteamTools extension.");
 	g_hCvarMaxSpeed = CreateConVar("tank_speed", "45.0", "The maximum speed (units / second) that the tank can move.");
@@ -1027,6 +1031,7 @@ public void OnPluginStart()
 	g_hCvarLavaPush = CreateConVar("tank_lava_pushup", "600.0", "How much the giant should be boosted if he falls into the lava in helltower.");
 	g_hCvarUpdatesPanel = CreateConVar("tank_updates_panel", "1", "0 - never show updates panel | 1 - only show when requested by !stt in chat | 2 - show when the player first spawns");
 	g_hCvarOfficialServer = CreateConVar("tank_official_server", "0", "This turns on specific messages only for our server.");
+	g_hCvarTags = CreateConVar("tank_sv_tags", "1", "0/1 - Whether or not to attempt to set an 'stt' tag inside of sv_tags.");
 
 	g_hCvarPointsForTank = CreateConVar("tank_points_for_tank", "2", "Scoreboard points awarded when enough damage is done to the tank.");
 	g_hCvarPointsForTankPlr = CreateConVar("tank_points_for_tank_plr", "1", "Scoreboard points awarded when enough damage is done to the tank.");
@@ -1140,6 +1145,7 @@ public void OnPluginStart()
 	g_hCvarTournament = FindConVar("mp_tournament");
 	g_cvar_redTeamName = FindConVar("mp_tournament_redteamname");
 	g_cvar_blueTeamName = FindConVar("mp_tournament_blueteamname");
+	g_cvar_sv_tags = FindConVar("sv_tags");
 	int iFlags = GetConVarFlags(g_hCvarTournament);
 	if(iFlags & FCVAR_NOTIFY) iFlags &= ~(FCVAR_NOTIFY);
 	if(iFlags & FCVAR_REPLICATED) iFlags &= ~(FCVAR_REPLICATED);
@@ -11151,8 +11157,6 @@ public Action Command_MakeGiant(int client, int args)
 {
 	if(!g_bEnabled) return Plugin_Continue;
 
-	if(client < 1 || client > MaxClients || !IsClientInGame(client)) return Plugin_Handled;
-
 	bool bMakeBuster = false;
 	char strCommand[32];
 	GetCmdArg(0, strCommand, sizeof(strCommand)); // The 0 arguement is the command name
@@ -13996,6 +14000,9 @@ void Mod_Toggle(bool enable)
 #endif
 		}
 
+		// Add stt tag to sv_tags.
+		Mod_ToggleTags(true);
+
 		// Set some cvars.
 		// Fixes sentry guns not targeting the tank on stage 2 maps
 		// See: https://github.com/ValveSoftware/source-sdk-2013/blob/master/sp/src/game/server/baseentity.cpp#L2858
@@ -14050,6 +14057,9 @@ void Mod_Toggle(bool enable)
 		LogMessage("Stop that Tank!: Ready");
 	}else{
 		// Disable the mod.
+
+		// Remove stt tag from sv_tags.
+		Mod_ToggleTags(false);
 
 		// Disable memory patches.
 		if(g_patchPhysics != null && g_patchPhysics.isEnabled())
@@ -14176,4 +14186,32 @@ void Mod_DetermineGameMode()
 #if defined DEBUG
 	PrintToServer("(Mod_DetermineGameMode) g_nGameMode = %d!", g_nGameMode);
 #endif
+}
+
+void Mod_ToggleTags(bool enable)
+{
+	if(!GetConVarBool(g_hCvarTags)) return;
+
+	char tags[512];
+	GetConVarString(g_cvar_sv_tags, tags, sizeof(tags));
+	if(enable)
+	{
+		// Stick the stt tag in sv_tags.
+		if(StrContains(tags, "stt") == -1)
+		{
+			// Tag doesn't exist so add it.
+			if(strlen(tags) < sizeof(tags)-6)
+			{
+				Format(tags, sizeof(tags), "%s,stt,", tags);
+				SetConVarString(g_cvar_sv_tags, tags);
+			}
+		}
+	}else{
+		// Make sure stt tag is removed from sv_tags.
+		if(StrContains(tags, "stt") > -1)
+		{
+			ReplaceString(tags, sizeof(tags), "stt", "");
+			SetConVarString(g_cvar_sv_tags, tags);
+		}
+	}
 }
