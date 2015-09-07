@@ -4,6 +4,8 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define REG_EAX			0
 #define REG_ECX			1
@@ -12,8 +14,6 @@
 
 #define IA32_MOV_REG_IMM		0xB8	// encoding is +r <imm32>
 #endif
-
-extern void Msg( const char *, ... );
 
 /**
 * Checks if a call to a fpic thunk has just been written into dest.
@@ -25,9 +25,7 @@ extern void Msg( const char *, ... );
 */
 void check_thunks(unsigned char *dest, unsigned char *pc)
 {
-#if defined WIN32
-	return;
-#else
+#ifndef WIN32
 	/* Step write address back 4 to the start of the function address */
 	unsigned char *writeaddr = dest - 4;
 	unsigned char *calloffset = *(unsigned char **)writeaddr;
@@ -64,7 +62,10 @@ void check_thunks(unsigned char *dest, unsigned char *pc)
 			}
 		default:
 			{
-				Msg("Unknown thunk: %c\n", *(calladdr+1));
+				printf("Unknown thunk: %c\n", *(calladdr+1));
+#ifndef NDEBUG
+				abort();
+#endif
 				break;
 			}
 		}
@@ -81,8 +82,6 @@ void check_thunks(unsigned char *dest, unsigned char *pc)
 		*(void **)writeaddr = (void *)pc;
 		writeaddr += 4;
 	}
-
-	return;
 #endif
 }
 
@@ -157,9 +156,9 @@ int copy_bytes(unsigned char *func, unsigned char* dest, int required_len) {
 		else if(!twoByte)
 		{
 			if((opcode & 0xC4) == 0x00 ||
-			   (opcode & 0xF4) == 0x60 && ((opcode & 0x0A) == 0x02 || (opcode & 0x09) == 0x09) ||
+			   ((opcode & 0xF4) == 0x60 && ((opcode & 0x0A) == 0x02 || (opcode & 0x09) == 0x09)) ||
 			   (opcode & 0xF0) == 0x80 ||
-			   (opcode & 0xF8) == 0xC0 && (opcode & 0x0E) != 0x02 ||
+			   ((opcode & 0xF8) == 0xC0 && (opcode & 0x0E) != 0x02) ||
 			   (opcode & 0xFC) == 0xD0 ||
 			   (opcode & 0xF6) == 0xF6)
 			{
@@ -170,11 +169,11 @@ int copy_bytes(unsigned char *func, unsigned char* dest, int required_len) {
 		}
 		else
 		{
-			if((opcode & 0xF0) == 0x00 && (opcode & 0x0F) >= 0x04 && (opcode & 0x0D) != 0x0D ||
+			if(((opcode & 0xF0) == 0x00 && (opcode & 0x0F) >= 0x04 && (opcode & 0x0D) != 0x0D) ||
 			   (opcode & 0xF0) == 0x30 ||
 			   opcode == 0x77 ||
 			   (opcode & 0xF0) == 0x80 ||
-			   (opcode & 0xF0) == 0xA0 && (opcode & 0x07) <= 0x02 ||
+			   ((opcode & 0xF0) == 0xA0 && (opcode & 0x07) <= 0x02) ||
 			   (opcode & 0xF8) == 0xC8)
 			{
 				// No mod R/M byte
@@ -250,7 +249,7 @@ int copy_bytes(unsigned char *func, unsigned char* dest, int required_len) {
 			   (opcode & 0xFE) == 0xD4 ||   // AAD/AAM
 			   (opcode & 0xF8) == 0xE0 ||   // LOOP/JCXZ
 			   opcode == 0xEB ||
-			   opcode == 0xF6 && (modRM & 0x30) == 0x00)   // TEST
+			   (opcode == 0xF6 && (modRM & 0x30) == 0x00))   // TEST
 			{
 				if (dest)
 					*dest++ = *func++;
@@ -275,7 +274,7 @@ int copy_bytes(unsigned char *func, unsigned char* dest, int required_len) {
 					(opcode & 0xFC) == 0xA0 ||
 					(opcode & 0xEE) == 0xA8 ||
 					opcode == 0xC7 ||
-					opcode == 0xF7 && (modRM & 0x30) == 0x00)
+					(opcode == 0xF7 && (modRM & 0x30) == 0x00))
 			{
 				if (dest) {
 					//Fix CALL/JMP offset
@@ -370,7 +369,7 @@ void* eval_jump(void* src) {
 	else if (addr[0] == OP_JMP_BYTE) {
 		addr = &addr[OP_JMP_BYTE_SIZE] + *(char*)&addr[1];
 		//mangled 32bit jump?
-		if (addr[0] = OP_JMP) {
+		if (addr[0] == OP_JMP) {
 			addr = addr + *(int*)&addr[1];
 		}
 		return addr;

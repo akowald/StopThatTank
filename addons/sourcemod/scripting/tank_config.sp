@@ -33,7 +33,6 @@
 #define MAXLEN_CHAT_TIP 192
 #define MAXLEN_CART_PATH 256
 #define MAXLEN_LASTGIANT 32
-#define ARRAY_PARENT_SIZE 3
 
 ArrayList g_chatTips;
 ArrayList g_cartModels;
@@ -50,6 +49,17 @@ enum
 	ParentArray_Team,
 	ParentArray_Location,
 };
+#define ARRAY_PARENT_SIZE 3
+
+ArrayList g_giantSpawns;
+enum
+{
+	GiantSpawnArray_Team=0,
+	GiantSpawnArray_PointIndex,
+	GiantSpawnArray_Origin,
+	GiantSpawnArray_Angles=5,
+};
+#define ARRAY_GIANTSPAWN_SIZE 8
 
 methodmap BlockedCosmetics < StringMap
 {
@@ -211,10 +221,11 @@ methodmap Config < StringMap
 		g_chatTips.Clear(); // Clear the list of chat tips
 		g_parentList.Clear(); // Clear the tank parenting settings.
 		g_cartModels.Clear(); // Clear the list of cart models.
+		g_giantSpawns.Clear(); // Clear the list of giant spawn overrides.
 
 		char configPath[PLATFORM_MAX_PATH];
-		char map[MAXLEN_CONFIG_VALUE];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 
 		// See if a map specific config file is present and load that first.
 		BuildPath(Path_SM, configPath, sizeof(configPath), "configs/stt/maps/%s.cfg", map);
@@ -240,7 +251,7 @@ methodmap Config < StringMap
 			delete kv;
 		}
 
-		// Read the config file / insert values into the hash table.
+		// Read the config file and insert values into the hash table.
 		BuildPath(Path_SM, configPath, sizeof(configPath), FILE_STT_CONFIG);
 		if(!FileExists(configPath))
 		{
@@ -368,8 +379,8 @@ methodmap Config < StringMap
 	{
 		// Read the config file and spawn any props into the world.
 		char configPath[PLATFORM_MAX_PATH];
-		char map[MAXLEN_CONFIG_VALUE];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 
 		// See if a map specific config file is present and load that first.
 		BuildPath(Path_SM, configPath, sizeof(configPath), "configs/stt/maps/%s.cfg", map);
@@ -414,6 +425,33 @@ methodmap Config < StringMap
 
 		delete kv;
 	}
+
+	/**
+	 * Confirms that a section matches the given pattern from the config file.
+	 * 
+	 * @param str 		The string to check the pattern on.
+	 * @param pattern 	The given pattern from the config file. Patterns that start with @ will be considered a regular expression.
+	 * @return 			True if the pattern matches, false otherwise.
+	 */
+	public bool matchesSection(const char[] str, const char[] pattern)
+	{
+		if(pattern[0] == '\0') return false; // Empty section name.
+
+		if(pattern[0] == '@' && pattern[1] != '\0') // Regex pattern passed.
+		{
+			char error[32];
+			int result = SimpleRegexMatch(str, pattern[1], 0, error, sizeof(error));
+			if(result == -1)
+			{
+				LogMessage("Failed to parse regular expression: \"%s\". Error: %s", pattern[1], error);
+				return false;
+			}
+
+			return (result > 0);
+		}
+
+		return (strcmp(str, pattern, false) == 0);
+	}
 };
 Config config = null;
 
@@ -427,152 +465,201 @@ Config config = null;
  */
 public void Config_LoadSection(KeyValues kv, const char[] sectionName, const char[] fileName, bool trusted)
 {
-	char bufferName[MAXLEN_CONFIG_VALUE];
-	char bufferValue[MAXLEN_CONFIG_VALUE];
-	if(kv.JumpToKey(sectionName, false))
+
+	// Loop through all the keys and check if they match sectionName.
+	if(kv.GotoFirstSubKey(false))
 	{
-		if(kv.GotoFirstSubKey(false))
+		char bufferName[MAXLEN_CONFIG_VALUE];
+		char bufferValue[MAXLEN_CONFIG_VALUE];		
+
+		do
 		{
-			do
+			kv.GetSectionName(bufferName, sizeof(bufferName));
+			//PrintToServer("Comparing \"%s\" to \"%s\"..", sectionName, bufferName);
+			if(config.matchesSection(sectionName, bufferName))
 			{
-				kv.GetSectionName(bufferName, sizeof(bufferName));
-				kv.GetString(NULL_STRING, bufferValue, sizeof(bufferValue));
-
-				if(strcmp(bufferName, "props") == 0) // The prop section is reserved.
-				{
-					continue;
-				}
-
-				if(strncmp(bufferName, "start:", 6) == 0 || strncmp(bufferName, "end:", 4) == 0) // The matches for the start or end goal node can be ignored
-				{
-					continue;
-				}
-
-				if(strncmp(bufferName, "parent", 6, false) == 0) // User wants to specify tank parenting information.
-				{
-					int team = 0; // any team
-					if(StrContains(bufferName, "_red", false) != -1) team = TFTeam_Red;
-					else if(StrContains(bufferName, "_blu", false) != -1) team = TFTeam_Blue;
-
-					if(kv.GotoFirstSubKey(false))
-					{
-						do
-						{
-							kv.GetSectionName(bufferName, sizeof(bufferName));
-
-							int parent[ARRAY_PARENT_SIZE];
-							parent[ParentArray_Type] = -1;
-							
-							float location = -1.0;
-							if(strcmp(bufferName, "start", false) == 0)
-							{
-								parent[ParentArray_Type] = ParentType_Start;
-							}else if(strcmp(bufferName, "end", false) == 0)
-							{
-								parent[ParentArray_Type] = ParentType_End;
-							}
-							location = kv.GetFloat(NULL_STRING, -1.0);
-
-							if(parent[ParentArray_Type] == -1)
-							{
-								LogMessage("Malformed parent type \"%s\". Use either \"start\" or \"stop\"!", bufferName);
-							}else if(location < 0.0 || location > 1.0)
-							{
-								LogMessage("Malformed parent location \"%f\". Specify a value between 0.0 and 1.0!", location);
-							}else{
-								parent[ParentArray_Location] = view_as<int>(location);
-								parent[ParentArray_Team] = team;
-
-								if(team == 0)
-								{
-									parent[ParentArray_Team] = TFTeam_Red;
-									g_parentList.PushArray(parent, ARRAY_PARENT_SIZE);
-									parent[ParentArray_Team] = TFTeam_Blue;
-									g_parentList.PushArray(parent, ARRAY_PARENT_SIZE);
-								}else{
-									g_parentList.PushArray(parent, ARRAY_PARENT_SIZE);
-								}
-							}
-						}while(kv.GotoNextKey(false));
-
-						kv.GoBack();
 #if defined DEBUG
-						PrintToServer("(Config_LoadSection) Size of parent config = %d", g_parentList.Length);
+				PrintToServer("(Config_LoadSection) \"%s\" matches \"%s\"!", sectionName, bufferName);
 #endif
-					}
-
-					continue;
-				}
-
-				if(strcmp(bufferName, "cvar", false) == 0) // User wants to specify a cvar value change.
+				if(kv.GotoFirstSubKey(false))
 				{
-					if(!trusted)
+					do
 					{
-						LogMessage("Failed to load cvar in %s: section (%s): No cvars can be set in map config files.", fileName, sectionName);
-						continue;
-					}
+						kv.GetSectionName(bufferName, sizeof(bufferName));
+						kv.GetString(NULL_STRING, bufferValue, sizeof(bufferValue));
+						//PrintToServer("     Encountered: \"%s\"", bufferName);
 
-					char explode[2][128];
-					if(ExplodeString(bufferValue, ":", explode, sizeof(explode), sizeof(explode[]), true) == sizeof(explode))
-					{
-						ConVar cvar = FindConVar(explode[0]);
-						if(cvar != null)
+						if(strcmp(bufferName, "props", false) == 0) // The prop section is reserved.
 						{
-							if(strcmp(explode[1], "default", false) == 0)
-							{
-								// Substitute the default value of the convar.
-								cvar.GetDefault(explode[1], sizeof(explode[]));
-							}
-
-							cvar.SetString(explode[1], true, true);
-#if defined DEBUG
-							PrintToServer("(Config_LoadSection) ConVar(%s) => \"%s\"", explode[0], explode[1]);
-#endif
-						}else{
-							LogMessage("Failed to find cvar \"%s\" in %s: section (%s)!", explode[0], fileName, sectionName);
+							continue;
 						}
-					}else{
-						LogMessage("Malformed cvar value \"%s\" in %s: section (%s)!", explode[1], fileName, sectionName);
-					}
-					
-					continue;
-				}
 
-				if(bufferName[0] == '\0' || bufferValue[0] == '\0')
-				{
-					LogMessage("Blank config name or value in %s: section (%s)!", fileName, sectionName);
-					continue;
-				}
+						if(strncmp(bufferName, "start:", 6, false) == 0 || strncmp(bufferName, "end:", 4, false) == 0) // The matches for the start or end goal node can be ignored
+						{
+							continue;
+						}
+
+						if(strncmp(bufferName, "parent", 6, false) == 0) // User wants to specify tank parenting information.
+						{
+							int team = 0; // any team
+							if(StrContains(bufferName, "_red", false) != -1) team = TFTeam_Red;
+							else if(StrContains(bufferName, "_blu", false) != -1) team = TFTeam_Blue;
+
+							if(kv.GotoFirstSubKey(false))
+							{
+								do
+								{
+									kv.GetSectionName(bufferName, sizeof(bufferName));
+
+									int parent[ARRAY_PARENT_SIZE];
+									parent[ParentArray_Type] = -1;
+									
+									float location = -1.0;
+									if(strcmp(bufferName, "start", false) == 0)
+									{
+										parent[ParentArray_Type] = ParentType_Start;
+									}else if(strcmp(bufferName, "end", false) == 0)
+									{
+										parent[ParentArray_Type] = ParentType_End;
+									}
+									location = kv.GetFloat(NULL_STRING, -1.0);
+
+									if(parent[ParentArray_Type] == -1)
+									{
+										LogMessage("Config error. Section \"%s\": Malformed parent type \"%s\". Use either \"start\" or \"stop\"!", sectionName, bufferName);
+									}else if(location < 0.0 || location > 1.0)
+									{
+										LogMessage("Config error. Section \"%s\": Malformed parent location \"%f\". Specify a value between 0.0 and 1.0!", sectionName, location);
+									}else{
+										parent[ParentArray_Location] = view_as<int>(location);
+										parent[ParentArray_Team] = team;
+
+										if(team == 0)
+										{
+											parent[ParentArray_Team] = TFTeam_Red;
+											g_parentList.PushArray(parent, ARRAY_PARENT_SIZE);
+											parent[ParentArray_Team] = TFTeam_Blue;
+											g_parentList.PushArray(parent, ARRAY_PARENT_SIZE);
+										}else{
+											g_parentList.PushArray(parent, ARRAY_PARENT_SIZE);
+										}
+									}
+								}while(kv.GotoNextKey(false));
+
+								kv.GoBack();
+#if defined DEBUG
+								PrintToServer("(Config_LoadSection) Size of parent config = %d", g_parentList.Length);
+#endif
+							}
+
+							continue;
+						}
+
+						if(strncmp(bufferName, "giant_spawn", 11, false) == 0) // User wants to override a giant spawn.
+						{
+							int team = 0; // any team
+							if(StrContains(bufferName, "_red", false) != -1) team = TFTeam_Red;
+							else if(StrContains(bufferName, "_blu", false) != -1) team = TFTeam_Blue;
+
+							int index = kv.GetNum("index", -2);
+							if(index < -1 || index > MAX_LINKS)
+							{
+								LogMessage("Config error. Section \"%s\": Malformed giant spawn index. Use a value between -1 and %d (inclusive).", sectionName, MAX_LINKS);
+								continue;
+							}
+
+							float pos[3];
+							float ang[3];
+							kv.GetVector("origin", pos);
+							kv.GetVector("angle", ang);
+
+							int giantSpawn[ARRAY_GIANTSPAWN_SIZE];
+							giantSpawn[GiantSpawnArray_Team] = team;
+							giantSpawn[GiantSpawnArray_PointIndex] = index;
+							for(int i=0; i<3; i++)
+							{
+								giantSpawn[GiantSpawnArray_Origin+i] = view_as<int>(pos[i]);
+								giantSpawn[GiantSpawnArray_Angles+i] = view_as<int>(ang[i]);
+							}
+
+							g_giantSpawns.PushArray(giantSpawn, sizeof(giantSpawn));
+#if defined DEBUG
+							PrintToServer("(Config_LoadSection) Added giant spawn, team = %d, index = %d. Length so far = %d!", team, index, g_giantSpawns.Length);
+#endif
+							continue;
+						}
+
+						if(strcmp(bufferName, "cvar", false) == 0) // User wants to specify a cvar value change.
+						{
+							if(!trusted)
+							{
+								LogMessage("Config error. Section \"%s\": Failed to load cvar. No cvars can be set in map config files.", sectionName);
+								continue;
+							}
+
+							char explode[2][128];
+							if(ExplodeString(bufferValue, ":", explode, sizeof(explode), sizeof(explode[]), true) == sizeof(explode))
+							{
+								ConVar cvar = FindConVar(explode[0]);
+								if(cvar != null)
+								{
+									if(strcmp(explode[1], "default", false) == 0)
+									{
+										// Substitute the default value of the convar.
+										cvar.GetDefault(explode[1], sizeof(explode[]));
+									}
+
+									cvar.SetString(explode[1], true, true);
+#if defined DEBUG
+									PrintToServer("(Config_LoadSection) ConVar(%s) => \"%s\"", explode[0], explode[1]);
+#endif
+								}else{
+									LogMessage("Config error. Section \"%s\": Failed to find cvar \"%s\"!", sectionName, explode[0]);
+								}
+							}else{
+								LogMessage("Config error. Section \"%s\": Malformed cvar value \"%s\"!", sectionName, explode[1]);
+							}
+							
+							continue;
+						}
+
+						if(bufferName[0] == '\0' || bufferValue[0] == '\0')
+						{
+							LogMessage("Config error. Section \"%s\": Blank config name or value!", sectionName);
+							continue;
+						}
 
 #if defined DEBUG
-				PrintToServer("(Config_LoadSection) %s => %s", bufferName, bufferValue);
+						PrintToServer("(Config_LoadSection) %s => %s", bufferName, bufferValue);
 #endif
-				config.SetString(bufferName, bufferValue, true);
-			}while(kv.GotoNextKey(false));
+						config.SetString(bufferName, bufferValue, true);
+					}while(kv.GotoNextKey(false));
 
-			kv.GoBack();
+					kv.GoBack();
 
-			// Match for the start or end path_track node for stage-specific config values
-			char match[256];
-			for(int team=2; team<=3; team++)
-			{
-				int pathStart = EntRefToEntIndex(g_iRefPathStart[team]);
-				if(pathStart > MaxClients)
-				{
-					GetEntPropString(pathStart, Prop_Data, "m_iName", match, sizeof(match));
-					Format(match, sizeof(match), "start:%s", match);
-					Config_LoadSection(kv, match, fileName, trusted);
-				}
+					// Match for the start or end path_track node for stage-specific config values
+					char match[256];
+					for(int team=2; team<=3; team++)
+					{
+						int pathStart = EntRefToEntIndex(g_iRefPathStart[team]);
+						if(pathStart > MaxClients)
+						{
+							GetEntPropString(pathStart, Prop_Data, "m_iName", match, sizeof(match));
+							Format(match, sizeof(match), "start:%s", match);
+							Config_LoadSection(kv, match, fileName, trusted);
+						}
 
-				int pathEnd = EntRefToEntIndex(g_iRefPathGoal[team]);
-				if(pathEnd > MaxClients)
-				{
-					GetEntPropString(pathEnd, Prop_Data, "m_iName", match, sizeof(match));
-					Format(match, sizeof(match), "end:%s", match);
-					Config_LoadSection(kv, match, fileName, trusted);						
+						int pathEnd = EntRefToEntIndex(g_iRefPathGoal[team]);
+						if(pathEnd > MaxClients)
+						{
+							GetEntPropString(pathEnd, Prop_Data, "m_iName", match, sizeof(match));
+							Format(match, sizeof(match), "end:%s", match);
+							Config_LoadSection(kv, match, fileName, trusted);						
+						}
+					}
 				}
 			}
-		}
+		}while(kv.GotoNextKey(false));
 
 		kv.GoBack();
 	}
@@ -587,87 +674,100 @@ public void Config_LoadSection(KeyValues kv, const char[] sectionName, const cha
 */
 public void Config_LoadPropSection(KeyValues kv, const char[] sectionName)
 {
-	char bufferName[MAXLEN_CONFIG_VALUE];
-	if(kv.JumpToKey(sectionName, false))
+	// Loop through all the keys and check if they match sectionName.
+	if(kv.GotoFirstSubKey(false))
 	{
-		// See if the map config has custom props
-		if(kv.JumpToKey("props", false))
+		char bufferName[MAXLEN_CONFIG_VALUE];
+
+		do
 		{
-			if(kv.GotoFirstSubKey(false))
+			kv.GetSectionName(bufferName, sizeof(bufferName));
+			//PrintToServer("Comparing \"%s\" to \"%s\"..", sectionName, bufferName);
+			if(config.matchesSection(sectionName, bufferName))
 			{
-				int numProps = 0;
-				do
-				{
-					// Get model to spawn
-					kv.GetString("model", bufferName, sizeof(bufferName), "");
-					if(bufferName[0] == '\0' || !FileExists(bufferName, true))
-					{
-						LogMessage("Missing model name in section (%s): %s", sectionName, bufferName);
-						continue;
-					}
-
-					if(!IsModelPrecached(bufferName) && PrecacheModel(bufferName) == 0)
-					{
-						LogMessage("Failed to precache model: %s", bufferName);
-						continue;				
-					}
-
-					// Get origin and angles
-					float origin[3];
-					float angles[3];
-					char skin[12];
-					kv.GetVector("origin", origin, NULL_VECTOR);
-					kv.GetVector("angle", angles, NULL_VECTOR);
-					kv.GetString("skin", skin, sizeof(skin), "-1");
-
-					// Spawn the prop
-					int prop = CreateEntityByName("prop_dynamic");
-					if(prop > MaxClients)
-					{
-						DispatchKeyValue(prop, "model", bufferName);
-						DispatchKeyValue(prop, "solid", "6");
-						if(strcmp(skin, "-1") != 0) DispatchKeyValue(prop, "skin", skin);
-
-						DispatchSpawn(prop);
-						AcceptEntityInput(prop, "TurnOn");
-
-						TeleportEntity(prop, origin, angles, NULL_VECTOR);
 #if defined DEBUG
-						PrintToServer("(loadSection) Spawned map prop: %s", bufferName);
+				PrintToServer("(Config_LoadPropSection) \"%s\" matches \"%s\"!", sectionName, bufferName);
 #endif
-						numProps++;
+				// See if the map config has custom props
+				if(kv.JumpToKey("props", false))
+				{
+					if(kv.GotoFirstSubKey(false))
+					{
+						int numProps = 0;
+						do
+						{
+							// Get model to spawn
+							kv.GetString("model", bufferName, sizeof(bufferName), "");
+							if(bufferName[0] == '\0' || !FileExists(bufferName, true))
+							{
+								LogMessage("Missing model name in section (%s): %s", sectionName, bufferName);
+								continue;
+							}
+
+							if(!IsModelPrecached(bufferName) && PrecacheModel(bufferName) == 0)
+							{
+								LogMessage("Failed to precache model: %s", bufferName);
+								continue;				
+							}
+
+							// Get origin and angles
+							float origin[3];
+							float angles[3];
+							char skin[12];
+							kv.GetVector("origin", origin, NULL_VECTOR);
+							kv.GetVector("angle", angles, NULL_VECTOR);
+							kv.GetString("skin", skin, sizeof(skin), "-1");
+
+							// Spawn the prop
+							int prop = CreateEntityByName("prop_dynamic");
+							if(prop > MaxClients)
+							{
+								DispatchKeyValue(prop, "model", bufferName);
+								DispatchKeyValue(prop, "solid", "6");
+								if(strcmp(skin, "-1") != 0) DispatchKeyValue(prop, "skin", skin);
+
+								DispatchSpawn(prop);
+								AcceptEntityInput(prop, "TurnOn");
+
+								TeleportEntity(prop, origin, angles, NULL_VECTOR);
+#if defined DEBUG
+								PrintToServer("(Config_LoadPropSection) Spawned map prop: %s", bufferName);
+#endif
+								numProps++;
+							}
+
+						}while(kv.GotoNextKey(true));
+
+						LogMessage("Spawned %d prop(s) set by config file.", numProps);
+
+						kv.GoBack();
 					}
 
-				}while(kv.GotoNextKey(true));
+					kv.GoBack();
+				}
 
-				LogMessage("Spawned %d prop(s) set by config file.", numProps);
+				// Match for the start or end path_track node for stage-specific config values
+				char match[256];
+				for(int team=2; team<=3; team++)
+				{
+					int pathStart = EntRefToEntIndex(g_iRefPathStart[team]);
+					if(pathStart > MaxClients)
+					{
+						GetEntPropString(pathStart, Prop_Data, "m_iName", match, sizeof(match));
+						Format(match, sizeof(match), "start:%s", match);
+						Config_LoadPropSection(kv, match);
+					}
 
-				kv.GoBack();
+					int pathEnd = EntRefToEntIndex(g_iRefPathGoal[team]);
+					if(pathEnd > MaxClients)
+					{
+						GetEntPropString(pathEnd, Prop_Data, "m_iName", match, sizeof(match));
+						Format(match, sizeof(match), "end:%s", match);
+						Config_LoadPropSection(kv, match);						
+					}
+				}
 			}
-
-			kv.GoBack();
-		}
-
-		// Match for the start or end path_track node for stage-specific config values
-		char match[256];
-		for(int team=2; team<=3; team++)
-		{
-			int pathStart = EntRefToEntIndex(g_iRefPathStart[team]);
-			if(pathStart > MaxClients)
-			{
-				GetEntPropString(pathStart, Prop_Data, "m_iName", match, sizeof(match));
-				Format(match, sizeof(match), "start:%s", match);
-				Config_LoadPropSection(kv, match);
-			}
-
-			int pathEnd = EntRefToEntIndex(g_iRefPathGoal[team]);
-			if(pathEnd > MaxClients)
-			{
-				GetEntPropString(pathEnd, Prop_Data, "m_iName", match, sizeof(match));
-				Format(match, sizeof(match), "end:%s", match);
-				Config_LoadPropSection(kv, match);						
-			}
-		}
+		}while(kv.GotoNextKey(false));
 
 		kv.GoBack();
 	}

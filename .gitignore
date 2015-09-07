@@ -1,8 +1,3 @@
 *.zip
 
-Debug*/
-Release*/
-*.suo
-*.user
-*.sdf
-*.opensdf
+msvc*/

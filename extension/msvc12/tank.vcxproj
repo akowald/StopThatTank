@@ -685,7 +685,7 @@
     <ClCompile>
       <AdditionalOptions>/D SE_EPISODEONE=1 /D SE_DARKMESSIAH=2 /D SE_ORANGEBOX=3 /D SE_BLOODYGOODTIME=4 /D SE_EYE=5 /D SE_CSS=6 /D SE_ORANGEBOXVALVE=7 /D SE_LEFT4DEAD=8 /D SE_LEFT4DEAD2=9 /D SE_ALIENSWARM=10 /D SE_PORTAL2=11 /D SE_CSGO=12</AdditionalOptions>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..;..\sdk;$(SOURCEMOD18)\public;$(SOURCEMOD18)\public\extensions;$(SOURCEPAWN)\include;$(HL2SDKTF2)\public;$(HL2SDKTF2)\public\engine;$(HL2SDKTF2)\public\game\server;$(HL2SDKTF2)\public\tier0;$(HL2SDKTF2)\public\tier1;$(MMSOURCE111)\core;$(MMSOURCE111)\core\sourcehook;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;..\sdk;$(SOURCEMOD17)\public;$(SOURCEMOD17)\public\extensions;$(SOURCEMOD17)\public\sourcepawn;$(HL2SDKTF2)\public;$(HL2SDKTF2)\public\engine;$(HL2SDKTF2)\public\game\server;$(HL2SDKTF2)\public\tier0;$(HL2SDKTF2)\public\tier1;$(MMSOURCE110)\core;$(MMSOURCE110)\core\sourcehook;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;SDK_EXPORTS;_CRT_SECURE_NO_DEPRECATE;SOURCEMOD_BUILD;SOURCE_ENGINE=7;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -713,7 +713,7 @@
     <ClCompile>
       <AdditionalOptions>/MP /D SE_EPISODEONE=1 /D SE_DARKMESSIAH=2 /D SE_ORANGEBOX=3 /D SE_BLOODYGOODTIME=4 /D SE_EYE=5 /D SE_CSS=6 /D SE_ORANGEBOXVALVE=7 /D SE_LEFT4DEAD=8 /D SE_LEFT4DEAD2=9 /D SE_ALIENSWARM=10 /D SE_PORTAL2=11 /D SE_CSGO=12</AdditionalOptions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <AdditionalIncludeDirectories>..;..\sdk;$(SOURCEMOD18)\public;$(SOURCEMOD18)\public\extensions;$(SOURCEMOD18)\sourcepawn\include;$(HL2SDKTF2)\public;$(HL2SDKTF2)\public\engine;$(HL2SDKTF2)\public\game\server;$(HL2SDKTF2)\public\tier0;$(HL2SDKTF2)\public\tier1;$(MMSOURCE111)\core;$(MMSOURCE111)\core\sourcehook;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;..\sdk;$(SOURCEMOD17)\public;$(SOURCEMOD17)\public\extensions;$(SOURCEMOD17)\public\sourcepawn;$(HL2SDKTF2)\public;$(HL2SDKTF2)\public\engine;$(HL2SDKTF2)\public\game\server;$(HL2SDKTF2)\public\tier0;$(HL2SDKTF2)\public\tier1;$(MMSOURCE110)\core;$(MMSOURCE110)\core\sourcehook;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;SDK_EXPORTS;_CRT_SECURE_NO_DEPRECATE;SOURCEMOD_BUILD;SOURCE_ENGINE=7;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>

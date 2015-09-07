@@ -28,12 +28,6 @@
 #error This plugin must be compiled from tank.sp
 #endif
 
-#include <sourcemod>
-#include <tf2>
-#include <tf2_stocks>
-#include <tf2items>
-#include <tank>
-
 #define PATH_GIANT_TEMPLATES 		"configs/stt/giant_robot.cfg"
 #define PATH_GIANT_PLR_TEMPLATES	"configs/stt/giant_robot_plr.cfg"
 
@@ -1121,6 +1115,11 @@ void Giant_Clear(int client, int reason=0)
 		GiantTeleporter_Cleanup(team);
 	}
 
+	if(!(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
+	{
+		Player_RemoveBuildings(client);
+	}
+
 	if(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_MINIGUN_SOUNDS)
 	{
 		EmitSoundToAll("misc/null.wav", client, SNDCHAN_WEAPON);
@@ -1935,7 +1934,7 @@ public Action Timer_ShowHint(Handle timer, any ref)
 {
 	int client = EntRefToEntIndex(ref);
 	if(client >= 1 && client <= MaxClients && IsClientInGame(client) && IsPlayerAlive(client) && g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot
-		&& g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_strGiantHint][0] != '\0' && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+		&& strlen(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_strGiantHint]) > 0 && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 	{
 		Handle hEvent = CreateEvent("show_annotation");
 		if(hEvent != INVALID_HANDLE)
@@ -1961,6 +1960,7 @@ public Action Timer_ShowHint(Handle timer, any ref)
 			
 			SetEventInt(hEvent, "visibilityBitfield", (1 << client)); // Only show to player carrying the bomb
 			SetEventString(hEvent, "text", g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_strGiantHint]);
+
 			SetEventFloat(hEvent, "lifetime", 8.0);
 			SetEventString(hEvent, "play_sound", "misc/null.wav");
 			

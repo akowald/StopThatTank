@@ -1,5 +1,5 @@
 /**
- * vim: set ts=4 :
+ * vim: set ts=4 sw=4 tw=99 noet:
  * =============================================================================
  * SourceMod Base Extension Code
  * Copyright (C) 2004-2008 AlliedModders LLC.  All rights reserved.
@@ -97,9 +97,6 @@ IUserMessages *usermsgs = NULL;
 #if defined SMEXT_ENABLE_TRANSLATOR
 ITranslator *translator = NULL;
 #endif
-#if defined SMEXT_ENABLE_NINVOKE
-INativeInterface *ninvoke = NULL;
-#endif
 #if defined SMEXT_ENABLE_ROOTCONSOLEMENU
 IRootConsole *rootconsole = NULL;
 #endif
@@ -191,9 +188,6 @@ bool SDKExtension::OnExtensionLoad(IExtension *me, IShareSys *sys, char *error, 
 #if defined SMEXT_ENABLE_TRANSLATOR
 	SM_GET_IFACE(TRANSLATOR, translator);
 #endif
-#if defined SMEXT_ENABLE_NINVOKE
-	SM_GET_IFACE(NINVOKE, ninvoke);
-#endif
 #if defined SMEXT_ENABLE_ROOTCONSOLEMENU
 	SM_GET_IFACE(ROOTCONSOLE, rootconsole);
 #endif
@@ -237,6 +231,11 @@ void SDKExtension::OnExtensionUnload()
 	m_WeAreUnloaded = true;
 #endif
 	SDK_OnUnload();
+}
+
+void SDKExtension::OnDependenciesDropped()
+{
+	SDK_OnDependenciesDropped();
 }
 
 const char *SDKExtension::GetExtensionAuthor()
@@ -291,6 +290,10 @@ void SDKExtension::SDK_OnAllLoaded()
 {
 }
 
+void SDKExtension::SDK_OnDependenciesDropped()
+{
+}
+
 #if defined SMEXT_CONF_METAMOD
 
 PluginId g_PLID = 0;						/**< Metamod plugin ID */
@@ -298,8 +301,10 @@ ISmmPlugin *g_PLAPI = NULL;					/**< Metamod plugin API */
 SourceHook::ISourceHook *g_SHPtr = NULL;	/**< SourceHook pointer */
 ISmmAPI *g_SMAPI = NULL;					/**< SourceMM API pointer */
 
+#ifndef META_NO_HL2SDK
 IVEngineServer *engine = NULL;				/**< IVEngineServer pointer */
 IServerGameDLL *gamedll = NULL;				/**< IServerGameDLL pointer */
+#endif
 
 /** Exposes the extension to Metamod */
 SMM_API void *PL_EXPOSURE(const char *name, int *code)
@@ -312,14 +317,14 @@ SMM_API void *PL_EXPOSURE(const char *name, int *code)
 	{
 		if (code)
 		{
-			*code = IFACE_OK;
+			*code = META_IFACE_OK;
 		}
 		return static_cast<void *>(g_pExtensionIface);
 	}
 
 	if (code)
 	{
-		*code = IFACE_FAILED;
+		*code = META_IFACE_FAILED;
 	}
 
 	return NULL;
@@ -329,6 +334,7 @@ bool SDKExtension::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, 
 {
 	PLUGIN_SAVEVARS();
 
+#ifndef META_NO_HL2SDK
 #if !defined METAMOD_PLAPI_VERSION
 	GET_V_IFACE_ANY(serverFactory, gamedll, IServerGameDLL, INTERFACEVERSION_SERVERGAMEDLL);
 	GET_V_IFACE_CURRENT(engineFactory, engine, IVEngineServer, INTERFACEVERSION_VENGINESERVER);
@@ -336,6 +342,7 @@ bool SDKExtension::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, 
 	GET_V_IFACE_ANY(GetServerFactory, gamedll, IServerGameDLL, INTERFACEVERSION_SERVERGAMEDLL);
 	GET_V_IFACE_CURRENT(GetEngineFactory, engine, IVEngineServer, INTERFACEVERSION_VENGINESERVER);
 #endif
+#endif //META_NO_HL2SDK
 
 	m_SourceMMLoaded = true;
 

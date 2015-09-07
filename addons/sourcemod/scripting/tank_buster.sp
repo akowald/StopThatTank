@@ -29,11 +29,6 @@
 #error This plugin must be compiled from tank.sp
 #endif
 
-#include <sourcemod>
-#include <sdktools>
-#include <sdkhooks>
-#include <tank>
-
 enum eSentryVisionStruct
 {
 	Handle:g_hSentryVisionList,			// List of all obj_sentrygun entities that are being watched

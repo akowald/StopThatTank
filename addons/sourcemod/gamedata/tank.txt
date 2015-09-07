@@ -334,6 +334,11 @@
 				"linux"		"480"
 				"windows"		"470"
 			}
+			"CBaseEntity::PhysicsSolidMaskForEntity"
+			{
+				"linux"		"168"
+				"windows"		"167"
+			}
 		}
 	}
 }
