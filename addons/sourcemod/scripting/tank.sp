@@ -9630,15 +9630,25 @@ void Bomb_Think(int iBomb)
 								int path = Entity_FindEntityByName(targetname, "path_track");
 								if(path > MaxClients)
 								{
+									AcceptEntityInput(path, "EnablePath");
 #if defined DEBUG
 									PrintToServer("(Bomb_Think) Teleporting the cart to tank_teleport_goal: \"%s\"!", targetname);
 #endif
 									SetVariantEntity(path);
 									AcceptEntityInput(iTrackTrain, "TeleportToPathTrack");
 
-									// Maps disable paths when control points are captured so the tank can't move backwards past a control point so re-enable them all
-									int iEntity = MaxClients+1;
-									while((iEntity = FindEntityByClassname(iEntity, "path_track")) > MaxClients) AcceptEntityInput(iEntity, "EnablePath");
+									// Enable all path_tracks between here and the goal.
+									int pathGoal = EntRefToEntIndex(g_iRefPathGoal[team]);
+									if(pathGoal > MaxClients)
+									{
+										AcceptEntityInput(pathGoal, "EnablePath");
+
+										int pathNext = path;
+										while((pathNext = GetEntDataEnt2(pathNext, Offset_GetNextOffset(pathNext))) > MaxClients && pathNext != pathGoal)
+										{
+											AcceptEntityInput(pathNext, "EnablePath");
+										}
+									}
 
 									teleportedCart = true;
 								}else{
@@ -9651,19 +9661,18 @@ void Bomb_Think(int iBomb)
 								int pathGoal = EntRefToEntIndex(g_iRefPathGoal[team]);
 								if(pathGoal > MaxClients)
 								{
+									AcceptEntityInput(pathGoal, "EnablePath");
+
 									int pathPrevious = GetEntDataEnt2(pathGoal, Offset_GetPreviousOffset(pathGoal));
 									if(pathPrevious > MaxClients)
 									{
+										AcceptEntityInput(pathPrevious, "EnablePath");
 #if defined DEBUG
 										GetEntPropString(pathPrevious, Prop_Data, "m_iName", targetname, sizeof(targetname));
 										PrintToServer("(Bomb_Think) Teleporting the cart to previous path: \"%s\"!", targetname);
 #endif
 										SetVariantEntity(pathPrevious);
 										AcceptEntityInput(iTrackTrain, "TeleportToPathTrack");
-										
-										// Maps disable paths when control points are captured so the tank can't move backwards past a control point so re-enable them all
-										int iEntity = MaxClients+1;
-										while((iEntity = FindEntityByClassname(iEntity, "path_track")) > MaxClients) AcceptEntityInput(iEntity, "EnablePath");
 									}
 								}
 							}
@@ -14448,7 +14457,7 @@ public MRESReturn CBaseEntity_PhysicsSolidMaskForEntity(int entity, Handle retur
 {
 	// This overridees the default value of: 33570827 or MASK_SOLID -> (CONTENTS_SOLID|CONTENTS_MOVEABLE|CONTENTS_WINDOW|CONTENTS_MONSTER|CONTENTS_GRATE)
 
-	// This prevents tank_boss from blocking other entities with physics based movements: func_tracktrain, func_movelinear, func_door, etc..
+	// This prevents tank_boss from blocking other entities with physics based movement: func_tracktrain, func_movelinear, func_door, etc..
 	DHookSetReturn(returnStruct, CONTENTS_WATER);
 
 	return MRES_Supercede;
