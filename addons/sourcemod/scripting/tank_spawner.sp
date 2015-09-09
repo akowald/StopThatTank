@@ -28,9 +28,6 @@
 #error This plugin must be compiled from tank.sp
 #endif
 
-#include <sourcemod>
-#include <sdktools>
-
 int g_iNumGiantSpawns[MAX_TEAMS][MAX_NUM_TEMPLATES];
 
 void Spawner_Cleanup(int client=-1)
@@ -90,14 +87,63 @@ bool Spawner_HasGiantTag(int client, int iTag)
 	return g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & iTag;
 }
 
+void Spawner_CheckGiantSpawns(int team, int pointIndex, float pos[3], float ang[3])
+{
+	int length = g_giantSpawns.Length;
+	int giantSpawn[ARRAY_GIANTSPAWN_SIZE];
+	for(int i=0; i<length; i++)
+	{
+		g_giantSpawns.GetArray(i, giantSpawn, sizeof(giantSpawn));
+
+		if(giantSpawn[GiantSpawnArray_Team] != 0 && giantSpawn[GiantSpawnArray_Team] != team) continue; // Meant for another team.
+		if(pointIndex != -1 && giantSpawn[GiantSpawnArray_PointIndex] != pointIndex) continue; // Meant for another control point index.
+#if defined DEBUG
+		PrintToServer("(Spawner_CheckGiantSpawns) Overrided with team = %d, index = %d!", giantSpawn[GiantSpawnArray_Team], giantSpawn[GiantSpawnArray_PointIndex]);
+#endif
+		// Override where the giant will spawn.
+		for(int a=0; a<3; a++)
+		{
+			pos[a] = view_as<float>(giantSpawn[GiantSpawnArray_Origin+a]);
+			ang[a] = view_as<float>(giantSpawn[GiantSpawnArray_Angles+a]);
+		}
+
+		return;
+	}
+}
+
 void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 {
-	// Gets the spawn position of the object and saves it for later
+	// Gets the spawn position of the object and saves it for later.
 	int team = GetClientTeam(client);
-	float flPos[3];
-	float flAng[3];
+	float pos[3];
+	float ang[3];
 
-	// Find a spawn position in hell on plr_hightower_event
+	for(int i=0; i<3; i++)
+	{
+		g_nSpawner[client][g_flSpawnerPos][i] = 0.0;
+		g_nSpawner[client][g_flSpawnerAng][i] = 0.0;		
+	}
+
+	// The tank will always spawn where the cart resides.
+	if(spawnType == Spawn_Tank)
+	{
+		int trackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
+		if(trackTrain > MaxClients)
+		{
+			GetEntPropVector(trackTrain, Prop_Send, "m_vecOrigin", pos);
+			GetEntPropVector(trackTrain, Prop_Send, "m_angRotation", ang);
+
+			for(int i=0; i<3; i++)
+			{
+				g_nSpawner[client][g_flSpawnerPos][i] = pos[i];
+				g_nSpawner[client][g_flSpawnerAng][i] = ang[i];
+			}
+		}
+
+		return;
+	}
+
+	// Find a spawn position in hell on plr_hightower_event.
 	if(spawnType == Spawn_GiantRobot && g_nMapHack == MapHack_HightowerEvent && g_hellTeamWinner > 0)
 	{
 		char targetName[32] = "spawn_loot_loser";
@@ -105,7 +151,7 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 
 		if(strcmp(targetName, "spawn_loot_winner") == 0)
 		{
-			// In an effort to give some kind of reward for winning the round, spawn the winning team's giant a little closer to the gate.
+			// In an effort to give some kind of reward for winning the payload race, spawn the winning team's giant a little closer to the gate.
 			g_nSpawner[client][g_flSpawnerPos][0] = -1896.09;
 			g_nSpawner[client][g_flSpawnerPos][1] = -294.79;
 			g_nSpawner[client][g_flSpawnerPos][2] = -8384.29;
@@ -133,138 +179,128 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 			{
 				marker = list.Get(GetRandomInt(0, list.Length-1));
 
-				GetEntPropVector(marker, Prop_Send, "m_vecOrigin", flPos);
-				GetEntPropVector(marker, Prop_Send, "m_angRotation", flAng);
+				GetEntPropVector(marker, Prop_Send, "m_vecOrigin", pos);
+				GetEntPropVector(marker, Prop_Send, "m_angRotation", ang);
 
 				for(int i=0; i<3; i++)
 				{
-					g_nSpawner[client][g_flSpawnerPos][i] = flPos[i];
-					g_nSpawner[client][g_flSpawnerAng][i] = flAng[i];
+					g_nSpawner[client][g_flSpawnerPos][i] = pos[i];
+					g_nSpawner[client][g_flSpawnerAng][i] = ang[i];
 				}
 
 				delete list;
 				return;
 			}
+
+			delete list;
 		}
 	}
 
-	int iTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
-	if(iTrain <= MaxClients) return;
-	if(spawnType == Spawn_Tank)
+	// For the RED team on payload maps:
+	// Go through the control points of the BLUE team sequentially. The first captured control point by the RED team will be chosen.
+	if(g_nGameMode != GameMode_Race && team == TFTeam_Red)
 	{
-		// The tank will always spawn where the cart resides
-		GetEntPropVector(iTrain, Prop_Send, "m_vecOrigin", flPos);
-		GetEntPropVector(iTrain, Prop_Send, "m_angRotation", flAng);
-
-		for(int i=0; i<3; i++)
+		int linkedTeam = TFTeam_Blue;
+		for(int i=0; i<MAX_LINKS; i++)
 		{
-			g_nSpawner[client][g_flSpawnerPos][i] = flPos[i];
-			g_nSpawner[client][g_flSpawnerAng][i] = flAng[i];
-		}
+			if(g_iRefLinkedCPs[linkedTeam][i] == 0 || g_iRefLinkedPaths[linkedTeam][i] == 0) continue; // non-existant
 
-		return;
-	}
+			int controlPoint = EntRefToEntIndex(g_iRefLinkedCPs[linkedTeam][i]);
+			int pathTrack = EntRefToEntIndex(g_iRefLinkedPaths[linkedTeam][i]);
+			if(controlPoint <= MaxClients || pathTrack <= MaxClients) continue;
 
-	// This gets a position on the tracks that takes into account how far the tank has traveled and the distance to the goal
-	// Countdown through control points backwards
-	// The captured point that isn't start or goal AND is more than tank_move_distance is chosen
-	// 0 is the first capture point, the last is the final one (the one that goes boom)
+			if(GetEntProp(controlPoint, Prop_Data, "m_iTeamNum") != team) continue; // Control point isn't owned by the spawning player.
 
-	int iWatcher = EntRefToEntIndex(g_iRefTrainWatcher[team]);
-	int iPathGoal = EntRefToEntIndex(g_iRefPathGoal[team]);
-	if(iTrain <= MaxClients || iWatcher <= MaxClients || iPathGoal <= MaxClients) return;
-
-	for(int i=MAX_LINKS-1; i>=0; i--)
-	{
-		if(g_iRefLinkedCPs[team][i] == 0 || g_iRefLinkedPaths[team][i] == 0) continue; // non-existant
-		if(g_iRefLinkedCPs[team][i] == g_iRefControlPointGoal[team]) continue; // Bypass the final control point (the goal)
-
-		int iControlPoint = EntRefToEntIndex(g_iRefLinkedCPs[team][i]);
-		int iPathTrack = EntRefToEntIndex(g_iRefLinkedPaths[team][i]);
-
-		if(iControlPoint <= MaxClients || iPathTrack <= MaxClients) continue;
-		
-		float flDistanceToGoal = Path_GetDistance(iPathTrack, iPathGoal);
-		bool bCaptured = (GetEntProp(iControlPoint, Prop_Send, "m_nSkin") != 0);
-
-		float flDistanceMax = config.LookupFloat(g_hCvarDistanceMove);
-		if(g_nMapHack == MapHack_CactusCanyon) flDistanceMax = 4000.0; // Ensure that the cart moves back to the first control point
 #if defined DEBUG
-		PrintToServer("(Spawner_GetSpawnPosition) #%d Captured: %d Distance to goal: %0.1f/%0.1f", i, bCaptured, flDistanceToGoal, flDistanceMax);
+			PrintToServer("(Spawner_SaveSpawnPosition) RED on payload: Control point #%d chosen.", i);
 #endif
-		if(bCaptured && flDistanceToGoal > flDistanceMax)
-		{
-			GetEntPropVector(iPathTrack, Prop_Send, "m_vecOrigin", flPos);
-			Path_GetOrientation(iPathTrack, flAng);
-
-			switch(g_nMapHack)
-			{
-				case MapHack_Frontier:
-				{
-					// Spawn point needs to be 1 path ahead for frontier
-					int iPathNext = GetEntDataEnt2(iPathTrack, Offset_GetNextOffset(iPathTrack));
-					if(iPathNext > MaxClients)
-					{
-						GetEntPropVector(iPathNext, Prop_Send, "m_vecOrigin", flPos);
-						Path_GetOrientation(iPathNext, flAng);
-					}
-				}
-			}
+			GetEntPropVector(pathTrack, Prop_Send, "m_vecOrigin", pos);
+			Path_GetOrientation(pathTrack, ang, true);
+			Spawner_CheckGiantSpawns(linkedTeam, i+1, pos, ang);
 
 			for(int a=0; a<3; a++)
 			{
-				g_nSpawner[client][g_flSpawnerPos][a] = flPos[a];
-				g_nSpawner[client][g_flSpawnerAng][a] = flAng[a];
+				g_nSpawner[client][g_flSpawnerPos][a] = pos[a];
+				g_nSpawner[client][g_flSpawnerAng][a] = ang[a];
+			}
+
+			return;
+		}
+	}else{
+		// For payload race maps and BLUE team on payload.
+		// Go through the control points backwards. The first capture point that isn't start or goal and is more than tank_distance_move is chosen from the goal is chosen.
+		int pathGoal = EntRefToEntIndex(g_iRefPathGoal[team]);
+		if(pathGoal > MaxClients)
+		{
+			for(int i=MAX_LINKS-1; i>=0; i--)
+			{
+				if(g_iRefLinkedCPs[team][i] == 0 || g_iRefLinkedPaths[team][i] == 0) continue; // non-existant
+				if(g_iRefLinkedCPs[team][i] == g_iRefControlPointGoal[team]) continue; // Bypass the final control point (the goal)
+
+				int controlPoint = EntRefToEntIndex(g_iRefLinkedCPs[team][i]);
+				int pathTrack = EntRefToEntIndex(g_iRefLinkedPaths[team][i]);
+				if(controlPoint <= MaxClients || pathTrack <= MaxClients) continue;
+				
+				if(GetEntProp(controlPoint, Prop_Data, "m_iTeamNum") != team) continue; // Control point isn't owned by the spawning player.
+
+				float distanceToGoal = Path_GetDistance(pathTrack, pathGoal);
+				float maxDistance = config.LookupFloat(g_hCvarDistanceMove);
+				if(distanceToGoal > maxDistance)
+				{
+#if defined DEBUG
+					PrintToServer("(Spawner_SaveSpawnPosition) Payload race or BLU on payload: Control point #%d: Distance to goal: %0.1f/%0.1f", i, distanceToGoal, maxDistance);
+#endif
+					GetEntPropVector(pathTrack, Prop_Send, "m_vecOrigin", pos);
+					Path_GetOrientation(pathTrack, ang);
+					Spawner_CheckGiantSpawns(team, i+1, pos, ang);
+
+					for(int a=0; a<3; a++)
+					{
+						g_nSpawner[client][g_flSpawnerPos][a] = pos[a];
+						g_nSpawner[client][g_flSpawnerAng][a] = ang[a];
+					}
+
+					return;
+				}
+			}
+		}
+	}
+
+	// Fallback on spawning at the start path track node.
+	int teams[2];
+	teams[0] = team;
+	teams[1] = (team == TFTeam_Red) ? TFTeam_Blue : TFTeam_Red;
+	for(int i=0; i<sizeof(teams); i++)
+	{
+		int startPath = EntRefToEntIndex(g_iRefPathStart[teams[i]]);
+		if(startPath > MaxClients)
+		{
+#if defined DEBUG
+			PrintToServer("(Spawner_SaveSpawnPosition) Chose start path, team = %d!", teams[i]);
+#endif		
+			GetEntPropVector(startPath, Prop_Send, "m_vecOrigin", pos);
+			Path_GetOrientation(startPath, ang);
+			Spawner_CheckGiantSpawns(teams[i], 0, pos, ang);
+
+			for(int a=0; a<3; a++)
+			{
+				g_nSpawner[client][g_flSpawnerPos][a] = pos[a];
+				g_nSpawner[client][g_flSpawnerAng][a] = ang[a];
 			}
 
 			return;
 		}
 	}
-	
-	// Find a spawn position at the start since we found no qualifying control points
-	int iPathStart = EntRefToEntIndex(g_iRefPathStart[team]);
-	if(iPathStart > MaxClients)
-	{
-		GetEntPropVector(iPathStart, Prop_Send, "m_vecOrigin", flPos);
-		Path_GetOrientation(iPathStart, flAng);
 
-		switch(g_nMapHack)
-		{
-			case MapHack_Barnblitz:
-			{
-				// The roof over the start path in barnblitz causes the giant to get stuck
-				flPos[0] -= 50.0;
-			}
-			case MapHack_Frontier:
-			{
-				// Spawn point needs to be 1 path ahead for frontier for the flatbed & first spawn point
-				int iPathNext = GetEntDataEnt2(iPathStart, Offset_GetNextOffset(iPathStart));
-				if(iPathNext > MaxClients)
-				{
-					GetEntPropVector(iPathNext, Prop_Send, "m_vecOrigin", flPos);
-					Path_GetOrientation(iPathNext, flAng);
-				}				
-			}
-		}
-		
-		for(int i=0; i<3; i++)
-		{
-			g_nSpawner[client][g_flSpawnerPos][i] = flPos[i];
-			g_nSpawner[client][g_flSpawnerAng][i] = flAng[i];
-		}
-
-		return;
-	}else{
-		LogMessage("(Spawner_GetSpawnPosition) Failed to get spawn position: start not found!");
-	}
+	LogMessage("Failed to find spawn position for giant! Make sure 'sm_makegiant' is used after tanks spawn.");
 }
 
-void Spawner_GetSpawnPosition(int client, float flPos[3], float flAng[3])
+void Spawner_GetSpawnPosition(int client, float pos[3], float ang[3])
 {
 	for(int i=0; i<3; i++)
 	{
-		flPos[i] = g_nSpawner[client][g_flSpawnerPos][i];
-		flAng[i] = g_nSpawner[client][g_flSpawnerAng][i];
+		pos[i] = g_nSpawner[client][g_flSpawnerPos][i];
+		ang[i] = g_nSpawner[client][g_flSpawnerAng][i];
 	}
 }
 
@@ -388,7 +424,7 @@ public Action Spawner_Timer_Spawn(Handle hTimer, any client)
 			g_iNumGiantSpawns[team][g_nSpawner[client][g_iSpawnerGiantIndex]]++;
 
 			// Show a hint a few seconds after the giant has spawned.
-			if(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_strGiantHint][0] != '\0')
+			if(strlen(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_strGiantHint]) > 0)
 			{
 				CreateTimer(5.0, Timer_ShowHint, EntIndexToEntRef(client), TIMER_FLAG_NO_MAPCHANGE);
 			}
@@ -526,6 +562,24 @@ public Action Spawner_Timer_Spawn(Handle hTimer, any client)
 
 					CreateTimer(1.0, Timer_EntityCleanup, EntIndexToEntRef(spell));
 				}
+			}
+
+			// Check the spawn position of the giant to see if they are stuck.
+			GetClientAbsOrigin(client, flPos);
+			float mins[3];
+			float maxs[3];
+			GetClientMins(client, mins);
+			GetClientMaxs(client, maxs);
+			int mask = MASK_RED;
+			if(team != TFTeam_Red) mask = MASK_BLUE;
+
+			TR_TraceHullFilter(flPos, flPos, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+			if(TR_DidHit())
+			{
+#if defined DEBUG
+				PrintToServer("(Spawner_Timer_Spawn) Giant %N might be stuck..", client);
+#endif
+				Player_FindFreePosition2(client, flPos, mins, maxs);
 			}
 		}
 	}

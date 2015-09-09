@@ -1,3 +1,23 @@
+/**
+ * ==============================================================================
+ * Stop that Tank!
+ * Copyright (C) 2014-2015 Alex Kowald
+ * ==============================================================================
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License, version 3.0, as published by the
+ * Free Software Foundation.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "extension.h"
 
 Tank g_Interface;
@@ -880,6 +900,9 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		return false;
 	}
 
+	sharesys->AddDependency(myself, "bintools.ext", true, true);
+	sharesys->AddDependency(myself, "sdkhooks.ext", true, true);
+
 	char conf_error[255] = "";
 	if (!gameconfs->LoadGameConfigFile("tank", &g_pGameConf, conf_error, sizeof(conf_error)))
 	{
@@ -965,16 +988,15 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		g_bShouldTransmitReady = true;
 	}
 
-	sharesys->AddDependency(myself, "bintools.ext", true, true);
-	sharesys->AddDependency(myself, "sdkhooks.ext", true, true);
+	sharesys->AddNatives(myself, g_ExtensionNatives);
+
+	g_bShouldTransmitReady = false;
 
 	return true;
 }
 
 void Tank::SDK_OnAllLoaded()
 {
-	sharesys->AddNatives(myself, g_ExtensionNatives);
-
 	SM_GET_LATE_IFACE(BINTOOLS, g_pBinTools);
 	SM_GET_LATE_IFACE(SDKHOOKS, g_pSDKHooks);
 
@@ -999,8 +1021,25 @@ bool Tank::QueryRunning(char *error, size_t maxlength)
 	return true;
 }
 
+void Tank::NotifyInterfaceDrop(SMInterface *pInterface)
+{
+	if(strcmp(pInterface->GetInterfaceName(), SMINTERFACE_SDKHOOKS_NAME) == 0)
+	{
+		if(g_pSDKHooks != NULL)
+		{
+			g_pSDKHooks->RemoveEntityListener(this);
+			g_pSDKHooks = NULL;
+		}
+	}else if(strcmp(pInterface->GetInterfaceName(), SMINTERFACE_BINTOOLS_NAME) == 0)
+	{
+		g_pBinTools = NULL;
+	}
+}
+
 void Tank::SDK_OnUnload()
 {
+	gameconfs->CloseGameConfigFile(g_pGameConf);
+
 	if(passDetour != NULL)
 	{
 		passDetour->Destroy();
@@ -1026,30 +1065,16 @@ void Tank::SDK_OnUnload()
 		entityFilterDetour->Destroy();
 	}
 
-	if(g_pForwardUpgrades != NULL)
-	{
-		forwards->ReleaseForward(g_pForwardUpgrades);
-	}
-	if(g_pForwardShouldTransmit != NULL)
-	{
-		forwards->ReleaseForward(g_pForwardShouldTransmit);
-	}
-	if(g_pForwardOnWeaponPickup != NULL)
-	{
-		forwards->ReleaseForward(g_pForwardOnWeaponPickup);
-	}
-	if(g_pForwardOnWeaponCreate != NULL)
-	{
-		forwards->ReleaseForward(g_pForwardOnWeaponCreate);
-	}
-	if(g_pForwardPassFilter != NULL)
-	{
-		forwards->ReleaseForward(g_pForwardPassFilter);
-	}
-
+	forwards->ReleaseForward(g_pForwardUpgrades);
+	forwards->ReleaseForward(g_pForwardShouldTransmit);
+	forwards->ReleaseForward(g_pForwardOnWeaponPickup);
+	forwards->ReleaseForward(g_pForwardOnWeaponCreate);
+	forwards->ReleaseForward(g_pForwardPassFilter);
+	
 	if(g_pSDKHooks != NULL)
 	{
 		g_pSDKHooks->RemoveEntityListener(this);
+		g_pSDKHooks = NULL;
 	}
 
 	FOR_EACH_MAP_FAST(g_Hooks, hookId)

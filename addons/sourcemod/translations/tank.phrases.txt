@@ -293,7 +293,7 @@
 	}
 	"Tank_Chat_FailToLoad"
 	{
-		"#format"		"{1:s},{2:c}"
-		"en"			" Failed to load {1}Stop that Tank!{2}. See logs for more information. The round will restart now.."
+		"#format"		"{1:c},{2:s},{3:c}"
+		"en"			"{1} Failed to load {2}Stop that Tank!{3}. See logs for more information. The round will restart now.."
 	}
 }

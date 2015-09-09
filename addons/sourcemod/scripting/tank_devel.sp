@@ -28,9 +28,6 @@
 #error This plugin must be compiled from tank.sp
 #endif
 
-#include <sourcemod>
-#include <sdktools>
-
 #define TARGETNAME_CART_PROP			"stt_cart_prop"
 #define TARGETNAME_OVERTIME_TIMER		"stt_overtime_timer"
 #define TARGETNAME_GIANTWAVE_TIMER 		"stt_giant_wave_timer"
@@ -120,8 +117,8 @@ void MapLogic_ParentTank(int team)
 	int tank = EntRefToEntIndex(g_iRefTank[team]);
 	if(tank <= MaxClients)
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		
 		LogMessage("Map (%s) parent request failed for tank (team %d): Tank missing!", map, team);
 		return;
@@ -130,8 +127,8 @@ void MapLogic_ParentTank(int team)
 	int cart = EntRefToEntIndex(g_iRefTrackTrain[team]);
 	if(cart <= MaxClients)
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		
 		LogMessage("Map (%s) parent request failed for tank (team %d): Cart missing!", map, team);
 		return;
@@ -139,8 +136,8 @@ void MapLogic_ParentTank(int team)
 
 	if(g_bRaceParentedForHill[team])
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		
 		LogMessage("Map (%s) parent request failed for tank (team %d): Under uphill path control!", map, team);
 		return;
@@ -148,8 +145,8 @@ void MapLogic_ParentTank(int team)
 
 	if(GetEntPropEnt(tank, Prop_Send, "moveparent") > MaxClients)
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		
 		LogMessage("Map (%s) parent request failed for tank (team %d): Tank is already parented!", map, team);
 		return;
@@ -164,8 +161,8 @@ void MapLogic_UnParentTank(int team)
 	int tank = EntRefToEntIndex(g_iRefTank[team]);
 	if(tank <= MaxClients)
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		
 		LogMessage("Map (%s) un-parent request failed for tank (team %d): Tank missing!", map, team);
 		return;
@@ -174,8 +171,8 @@ void MapLogic_UnParentTank(int team)
 	int cart = EntRefToEntIndex(g_iRefTrackTrain[team]);
 	if(cart <= MaxClients)
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		
 		LogMessage("Map (%s) un-parent request failed for tank (team %d): Cart missing!", map, team);
 		return;
@@ -183,8 +180,8 @@ void MapLogic_UnParentTank(int team)
 
 	if(g_bRaceParentedForHill[team])
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		
 		LogMessage("Map (%s) un-parent request failed for tank (team %d): Under uphill path control!", map, team);
 		return;
@@ -192,8 +189,8 @@ void MapLogic_UnParentTank(int team)
 
 	if(GetEntPropEnt(tank, Prop_Send, "moveparent") <= MaxClients)
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		
 		LogMessage("Map (%s) un-parent request failed for tank (team %d): Tank is not parented at the moment!", map, team);
 		return;

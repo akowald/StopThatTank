@@ -25,6 +25,7 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <clientprefs>
+#include <regex>
 #include <tf2>
 #include <tf2_stocks>
 #include <tf2items>
@@ -41,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.3.1"
+#define PLUGIN_VERSION 				"1.4"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -349,7 +350,15 @@ int g_iRefTrackTrain[MAX_TEAMS];
 int g_iRefTrackTrain2[MAX_TEAMS]; // for the flatbed in pl_frontier
 int g_iRefTrainWatcher[MAX_TEAMS];
 int g_iRefTrigger[MAX_TEAMS];
-Handle g_hArrayTrainProps;
+
+ArrayList g_trainProps;
+enum
+{
+	TrainPropArray_Reference=0,
+	TrainPropArray_SolidType,
+};
+#define ARRAY_TRAINPROP_SIZE 2
+
 int g_iRefTank[MAX_TEAMS];
 int g_iRefFakeTank[MAX_TEAMS];
 int g_iRefHealthBar;
@@ -490,6 +499,9 @@ Handle g_hCvarUpdatesPanel;
 Handle g_hCvarOfficialServer;
 Handle g_hCvarNavMesh;
 Handle g_hCvarTags;
+Handle g_hCvarTeleportStartRed;
+Handle g_hCvarTeleportStartBlue;
+Handle g_hCvarTeleportGoal;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -515,6 +527,7 @@ Handle g_hSDKFindHealerIndex;
 Handle g_hSDKWeaponSwitch;
 Handle g_hSDKLaunchGrenadePre;
 Handle g_hSDKLaunchGrenadePost;
+Handle g_hSDKSolidMask;
 
 Handle g_cookieInfoPanel;
 
@@ -529,13 +542,7 @@ enum eMapHack
 {
 	MapHack_None=0,
 	MapHack_ThunderMountain,
-	MapHack_Goldrush,
 	MapHack_Frontier,
-	MapHack_Hoodoo,
-	MapHack_Barnblitz,
-	MapHack_Swiftwater,
-	MapHack_SimpsonHouse,
-	MapHack_Upward,
 	MapHack_Hightower,
 	MapHack_HightowerEvent,
 	MapHack_Pipeline,
@@ -1032,6 +1039,9 @@ public void OnPluginStart()
 	g_hCvarUpdatesPanel = CreateConVar("tank_updates_panel", "1", "0 - never show updates panel | 1 - only show when requested by !stt in chat | 2 - show when the player first spawns");
 	g_hCvarOfficialServer = CreateConVar("tank_official_server", "0", "This turns on specific messages only for our server.");
 	g_hCvarTags = CreateConVar("tank_sv_tags", "1", "0/1 - Whether or not to attempt to set an 'stt' tag inside of sv_tags.");
+	g_hCvarTeleportStartRed = CreateConVar("tank_teleport_start_red", "", "The targetname of the path_track to teleport the cart to when the round begins. Leaving this blank will use start_node from the team_train_watcher. Set this to \"disabled\" to disable teleporting.");
+	g_hCvarTeleportStartBlue = CreateConVar("tank_teleport_start_blue", "", "The targetname of the path_track to teleport the cart to when the round begins. Leaving this blank will use start_node from the team_train_watcher. Set this to \"disabled\" to disable teleporting.");
+	g_hCvarTeleportGoal = CreateConVar("tank_teleport_goal", "", "The targetname of the path_track to teleport the cart to when the bomb is deployed. The cart will start moving forward from this position and trigger a win.");
 
 	g_hCvarPointsForTank = CreateConVar("tank_points_for_tank", "2", "Scoreboard points awarded when enough damage is done to the tank.");
 	g_hCvarPointsForTankPlr = CreateConVar("tank_points_for_tank_plr", "1", "Scoreboard points awarded when enough damage is done to the tank.");
@@ -1084,7 +1094,7 @@ public void OnPluginStart()
 	g_hCvarRaceInterval = CreateConVar("tank_race_interval", "3.0", "Time (seconds) in between tank level/speed changes.");
 	g_hCvarRaceDamageBase = CreateConVar("tank_race_damage_base", "50", "base + EPC * average | The base damage in the formula for each level interval.");
 	g_hCvarRaceDamageAverage = CreateConVar("tank_race_damage_average", "15", "base + EPC * average | The average damage in the formula for each level interval.");
-	g_hCvarRaceTimeGiantStart = CreateConVar("tank_race_time_giant_start", "1.0", "Time (minutes) after tanks start moving when giant robots will spawn.");
+	g_hCvarRaceTimeGiantStart = CreateConVar("tank_race_time_giant_start", "0.75", "Time (minutes) after tanks start moving when giant robots will spawn.");
 	g_hCvarRaceTimeIntermission = CreateConVar("tank_race_time_intermission", "0.9", "Time (minutes) after giants spawn that the tanks will move again. Set to -1.0 to disable intermission. Can't be less than 0.2.");
 	g_hCvarRaceTimeWave = CreateConVar("tank_race_time_wave", "1.333", "Time (minutes) between giant waves in payload race. The first giant spawn time is set with tank_race_time_giant_start.");
 	g_hCvarRaceNumWaves = CreateConVar("tank_race_num_waves", "2", "Number of giants that spawn in each payload race round.");
@@ -1212,7 +1222,6 @@ public void OnPluginStart()
 	AddNormalSoundHook(NormalSoundHook);
 	AddGameLogHook(OnGameLog);
 
-	g_hArrayTrainProps = CreateArray();
 	for(int i=2; i<=3; i++)
 	{
 		g_nGiantTeleporter[i][g_hGiantTeleporterTeleQueue] = CreateArray();
@@ -1289,6 +1298,8 @@ public void OnPluginStart()
 	g_chatTips = new ArrayList(ByteCountToCells(MAXLEN_CHAT_TIP));
 	g_parentList = new ArrayList(ARRAY_PARENT_SIZE);
 	g_cartModels = new ArrayList(ByteCountToCells(MAXLEN_CART_PATH));
+	g_giantSpawns = new ArrayList(ARRAY_GIANTSPAWN_SIZE);
+	g_trainProps = new ArrayList(ARRAY_TRAINPROP_SIZE);
 }
 
 public void OnAllPluginsLoaded()
@@ -1352,32 +1363,14 @@ public void OnMapStart()
 	g_bEnabled = true;
 	g_nMapHack = MapHack_None;
 	
-	char strMap[128];
-	GetCurrentMap(strMap, sizeof(strMap));
+	char strMap[PLATFORM_MAX_PATH];
+	GetMapName(strMap, sizeof(strMap));
 	if(strcmp(strMap, "pl_thundermountain", false) == 0)
 	{
 		g_nMapHack = MapHack_ThunderMountain;
-	}else if(strcmp(strMap, "pl_goldrush", false) == 0)
-	{
-		g_nMapHack = MapHack_Goldrush;
 	}else if(strcmp(strMap, "pl_frontier_final", false) == 0)
 	{
 		g_nMapHack = MapHack_Frontier;
-	}else if(strcmp(strMap, "pl_hoodoo_final", false) == 0)
-	{
-		g_nMapHack = MapHack_Hoodoo;
-	}else if(strcmp(strMap, "pl_barnblitz", false) == 0)
-	{
-		g_nMapHack = MapHack_Barnblitz;
-	}else if(strncmp(strMap, "pl_swiftwater", 13, false) == 0)
-	{
-		g_nMapHack = MapHack_Swiftwater;
-	}else if(strncmp(strMap, "pl_simpson_house", 16, false) == 0)
-	{
-		g_nMapHack = MapHack_SimpsonHouse;
-	}else if(strcmp(strMap, "pl_upward", false) == 0)
-	{
-		g_nMapHack = MapHack_Upward;
 	}else if(strcmp(strMap, "plr_hightower", false) == 0)
 	{
 		g_nMapHack = MapHack_Hightower;
@@ -2117,23 +2110,6 @@ public void Event_RoundStart(Handle hEvent, char[] strEventName, bool bDontBroad
 
 	// Find the model of the payload cart itself, usually a "prop_phyiscs_*", but can be prop_dyanmic, depends on the map
 	Train_FindProps();
-	if(GetArraySize(g_hArrayTrainProps) > 0)
-	{
-		for(int i=0,size=GetArraySize(g_hArrayTrainProps); i<size; i++)
-		{
-			int iProp = EntRefToEntIndex(GetArrayCell(g_hArrayTrainProps, i));
-			if(iProp > MaxClients)
-			{
-				SetEntityRenderMode(iProp, RENDER_NONE); // Gets rid of outline
-				SetEntityRenderColor(iProp, _, _, _, 0); // Makes the model invisible
-				
-				// Make the conventional payload cart invisible
-				DispatchKeyValue(iProp, "solid", "0");
-				AcceptEntityInput(iProp, "DisableShadow");
-				//DispatchKeyValue(iProp, "Disable shadows", "1");
-			}
-		}
-	}
 
 	// The teams have just been scrambled so notify all the players with a sound when the round starts
 	if(g_bIsScramblePending)
@@ -2173,13 +2149,13 @@ int Watcher_GetNumControlPoints(int team)
 
 void Mod_Disable()
 {
-	PrintToChatAll("%t", "Tank_Chat_FailToLoad", g_strTeamColors[TFTeam_Blue], 0x01);
-	LogMessage("Stop that Tank! has failed to load and has been disabled. Restart the map to reload the mod.");
-
 	Mod_Toggle(false);
 
 	g_bEnabled = false;
 	ServerCommand("mp_restartgame 2");
+
+	PrintToChatAll("%t", "Tank_Chat_FailToLoad", 0x01, g_strTeamColors[TFTeam_Blue], 0x01);
+	LogMessage("Stop that Tank! has failed to load and has been disabled. Restart the map to reload the mod.");
 }
 
 public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroadcast)
@@ -2187,8 +2163,14 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 #if defined DEBUG
 	PrintToServer("(Event_RoundActive)");
 #endif
-
 	if(!g_bEnabled) return;
+
+	if(!GetConVarBool(g_hCvarEnabled))
+	{
+		LogMessage("(Event_RoundActive) tank_enabled set to 0, disabling Stop that Tank!..");
+		Mod_Disable();
+		return;
+	}
 
 	// Find BLUE's team_train_watcher
 	if(Tank_FindTrainWatcher(TFTeam_Blue) <= MaxClients)
@@ -2230,9 +2212,11 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		}
 	}
 
+	Train_FindPropsByPhysConstraint(TFTeam_Blue);
+	if(g_nGameMode == GameMode_Race) Train_FindPropsByPhysConstraint(TFTeam_Red);
+
 	// Find BLUE's first path_track
-	int iPathStartBlue = Tank_FindPathStart(TFTeam_Blue);
-	if(iPathStartBlue <= MaxClients)
+	if(Tank_FindPathStart(TFTeam_Blue) <= MaxClients)
 	{
 		LogMessage("(Event_RoundActive) Failed to find BLUE's starting path_track!");
 	}
@@ -2258,24 +2242,6 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		}
 	}
 
-	// Teleport both team's carts to the starting path_track node defined in the team's train watcher
-	for(int team=2; team<=3; team++)
-	{
-		if(g_nMapHack == MapHack_Frontier) break;
-		if(team == TFTeam_Red && g_nGameMode != GameMode_Race) continue;
-
-		int iTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
-		if(iTrain > MaxClients)
-		{
-			int iPathStart = EntRefToEntIndex(g_iRefPathStart[team]);
-			if(iPathStart > MaxClients)
-			{
-				SetVariantEntity(iPathStart);
-				AcceptEntityInput(iTrain, "TeleportToPathTrack");
-			}
-		}
-	}
-
 	g_iRefTrackTrain2[TFTeam_Red] = 0;
 	g_iRefTrackTrain2[TFTeam_Blue] = 0;
 
@@ -2284,46 +2250,42 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		case MapHack_Frontier:
 		{
 			// Find the extra flatbed_tracktrain in pl_frontier_final
-			int iTrackTrain2 = Entity_FindEntityByName("flatbed_tracktrain", "func_tracktrain");
-			if(iTrackTrain2 > MaxClients)
+			int trackTrain2 = Entity_FindEntityByName("flatbed_tracktrain", "func_tracktrain");
+			if(trackTrain2 > MaxClients)
 			{
-				g_iRefTrackTrain2[TFTeam_Blue] = EntIndexToEntRef(iTrackTrain2);
-				
-				// Make the train non-solid
-				//DispatchKeyValue(iTrackTrain2, "solid", "0");
-				
-				// Set the max of the flatbed, set it slightly faster so it doesn't get too far behind
-				SetEntPropFloat(iTrackTrain2, Prop_Data, "m_maxSpeed", config.LookupFloat(g_hCvarMaxSpeed));
+				g_iRefTrackTrain2[TFTeam_Blue] = EntIndexToEntRef(trackTrain2);
 				
 				// Delete the sparks associated with the func_tracktrain entity
-				Train_KillSparks(iTrackTrain2);
+				Train_KillSparks(trackTrain2);
 				
 				// Teleport it to it's current location just to fix some dispenser trigger area bugs
 				float flPos[3];
-				GetEntPropVector(iTrackTrain2, Prop_Send, "m_vecOrigin", flPos);
-				TeleportEntity(iTrackTrain2, flPos, NULL_VECTOR, NULL_VECTOR);
-
+				GetEntPropVector(trackTrain2, Prop_Send, "m_vecOrigin", flPos);
+				TeleportEntity(trackTrain2, flPos, NULL_VECTOR, NULL_VECTOR);
 #if defined DEBUG
-				PrintToServer("(Event_RoundActive) flatbed_traintrack: %d!", iTrackTrain2);
+				PrintToServer("(Event_RoundActive) flatbed_traintrack: %d!", trackTrain2);
 #endif
 			}
-			
+
 			// Disable the trigger_hurt that kills the player if they stand in front of the cart
 			// It's parented to the chew chew prop
-			int iTrigger = MaxClients+1;
-			while((iTrigger = FindEntityByClassname(iTrigger, "trigger_hurt")) > MaxClients)
+			int trigger = MaxClients+1;
+			while((trigger = FindEntityByClassname(trigger, "trigger_hurt")) > MaxClients)
 			{
-				int iParent = GetEntPropEnt(iTrigger, Prop_Send, "moveparent");
-				if(iParent > MaxClients)
+				int parent = GetEntPropEnt(trigger, Prop_Send, "moveparent");
+				if(parent > MaxClients)
 				{
-					for(int i=0,size=GetArraySize(g_hArrayTrainProps); i<size; i++)
+					for(int i=0,size=g_trainProps.Length; i<size; i++)
 					{
-						int iProp = EntRefToEntIndex(GetArrayCell(g_hArrayTrainProps, i));
-						if(iProp > MaxClients && iProp == iParent)
+						int array[ARRAY_TRAINPROP_SIZE];
+						g_trainProps.GetArray(i, array, sizeof(array));
+
+						int prop = EntRefToEntIndex(array[TrainPropArray_Reference]);
+						if(prop > MaxClients && prop == parent)
 						{
-							AcceptEntityInput(iTrigger, "Kill");
+							AcceptEntityInput(trigger, "Kill");
 #if defined DEBUG
-							PrintToServer("(Event_RoundActive) Killed trigger_hurt parented to cart: %d!", iTrigger);
+							PrintToServer("(Event_RoundActive) Killed trigger_hurt parented to cart: %d!", trigger);
 #endif
 							break;
 						}
@@ -2334,33 +2296,19 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		case MapHack_HightowerEvent:
 		{
 			// This is meant to catch the redmond and blutarch models in plr_hightower_event (they don't exist until halfway through teamplay_round_start and teamplay_round_active)
-			int iProp = MaxClients+1;
-			while((iProp = FindEntityByClassname(iProp, "prop_dynamic")) > MaxClients)
+			int prop = MaxClients+1;
+			while((prop = FindEntityByClassname(prop, "prop_dynamic")) > MaxClients)
 			{
 				char strModel[100];
-				GetEntPropString(iProp, Prop_Data, "m_ModelName", strModel, sizeof(strModel));		
+				GetEntPropString(prop, Prop_Data, "m_ModelName", strModel, sizeof(strModel));		
 				
 				if(strcmp(strModel, "models/props_trainyard/bomb_blutarch.mdl") == 0 || strcmp(strModel, "models/props_trainyard/bomb_redmond.mdl") == 0)
 				{
-	#if defined DEBUG
-					char strClass[40];
-					GetEdictClassname(iProp, strClass, sizeof(strClass));
-					PrintToServer("(Event_RoundActive) Found event prop \"%s\": %d (parent %d) (m_nSolidType %d)!", strModel, iProp, GetEntPropEnt(iProp, Prop_Send, "moveparent"), GetEntProp(iProp, Prop_Send, "m_nSolidType"));
-	#endif
-					// Save the solid type for later
-					SetEntProp(iProp, Prop_Send, "m_nForceBone", GetEntProp(iProp, Prop_Send, "m_nSolidType"));
-					
-					PushArrayCell(g_hArrayTrainProps, EntIndexToEntRef(iProp));
-
-					SetEntityRenderMode(iProp, RENDER_NONE); // Gets rid of outline
-					SetEntityRenderColor(iProp, _, _, _, 0); // Makes the model invisible
-					
-					// Make the conventional payload cart invisible
-					DispatchKeyValue(iProp, "solid", "0");
-					DispatchKeyValue(iProp, "Disable shadows", "1");				
+					Train_AddProp(prop);
 				}
 			}
 
+			/*
 			// Teleport the blu and red func_tracktrain entities into their starting position
 			int iTrain = EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]);
 			if(iTrain > MaxClients)
@@ -2378,6 +2326,7 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 				SetVariantString("plr_red_pathC_start3");
 				AcceptEntityInput(iTrain, "TeleportToPathTrack");
 			}
+			*/
 
 			// Disable the hell gates relay so we can trigger it whenever we want.
 			int relay = Entity_FindEntityByName(HELL_GATES_TARGETNAME, "logic_relay");
@@ -2465,6 +2414,63 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 	config.refresh();
 	config.spawnProps();
 
+	// Teleport both team's carts to the starting path_track node defined in the team's train watcher.
+	for(int team=2; team<=3; team++)
+	{
+		Handle cvar = g_hCvarTeleportStartRed;
+		if(team == TFTeam_Blue) cvar = g_hCvarTeleportStartBlue;
+
+		char value[64];
+		config.LookupString(cvar, value, sizeof(value));
+		if(strcmp(value, "disabled", false) == 0) continue;
+
+		int train = EntRefToEntIndex(g_iRefTrackTrain[team]);
+		if(train <= MaxClients) continue;
+
+		if(strlen(value) <= 0)
+		{
+			// tank_teleport_start* was left blank so teleport the cart to the start_node set from the active team_train_watcher.
+			int pathStart = EntRefToEntIndex(g_iRefPathStart[team]);
+			if(pathStart > MaxClients)
+			{
+				SetVariantFloat(0.0);
+				AcceptEntityInput(train, "SetSpeed");
+
+				SetVariantEntity(pathStart);
+				AcceptEntityInput(train, "TeleportToPathTrack");
+			}
+		}else{
+			// Attempt to find the targetname of the path_track node provided and teleport the func_tracktrain to it.
+			int path = Entity_FindEntityByName(value, "path_track");
+			if(path > MaxClients)
+			{
+				g_iRefPathStart[team] = EntIndexToEntRef(path);
+
+				SetVariantFloat(0.0);
+				AcceptEntityInput(train, "SetSpeed");
+
+				SetVariantEntity(path);
+				AcceptEntityInput(train, "TeleportToPathTrack");
+			}else{
+				LogMessage("Failed to find path_track \"%s\" set in cfg. The cart will not be teleported on round start.");
+			}
+		}
+	}
+
+	switch(g_nMapHack)
+	{
+		case MapHack_Frontier:
+		{
+			// Find the extra flatbed_tracktrain in pl_frontier_final
+			int trackTrain2 = EntRefToEntIndex(g_iRefTrackTrain2[TFTeam_Blue]);
+			if(trackTrain2 > MaxClients)
+			{
+				// Set the max of the flatbed, set it slightly faster so it doesn't get too far behind
+				SetEntPropFloat(trackTrain2, Prop_Data, "m_maxSpeed", config.LookupFloat(g_hCvarMaxSpeed));
+			}
+		}
+	}
+
 	// For the finale, have the tank deploy and explode
 	// For multi-stage maps, the tank needs to stay put.
 	char finale[8];
@@ -2498,34 +2504,11 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 	PrintToServer("(Event_RoundActive) Max CPs: %d, Sim. Tanks: %d!", g_iMaxControlPoints[TFTeam_Blue], g_iNumTankMaxSimulated);
 #endif
 
-	// For cactus canyon's 2nd (and final) stage, start the cart a few spaces ahead at minecart_path_s3_28
-	if(g_nGameMode != GameMode_Race && g_nMapHack == MapHack_CactusCanyon && g_bIsFinale)
-	{
-		// Find the new starting path node for this stage
-		int iNewStart = Entity_FindEntityByName("minecart_path_s3_28", "path_track");
-		if(iNewStart > MaxClients)
-		{
-#if defined DEBUG
-			PrintToServer("(Event_RoundActive) HACK: Moving the cart up to: %d!", iNewStart);
-#endif
-			g_iRefPathStart[TFTeam_Blue] = EntIndexToEntRef(iNewStart);
-			iPathStartBlue = iNewStart;
-
-			if(iTrackTrainBlue > MaxClients)
-			{
-				SetVariantFloat(0.0);
-				AcceptEntityInput(iTrackTrainBlue, "SetSpeed");
-				SetVariantString("minecart_path_s3_28");
-				AcceptEntityInput(iTrackTrainBlue, "TeleportToPathTrack");
-			}
-		}
-	}
-
 	// Spawn the BLUE team's tank on the payload cart
-	int iTank = Tank_CreateTank(TFTeam_Blue);
-	if(iTank > MaxClients)
+	int tank = Tank_CreateTank(TFTeam_Blue);
+	if(tank > MaxClients)
 	{
-		g_iRefTank[TFTeam_Blue] = EntIndexToEntRef(iTank);
+		g_iRefTank[TFTeam_Blue] = EntIndexToEntRef(tank);
 		
 		Tank_SetNoTarget(TFTeam_Blue, true);
 		
@@ -2538,10 +2521,10 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 	// Spawn the RED team's tank on the payload cart
 	if(g_nGameMode == GameMode_Race)
 	{
-		iTank = Tank_CreateTank(TFTeam_Red);
-		if(iTank > MaxClients)
+		tank = Tank_CreateTank(TFTeam_Red);
+		if(tank > MaxClients)
 		{
-			g_iRefTank[TFTeam_Red] = EntIndexToEntRef(iTank);
+			g_iRefTank[TFTeam_Red] = EntIndexToEntRef(tank);
 
 			Tank_SetNoTarget(TFTeam_Red, true);
 
@@ -2773,7 +2756,6 @@ public void Event_SetupFinished(Handle hEvent, char[] strEventName, bool bDontBr
 
 	if(!g_bEnabled) return;
 
-	GameRules_SetProp("m_bInSetup", false, 1); // Nightfall stage 3 has a disabled timer that still seems to set this netprop.
 	// Remove the faster ubercharge rate from mediguns whenever setup is completed (even if there's no setup period in the map, this function will still get called).
 	Player_RemoveUberChargeBonus();
 
@@ -2792,28 +2774,6 @@ public void Event_SetupFinished(Handle hEvent, char[] strEventName, bool bDontBr
 		if(g_iRefBombTimer != 0 && g_iRefBombTimer == EntIndexToEntRef(iTimer)) continue;
 
 		AcceptEntityInput(iTimer, "Disable");
-	}
-	
-	// There's a bug with pl_simpson_house where the setup gate clips with the tank
-	// We are going to remove the gate when the round starts
-	if(g_nMapHack == MapHack_SimpsonHouse)
-	{
-		// Search for hammer id 1553
-		int iGate = MaxClients+1;
-		while((iGate = FindEntityByClassname(iGate, "func_brush")) > MaxClients)
-		{
-			if(GetEntProp(iGate, Prop_Data, "m_iHammerID") == 1553)
-			{
-#if defined DEBUG
-				char strClass[40];
-				GetEdictClassname(iGate, strClass, sizeof(strClass));
-				PrintToServer("(Event_SetupFinished) Killing gate %d: \"%s\"!", iGate, strClass);
-#endif
-				AcceptEntityInput(iGate, "Kill");
-				
-				break;
-			}			
-		}
 	}
 
 	Train_Move(TFTeam_Blue, 0.0);
@@ -2836,6 +2796,14 @@ public void Event_SetupFinished(Handle hEvent, char[] strEventName, bool bDontBr
 		Buster_Cleanup(TFTeam_Red);
 		g_nBuster[TFTeam_Red][g_bBusterActive] = true;
 	}
+
+	RequestFrame(NextFrame_EndSetup);
+}
+
+public void NextFrame_EndSetup(any data)
+{
+	// Wait a frame to prevent the 'Setup' phrase to appear below the team_round_timer on the HUD during the round.
+	GameRules_SetProp("m_bInSetup", false);
 }
 
 void Tank_SetDefaultHealth(int team)
@@ -2952,12 +2920,17 @@ public Action Timer_StartRound(Handle hTimer, any junk)
 		AcceptEntityInput(iTimer, "Disable");
 	}
 
+	GameRules_SetProp("m_bInSetup", false); // Failsafe
+
 	g_hTimerStart = INVALID_HANDLE;
 	return Plugin_Stop;
 }
 
 void RaceTimer_Create()
 {
+	// Prevents the words 'Setup' from appearing below the team_round_timer in nightfall stage 3.
+	GameRules_SetProp("m_bInSetup", false);
+
 	// Create a HUD timer that will countdown the time until giant robots spawn for both teams
 	// After the timer has ended, the plr round would continue like normal
 	Bomb_KillTimer();
@@ -2998,7 +2971,7 @@ void RaceTimer_Create()
 			HookSingleEntityOutput(iTimer, "OnFinished", RaceTimer_OnFinished, true);
 
 #if defined DEBUG
-			PrintToServer("(Timer_StartRound) Created \"team_round_timer\" to countdown giants: %d!", iTimer);
+			PrintToServer("(RaceTimer_Create) Created \"team_round_timer\" to countdown giants: %d!", iTimer);
 #endif
 			g_iRefBombTimer = EntIndexToEntRef(iTimer);
 
@@ -3016,6 +2989,9 @@ public void NextFrame_EnableTimer(int iRefTimer)
 	if(iTimer > MaxClients)
 	{
 		AcceptEntityInput(iTimer, "Enable");
+
+		SetVariantInt(1);
+		AcceptEntityInput(iTimer, "ShowInHUD");
 	}
 }
 
@@ -3666,7 +3642,7 @@ void Train_FindProps()
 	// Blindly search through all edicts and catch any entities with a matching model.
 	// These entities sometimes trigger map logic so they are important to keep track of.
 
-	ClearArray(g_hArrayTrainProps);
+	g_trainProps.Clear();
 
 	char model[MAXLEN_CART_PATH];
 	char name[64];
@@ -3683,11 +3659,6 @@ void Train_FindProps()
 
 			if(strcmp(name, TARGETNAME_CART_PROP, false) == 0)
 			{
-#if defined DEBUG
-				char className[64];
-				GetEdictClassname(entity, className, sizeof(className));
-				PrintToServer("(Train_FindProps) %d \"%s\" - name=\"%s\",model=\"%s\",parent=%d,m_nSolidType=%d!", entity, className, name, model, GetEntPropEnt(entity, Prop_Send, "moveparent"), GetEntProp(entity, Prop_Send, "m_nSolidType"));
-#endif
 				Train_AddProp(entity);
 				continue;
 			}
@@ -3697,11 +3668,6 @@ void Train_FindProps()
 				g_cartModels.GetString(i, cartModel, sizeof(cartModel));
 				if(strcmp(model, cartModel) == 0)
 				{
-#if defined DEBUG
-					char className[64];
-					GetEdictClassname(entity, className, sizeof(className));
-					PrintToServer("(Train_FindProps) %d \"%s\" - name=\"%s\",model=\"%s\",parent=%d,m_nSolidType=%d!", entity, className, name, model, GetEntPropEnt(entity, Prop_Send, "moveparent"), GetEntProp(entity, Prop_Send, "m_nSolidType"));
-#endif
 					Train_AddProp(entity);
 					break;
 				}
@@ -3712,10 +3678,130 @@ void Train_FindProps()
 
 void Train_AddProp(int entity)
 {
-	// Save the solid type for later
-	SetEntProp(entity, Prop_Send, "m_nForceBone", GetEntProp(entity, Prop_Send, "m_nSolidType"));
-	
-	PushArrayCell(g_hArrayTrainProps, EntIndexToEntRef(entity));
+	int reference = EntIndexToEntRef(entity);
+
+	int size = g_trainProps.Length;
+	bool found = false;
+	for(int i=0; i<size; i++)
+	{
+		int array[ARRAY_TRAINPROP_SIZE];
+		g_trainProps.GetArray(i, array, sizeof(array));
+		if(array[TrainPropArray_Reference] == reference)
+		{
+			found = true;
+			break;
+		}
+	}
+
+	if(!found)
+	{
+		int array[ARRAY_TRAINPROP_SIZE];
+		// Save the solid type for later.
+		array[TrainPropArray_Reference] = reference;
+		array[TrainPropArray_SolidType] = SOLID_VPHYSICS; // GetEntProp(entity, Prop_Send, "m_nSolidType");
+
+		g_trainProps.PushArray(array, sizeof(array));
+#if defined DEBUG
+		char model[PLATFORM_MAX_PATH];
+		char className[64];
+		char name[64];
+		GetEdictClassname(entity, className, sizeof(className));
+		GetEntPropString(entity, Prop_Data, "m_ModelName", model, sizeof(model));
+		GetEntPropString(entity, Prop_Data, "m_iName", name, sizeof(name));
+
+		PrintToServer("(Train_AddProp) %d \"%s\" - name=\"%s\",model=\"%s\",parent=%d,m_nSolidType=%d!", entity, className, name, model, GetEntPropEnt(entity, Prop_Send, "moveparent"), GetEntProp(entity, Prop_Send, "m_nSolidType"));
+#endif
+
+		SetEntityRenderMode(entity, RENDER_NONE); // Gets rid of outline
+		SetEntityRenderColor(entity, _, _, _, 0); // Makes the model invisible
+		
+		// Make the conventional payload cart invisible
+		DispatchKeyValue(entity, "solid", "0");
+		AcceptEntityInput(entity, "DisableShadow");
+	}
+}
+
+void LoadStringFromAddress(char[] buffer, int maxlength, Address address)
+{
+	bool terminated = false;
+	for(int i=0; i<maxlength; i++)
+	{
+		buffer[i] = LoadFromAddress(address+view_as<Address>(i), NumberType_Int8);
+
+		if(buffer[i] == '\0')
+		{
+			terminated = true;
+			break;
+		}
+	}
+	if(!terminated) buffer[maxlength-1] = '\0';	
+}
+
+void Train_FindPropsByPhysConstraint(int team)
+{
+	// This will check for the phys_constraint relationship between the func_tracktrain and the physics prop of the cart. This is the default payload setup from the gametype library.
+	int train = EntRefToEntIndex(g_iRefTrackTrain[team]);
+	if(train > MaxClients)
+	{
+		char trainName[64];
+		GetEntPropString(train, Prop_Data, "m_iName", trainName, sizeof(trainName));
+		if(strlen(trainName) > 0)
+		{
+			int constraint = MaxClients+1;
+			while((constraint = FindEntityByClassname(constraint, "phys_constraint")) != -1)
+			{
+				// I will get rid of this monstrosity when SM 1.8 becomes the stable branch.
+				int offset = FindDataMapInfo(constraint, "m_nameAttach1");
+				if(offset <= 0) continue;
+				Address pointer = view_as<Address>(LoadFromAddress(GetEntityAddress(constraint)+view_as<Address>(offset), NumberType_Int32));
+				if(!IsValidAddress(pointer)) continue;
+				char name1[64];
+				LoadStringFromAddress(name1, sizeof(name1), pointer);				
+
+				offset = FindDataMapInfo(constraint, "m_nameAttach2");
+				if(offset <= 0) continue;
+				pointer = view_as<Address>(LoadFromAddress(GetEntityAddress(constraint)+view_as<Address>(offset), NumberType_Int32));
+				if(!IsValidAddress(pointer)) continue;
+				char name2[64];
+				LoadStringFromAddress(name2, sizeof(name2), pointer);
+
+				if(strlen(name1) <= 0 || strlen(name2) <= 0) continue;
+
+				bool found = false;
+				if(strcmp(trainName, name1, false) == 0)
+				{
+					found = true;
+					strcopy(name1, sizeof(name1), name2);
+				}else if(strcmp(trainName, name2, false) == 0)
+				{
+					found = true;
+				}
+
+				if(found)
+				{
+					int maxEntities = GetMaxEntities();
+					for(int entity=MaxClients+1; entity<maxEntities; entity++)
+					{
+						if(entity == train) continue;
+
+						if(IsValidEntity(entity))
+						{
+							GetEntPropString(entity, Prop_Data, "m_iName", name2, sizeof(name2));
+
+							if(strcmp(name1, name2) == 0)
+							{
+#if defined DEBUG
+								PrintToServer("(Train_FindPropsByPhysConstraint) Found relationship between \"%s\" and \"%s\"!", trainName, name1);
+#endif
+								Train_AddProp(entity);
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 void Tank_FindParts(int team)
@@ -3761,6 +3847,8 @@ int Tank_HookCaptureTrigger(int team)
 	{
 		return -1;
 	}
+
+
 
 	g_iRefTrigger[team] = 0;
 
@@ -3928,7 +4016,11 @@ int Tank_CreateTankEntity(int team)
 		
 		// Keeps the tank from instantly exploding once it hits the payload cart
 		SDKHook(tank, SDKHook_OnTakeDamage, Tank_OnTakeDamage);
-		
+		if(g_hSDKSolidMask != INVALID_HANDLE)
+		{
+			DHookEntity(g_hSDKSolidMask, false, tank);
+		}
+
 		DispatchSpawn(tank);
 		
 		// Set the tank's start path, it's on a timer because setting the track immediately after spawn is hit or miss
@@ -4007,7 +4099,7 @@ int Tank_FindTrainWatcher(int team)
 	{
 		//PrintToServer("Found timer @ %d - %d %d..", iWatcher, GetEntProp(iWatcher, Prop_Send, "m_iTeamNum"), GetEntProp(iWatcher, Prop_Data, "m_bDisabled"));
 		if(iWatcher > MaxClients && GetEntProp(iWatcher, Prop_Send, "m_iTeamNum") == team && !GetEntProp(iWatcher, Prop_Data, "m_bDisabled"))
-		{		
+		{
 #if defined DEBUG
 			PrintToServer("(Tank_FindTrainWatcher) team_train_watcher: %d! (team %d)", iWatcher, team);
 #endif
@@ -4029,7 +4121,7 @@ int Train_MoveBack(int team)
 	// Moves the cart backwards after a tank has been destroyed, this could be at the starting node or at a control point
 	
 	// Countdown through control points backwards
-	// The point that isn't start or goal AND is more than tank_move_distance is chosen to move the cart to
+	// The point that isn't start or goal AND is more than tank_distance_move is chosen to move the cart to
 	// 0 is the first capture point, the last is the final one, (the one that goes boom)
 
 	// Returns -1 if not moved back, otherwise it's the index of the control point+1 and 0 for start node.
@@ -4155,12 +4247,15 @@ void Train_MoveTo(int iTrackTrain, int iPathTrack)
 	
 	// Make the bomb prop non-solid again in case it was reset from parenting for the finale
 	// Make an exception if the cart no longer exists: The prop is probably falling and triggering the explosion
-	for(int a=0; a<GetArraySize(g_hArrayTrainProps); a++)
+	for(int i=0,size=g_trainProps.Length; i<size; i++)
 	{
-		int iProp = EntRefToEntIndex(GetArrayCell(g_hArrayTrainProps, a));
-		if(iProp > MaxClients)
+		int array[ARRAY_TRAINPROP_SIZE];
+		g_trainProps.GetArray(i, array, sizeof(array));
+
+		int prop = EntRefToEntIndex(array[TrainPropArray_Reference]);
+		if(prop > MaxClients)
 		{
-			SetEntProp(iProp, Prop_Send, "m_nSolidType", 0);
+			SetEntProp(prop, Prop_Send, "m_nSolidType", 0);
 		}
 	}	
 }
@@ -5305,7 +5400,7 @@ bool Player_FindFreePosition2(int client, float position[3], float mins[3], floa
 				GetPositionForward(position, ang, freePosition, r);
 
 				// Perform a line of sight check to avoid spawning players in unreachable map locations.
-				// The tank has this weird bug where players can be pushed into map displacements and can sometimes go completely into a wall.
+				// The tank has this weird bug where players can be pushed into map displacements and can sometimes go completely through a wall.
 				TR_TraceRayFilter(position, freePosition, mask, RayType_EndPoint, TraceEntityFilter_LOS);
 
 				if(!TR_DidHit())
@@ -5477,27 +5572,39 @@ void Tank_Think(int iTank)
 		SetEntPropFloat(iTank, Prop_Data, "m_speed", 0.0);
 		return;
 	}
-
-	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
+	
 	// Keep the tank idle during the grace period
 	if(!g_bIsRoundStarted)
 	{
 		SetEntPropFloat(iTank, Prop_Data, "m_speed", 0.0);
 
 		// If the tank is parented when the round ends, keep the tank tracks moving accurately
-		if(iTrackTrain > MaxClients && GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients)
+		int trackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
+		if(trackTrain > MaxClients && GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients)
 		{
-			float flSpeedTrain = GetEntPropFloat(iTrackTrain, Prop_Data, "m_flSpeed");
-			float flPlaybackRate = flSpeedTrain / GetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed") * 0.56;
+			float flSpeedTrain = GetEntPropFloat(trackTrain, Prop_Data, "m_flSpeed");
+			float flPlaybackRate = flSpeedTrain / GetEntPropFloat(trackTrain, Prop_Data, "m_maxSpeed") * 0.56;
 			if((g_nMapHack == MapHack_Hightower || g_nMapHack == MapHack_HightowerEvent) && g_bEnableMapHack[team]) flPlaybackRate = 0.0; // When the tank is parented to the lift, it won't be moving anywhere
 			
 			if(iTrackL > MaxClients) SetEntPropFloat(iTrackL, Prop_Send, "m_flPlaybackRate", flPlaybackRate);
 			if(iTrackR > MaxClients) SetEntPropFloat(iTrackR, Prop_Send, "m_flPlaybackRate", flPlaybackRate);			
 		}
 
+		int watcher = EntRefToEntIndex(g_iRefTrainWatcher[team]);
+		if(watcher > MaxClients)
+		{
+			float flDistanceToGoal = Train_RealDistanceToGoal(team);
+			float flDistanceParent = config.LookupFloat(g_hCvarGoalDistance);
+			float flTotalProgress = GetEntPropFloat(watcher, Prop_Send, "m_flTotalProgress");
+
+			// Control parenting of the tank to the cart in order to keep them in the same position.
+			Parent_Think(iTank, team, flDistanceToGoal, flDistanceParent, flTotalProgress);
+		}
+
 		return;
 	}
 	
+	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
 	int iTrigger = EntRefToEntIndex(g_iRefTrigger[team]);
 	int iWatcher = EntRefToEntIndex(g_iRefTrainWatcher[team]);
 	if(iTrackTrain <= MaxClients || iTrigger <= MaxClients || iWatcher <= MaxClients)
@@ -5638,20 +5745,29 @@ void Tank_Think(int iTank)
 		}
 	}
 	
-	// As we approach the goal node, parent the tank so it interacts with other map entities properly
-	if(GetEntPropEnt(iTank, Prop_Send, "moveparent") == -1 && flDistanceToGoal < flDistanceParent)
+	// As we approach the goal node, parent the tank so it interacts with other map entities properly (and the tank doesn't auto-deploy)
+	if(flDistanceToGoal < flDistanceParent)
 	{
-		Tank_Parent(team);
-		
-		for(int i=0,size=GetArraySize(g_hArrayTrainProps); i<size; i++)
+		if(GetEntPropEnt(iTank, Prop_Send, "moveparent") <= MaxClients)
 		{
-			int iProp = EntRefToEntIndex(GetArrayCell(g_hArrayTrainProps, i));
-			if(iProp > MaxClients)
+#if defined DEBUG
+			PrintToChatAll("PARENTING FOR GOAL");
+#endif
+			Tank_Parent(team);
+		}
+
+		for(int i=0,size=g_trainProps.Length; i<size; i++)
+		{
+			int array[ARRAY_TRAINPROP_SIZE];
+			g_trainProps.GetArray(i, array, sizeof(array));
+
+			int prop = EntRefToEntIndex(array[TrainPropArray_Reference]);
+			if(prop > MaxClients)
 			{
 #if defined DEBUG
-				PrintToServer("(Tank_Think) Setting m_nSolidType %d on %d!", GetEntProp(iProp, Prop_Send, "m_nForceBone"), iProp);
+				//PrintToServer("(Tank_Think) Restoring m_nSolidType %d on %d!", array[TrainPropArray_SolidType], prop);
 #endif
-				SetEntProp(iProp, Prop_Send, "m_nSolidType", GetEntProp(iProp, Prop_Send, "m_nForceBone"));
+				SetEntProp(prop, Prop_Send, "m_nSolidType", array[TrainPropArray_SolidType]);
 			}
 		}
 	}
@@ -5780,26 +5896,39 @@ void Tank_ThinkRace(int iTank)
 		return;
 	}
 	
-	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
+	
 	// Keep the tank idle during the grace period
 	if(!g_bIsRoundStarted)
 	{
 		SetEntPropFloat(iTank, Prop_Data, "m_speed", 0.0);
 
 		// If the tank is parented when the round ends, keep the tank tracks moving accurately
-		if(iTrackTrain > MaxClients && GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients)
+		int trackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
+		if(trackTrain > MaxClients && GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients)
 		{
-			float flSpeedTrain = GetEntPropFloat(iTrackTrain, Prop_Data, "m_flSpeed");
-			float flPlaybackRate = flSpeedTrain / GetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed") * 0.56;
+			float flSpeedTrain = GetEntPropFloat(trackTrain, Prop_Data, "m_flSpeed");
+			float flPlaybackRate = flSpeedTrain / GetEntPropFloat(trackTrain, Prop_Data, "m_maxSpeed") * 0.56;
 			if((g_nMapHack == MapHack_Hightower || g_nMapHack == MapHack_HightowerEvent) && g_bEnableMapHack[team]) flPlaybackRate = 0.0; // When the tank is parented to the lift, it won't be moving anywhere
 			
 			if(iTrackL > MaxClients) SetEntPropFloat(iTrackL, Prop_Send, "m_flPlaybackRate", flPlaybackRate);
 			if(iTrackR > MaxClients) SetEntPropFloat(iTrackR, Prop_Send, "m_flPlaybackRate", flPlaybackRate);			
 		}
 
+		int watcher = EntRefToEntIndex(g_iRefTrainWatcher[team]);
+		if(watcher > MaxClients)
+		{
+			float flDistanceToGoal = Train_RealDistanceToGoal(team);
+			float flDistanceParent = config.LookupFloat(g_hCvarGoalDistance);
+			float flTotalProgress = GetEntPropFloat(watcher, Prop_Send, "m_flTotalProgress");
+
+			// Control parenting of the tank to the cart during the grace period.
+			Parent_Think(iTank, team, flDistanceToGoal, flDistanceParent, flTotalProgress);
+		}
+
 		return;
 	}
 	
+	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
 	int iTrigger = EntRefToEntIndex(g_iRefTrigger[team]);
 	int iWatcher = EntRefToEntIndex(g_iRefTrainWatcher[team]);
 	if(iTrackTrain <= MaxClients || iTrigger <= MaxClients || iWatcher <= MaxClients)
@@ -6109,15 +6238,18 @@ void Tank_ThinkRace(int iTank)
 			Tank_Parent(team);
 		}
 
-		for(int i=0,size=GetArraySize(g_hArrayTrainProps); i<size; i++)
+		for(int i=0,size=g_trainProps.Length; i<size; i++)
 		{
-			int iProp = EntRefToEntIndex(GetArrayCell(g_hArrayTrainProps, i));
-			if(iProp > MaxClients)
+			int array[ARRAY_TRAINPROP_SIZE];
+			g_trainProps.GetArray(i, array, sizeof(array));
+
+			int prop = EntRefToEntIndex(array[TrainPropArray_Reference]);
+			if(prop > MaxClients)
 			{
 #if defined DEBUG
-				//PrintToServer("(Tank_Think) Setting m_nSolidType %d on %d!", GetEntProp(iProp, Prop_Send, "m_nForceBone"), iProp);
+				//PrintToServer("(Tank_Think) Setting m_nSolidType %d on %d!", GetEntProp(prop, Prop_Send, "m_nForceBone"), prop);
 #endif
-				SetEntProp(iProp, Prop_Send, "m_nSolidType", GetEntProp(iProp, Prop_Send, "m_nForceBone"));
+				SetEntProp(prop, Prop_Send, "m_nSolidType", array[TrainPropArray_SolidType]);
 			}
 		}
 	}
@@ -6511,6 +6643,14 @@ void SDK_Init()
 		LogMessage("Failed to get offset: CTFPlayerShared::m_HealingRadius!");
 	}
 	
+	offset = GameConfGetOffset(hGamedata, "CBaseEntity::PhysicsSolidMaskForEntity");
+	if(offset > 0)
+	{
+		g_hSDKSolidMask = DHookCreate(offset, HookType_Entity, ReturnType_Int, ThisPointer_CBaseEntity, CBaseEntity_PhysicsSolidMaskForEntity);
+	}else{
+		LogMessage("Failed to get offset: CBaseEntity::PhysicsSolidMaskForEntity!");
+	}
+
 	// This call is used to translate a memory address into an entity index
 	StartPrepSDKCall(SDKCall_Raw);
 	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, "CBaseEntity::GetBaseEntity");
@@ -6812,7 +6952,7 @@ void SDK_Init()
 		}		
 	}
 
-	// This patch fixes uber effects on the bomb carrier.
+	// This patch fixes uber effects on the normal bomb carrier.
 	Address addrMedigun2 = GameConfGetAddress(hGamedata, "Patch_Medigun2");
 	if(addrMedigun2 == Address_Null)
 	{
@@ -7069,20 +7209,6 @@ int Tank_FindPathStart(int team)
 			PrintToServer("(Tank_FindPathStart) path_track: %d \"%s\"!", iPathStart, strStartNode);
 #endif
 			g_iRefPathStart[team] = EntIndexToEntRef(iPathStart);
-			
-			if(iTrackTrain > MaxClients)
-			{
-				float flPosPath[3];
-				GetEntPropVector(iPathStart, Prop_Send, "m_vecOrigin", flPosPath);
-				
-				float flPosCart[3];
-				GetEntPropVector(iTrackTrain, Prop_Send, "m_vecOrigin", flPosCart);
-	
-#if defined DEBUG
-				PrintToServer("(Tank_FindPathStart) Straight distance of cart (team %d) to start: %0.2f!", team, GetVectorDistance(flPosPath, flPosCart));
-#endif
-			}
-
 			return iPathStart;
 		}
 	}
@@ -7267,7 +7393,7 @@ void Train_KillSparks(int iTrackTrain)
 	}
 }
 
-public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLATFORM_MAX_PATH], int &entity, int &channel, float &volume, int &level, int &pitch, int &flags, char soundEntry[PLATFORM_MAX_PATH], int &seed)
+public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLATFORM_MAX_PATH], int &entity, int &channel, float &volume, int &level, int &pitch, int &flags)
 {
 	//char strClass[32];
 	//if(entity >= 1 && IsValidEntity(entity)) GetEdictClassname(entity, strClass, sizeof(strClass));
@@ -7907,7 +8033,6 @@ public void OnEntityDestroyed(int entity)
 #if defined DEBUG
 					PrintToChatAll("UN-PARENTED THE TANK TO THE CART FOR FINALE!!");
 #endif
-
 					// Teleport the cart prop on the goal node for maps with triggers to work on finales
 					int iGoalNode = EntRefToEntIndex(g_iRefPathGoal[iTeam]);
 					if(iGoalNode > MaxClients)
@@ -7915,12 +8040,19 @@ public void OnEntityDestroyed(int entity)
 						float flPos[3];
 						GetEntPropVector(iGoalNode, Prop_Send, "m_vecOrigin", flPos);
 						
-						for(int i=0,size=GetArraySize(g_hArrayTrainProps); i<size; i++)
+						for(int i=0,size=g_trainProps.Length; i<size; i++)
 						{
-							int iProp = EntRefToEntIndex(GetArrayCell(g_hArrayTrainProps, i));
-							if(iProp > MaxClients)
+							int array[ARRAY_TRAINPROP_SIZE];
+							g_trainProps.GetArray(i, array, sizeof(array));
+
+							int prop = EntRefToEntIndex(array[TrainPropArray_Reference]);
+							if(prop > MaxClients)
 							{
-								TeleportEntity(iProp, flPos, NULL_VECTOR, NULL_VECTOR);
+#if defined DEBUG
+								PrintToServer("(OnEntityDestroyed) Restoring m_nSolidType %d on %d!", array[TrainPropArray_SolidType], prop);
+#endif
+								SetEntProp(prop, Prop_Send, "m_nSolidType", array[TrainPropArray_SolidType]); // Just to be safe.
+								TeleportEntity(prop, flPos, NULL_VECTOR, NULL_VECTOR);
 							}
 						}
 					}
@@ -8344,8 +8476,8 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 			}
 
 			int loopKills = 5000;
-			int mark = (numKills - g_tankRank[rankIndex][g_tankRankNumKills]) / loopKills;
-			if(rankIndex == sizeof(g_tankRank)-1 && mark >= 1)
+			int mark;
+			if(rankIndex == sizeof(g_tankRank)-1 && (mark=((numKills - g_tankRank[rankIndex][g_tankRankNumKills]) / loopKills)) >= 1)
 			{
 				// The tank has reached the final rank, we need to calculate how many times it has leveled up in the final rank
 				// Each 5000 kills will count as a mark
@@ -9490,36 +9622,73 @@ void Bomb_Think(int iBomb)
 								}
 							}
 							
-							int iPathGoal = EntRefToEntIndex(g_iRefPathGoal[team]);
-							if(iPathGoal > MaxClients)
+							bool teleportedCart = false;
+							char targetname[64];
+							config.LookupString(g_hCvarTeleportGoal, targetname, sizeof(targetname));
+							if(strlen(targetname) > 0)
 							{
-								int iPathPrev = GetEntDataEnt2(iPathGoal, Offset_GetPreviousOffset(iPathGoal));
-								if(iPathPrev > MaxClients)
+								int path = Entity_FindEntityByName(targetname, "path_track");
+								if(path > MaxClients)
 								{
-									SetEntData(iTrackTrain, Offset_GetPathOffset(iTrackTrain), GetEntityAddress(iPathPrev));
-									
-									float flPathPos[3];
-									GetEntPropVector(iPathPrev, Prop_Send, "m_vecOrigin", flPathPos);
-									float flPathAng[3];
-									GetEntPropVector(iPathPrev, Prop_Send, "m_angRotation", flPathAng);
-									
-									TeleportEntity(iTrackTrain, flPathPos, flPathAng, NULL_VECTOR);
-									
-									// Maps disable paths when control points are captured so the tank can't move backwards past a control point so re-enable them all
-									int iEntity = MaxClients+1;
-									while((iEntity = FindEntityByClassname(iEntity, "path_track")) > MaxClients) AcceptEntityInput(iEntity, "EnablePath");
+									AcceptEntityInput(path, "EnablePath");
+#if defined DEBUG
+									PrintToServer("(Bomb_Think) Teleporting the cart to tank_teleport_goal: \"%s\"!", targetname);
+#endif
+									SetVariantEntity(path);
+									AcceptEntityInput(iTrackTrain, "TeleportToPathTrack");
+
+									// Enable all path_tracks between here and the goal.
+									int pathGoal = EntRefToEntIndex(g_iRefPathGoal[team]);
+									if(pathGoal > MaxClients)
+									{
+										AcceptEntityInput(pathGoal, "EnablePath");
+
+										int pathNext = path;
+										while((pathNext = GetEntDataEnt2(pathNext, Offset_GetNextOffset(pathNext))) > MaxClients && pathNext != pathGoal)
+										{
+											AcceptEntityInput(pathNext, "EnablePath");
+										}
+									}
+
+									teleportedCart = true;
+								}else{
+									LogMessage("Failed to find tank_teleport_goal \"%s\" set in config file.", targetname);
+								}
+							}
+
+							if(!teleportedCart)
+							{
+								int pathGoal = EntRefToEntIndex(g_iRefPathGoal[team]);
+								if(pathGoal > MaxClients)
+								{
+									AcceptEntityInput(pathGoal, "EnablePath");
+
+									int pathPrevious = GetEntDataEnt2(pathGoal, Offset_GetPreviousOffset(pathGoal));
+									if(pathPrevious > MaxClients)
+									{
+										AcceptEntityInput(pathPrevious, "EnablePath");
+#if defined DEBUG
+										GetEntPropString(pathPrevious, Prop_Data, "m_iName", targetname, sizeof(targetname));
+										PrintToServer("(Bomb_Think) Teleporting the cart to previous path: \"%s\"!", targetname);
+#endif
+										SetVariantEntity(pathPrevious);
+										AcceptEntityInput(iTrackTrain, "TeleportToPathTrack");
+									}
 								}
 							}
 							
-							for(int i=0,size=GetArraySize(g_hArrayTrainProps); i<size; i++)
+							for(int i=0,size=g_trainProps.Length; i<size; i++)
 							{
-								int iProp = EntRefToEntIndex(GetArrayCell(g_hArrayTrainProps, i));
-								if(iProp > MaxClients)
+								int array[ARRAY_TRAINPROP_SIZE];
+								g_trainProps.GetArray(i, array, sizeof(array));
+
+								int prop = EntRefToEntIndex(array[TrainPropArray_Reference]);
+								if(prop > MaxClients)
 								{
 #if defined DEBUG
-									PrintToServer("(Bomb_Think) Setting m_nSolidType %d on %d!", GetEntProp(iProp, Prop_Send, "m_nForceBone"), iProp);
+									PrintToServer("(Bomb_Think) Restoring m_nSolidType %d on %d!", array[TrainPropArray_SolidType], prop);
 #endif
-									SetEntProp(iProp, Prop_Send, "m_nSolidType", GetEntProp(iProp, Prop_Send, "m_nForceBone"));
+									SetEntProp(prop, Prop_Send, "m_nSolidType", array[TrainPropArray_SolidType]);
 								}
 							}
 							
@@ -10288,7 +10457,57 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
-		
+		int train = Entity_FindEntityByName("well_platform_train", "func_tracktrain");
+		if(train > MaxClients)
+		{
+			PrintToServer("train = %d 0x%X", train, GetEntityAddress(train));
+
+			int offset = FindDataMapInfo(train, "m_pPhysicsObject");
+			PrintToServer("offset = %d", offset);
+			PrintToServer("m_CollisionGroup = %d", GetEntProp(train, Prop_Send, "m_CollisionGroup"));
+			PrintToServer("m_nSolidType = %d", GetEntProp(train, Prop_Send, "m_nSolidType"));
+			PrintToServer("m_usSolidFlags = %d", GetEntProp(train, Prop_Send, "m_usSolidFlags"));
+
+			//SetEntProp(train, Prop_Send, "m_usSolidFlags", FSOLID_NOT_SOLID);
+
+
+
+			/*
+			Address physicsObject = view_as<Address>(LoadFromAddress(GetEntityAddress(train)+view_as<Address>(offset), NumberType_Int32));
+			PrintToServer("m_pPhysicsObject = 0x%X", physicsObject);
+			if(IsValidAddress(physicsObject))
+			{
+				if(g_hSDKEnableCollisions != INVALID_HANDLE)
+				{
+					PrintToServer("Calling CPhysicsObject::SetContents..");
+					SDKCall(g_hSDKEnableCollisions, physicsObject, 0x400);
+				}
+			}
+			*/
+		}
+
+		int tank = EntRefToEntIndex(g_iRefTank[TFTeam_Blue]);
+		if(tank > MaxClients)
+		{
+			PrintToServer("tank = %d", tank);
+			PrintToServer("m_CollisionGroup = %d", GetEntProp(tank, Prop_Send, "m_CollisionGroup"));
+			PrintToServer("m_nSolidType = %d", GetEntProp(tank, Prop_Send, "m_nSolidType"));
+			PrintToServer("m_usSolidFlags = %d", GetEntProp(tank, Prop_Send, "m_usSolidFlags"));
+
+			if(g_hSDKSolidMask != INVALID_HANDLE)
+			{
+				PrintToServer("Hooking on tank....");
+				DHookEntity(g_hSDKSolidMask, false, tank);
+			}
+		}
+
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
+		PrintToServer("map = \"%s\"", map);
+
+		PrintToServer("m_nSolidType = %d", GetEntProp(EntRefToEntIndex(g_iRefTank[TFTeam_Blue]), Prop_Send, "m_nSolidType"));
+
+
 	}
 
 	return Plugin_Handled;
@@ -10453,7 +10672,7 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "Jul-23: Anti-stalemate PLR timer");
+	DrawPanelText(hPanel, "Sep-9: Improved map support!");
 	if(GetConVarBool(g_hCvarOfficialServer))
 	{
 		DrawPanelText(hPanel, "Type !invite to join our Steam Group!");
@@ -11072,17 +11291,24 @@ public Action Listener_Joinclass(int client, const char[] command, int argc)
 	return Plugin_Continue;
 }
 
-void Path_GetOrientation(int iPathTrack, float flAng[3])
+void Path_GetOrientation(int iPathTrack, float flAng[3], bool pointBackwards=false)
 {
 	float flPosFirst[3];
 	GetEntPropVector(iPathTrack, Prop_Send, "m_vecOrigin", flPosFirst);
 
 	// Gets the angle from one path track, pointing to another
-	int iPathNext = GetEntDataEnt2(iPathTrack, Offset_GetNextOffset(iPathTrack));
-	if(iPathNext > MaxClients)
+	int nextPath;
+	if(pointBackwards)
+	{
+		nextPath = GetEntDataEnt2(iPathTrack, Offset_GetPreviousOffset(iPathTrack));
+	}else{
+		nextPath = GetEntDataEnt2(iPathTrack, Offset_GetNextOffset(iPathTrack));
+	}
+
+	if(nextPath > MaxClients)
 	{
 		float flPosNext[3];
-		GetEntPropVector(iPathNext, Prop_Send, "m_vecOrigin", flPosNext);
+		GetEntPropVector(nextPath, Prop_Send, "m_vecOrigin", flPosNext);
 
 		float flDir[3];
 		SubtractVectors(flPosNext, flPosFirst, flDir);
@@ -13317,10 +13543,10 @@ void Parent_Think(int tank, int team, float distanceToGoal, float distanceParent
 		if(array[ParentArray_Team] == 0 || array[ParentArray_Team] == team)
 		{
 			float location = view_as<float>(array[ParentArray_Location]);
-			if(totalProgress > location)
+			if(totalProgress >= location)
 			{
 #if defined DEBUG
-				PrintToServer("(Tank_Think) Hit parent config at %f - type %d", location, array[ParentArray_Type]);
+				PrintToServer("(Parent_Think) Hit parent config at %f - type %d", location, array[ParentArray_Type]);
 #endif
 				g_parentList.Erase(i);
 
@@ -13501,6 +13727,7 @@ public Action Tank_OnWeaponPickup(int client, int droppedWeapon, bool &result)
 public Action Tank_OnWeaponDropped(int itemDefinitionIndex, int accountId, int itemIdHigh, int itemIdLow, Address item)
 {
 	// CTFPlayer::m_AttributeManager + 104 seems to be the player's account id. Using this number you could possibly find the original owner of the weapon.
+	// Alternative way: Grab the account id from the player's AuthId_Steam3 auth string.
 	if(!g_bEnabled) return Plugin_Continue;
 	// At this time, a weapon is dropped for 3 reasons: 1) Spy feign 2) Player death 3) Weapon regeneration.
 
@@ -13776,7 +14003,7 @@ void Announcer_Think()
 	if(!g_announcer[g_announcerActive]) return;
 	if(g_bRaceIntermission) return;
 
-	// Both Tanks are very close to the end. "it's neck and neck" - "this is going to be close"
+	// Both Tanks are very close to the end. "it's neck and neck" or "this is going to be close"
 	if(!g_announcer[g_announcerCloseGame])
 	{
 		bool noProblem = true;
@@ -14007,7 +14234,7 @@ void Mod_Toggle(bool enable)
 		// Fixes sentry guns not targeting the tank on stage 2 maps
 		// See: https://github.com/ValveSoftware/source-sdk-2013/blob/master/sp/src/game/server/baseentity.cpp#L2858
 		SetConVarInt(g_hCvarLOSMode, 1);
-		ServerCommand("exec stt.cfg");
+		ServerCommand("exec stt_cvars.cfg");
 		Tournament_RestoreNames();
 
 		// Enable memory patches.
@@ -14109,8 +14336,8 @@ bool Mod_CanBeLoaded()
 	// If both of these things are satisfied, then STT will attempt to run.
 	if(GetConVarBool(g_hCvarEnabled))
 	{
-		char map[32];
-		GetCurrentMap(map, sizeof(map));
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
 		if(strncmp(map, "pl_", 3, false) == 0 || strncmp(map, "plr_", 4, false) == 0 || strncmp(map, "stt_", 4, false) == 0)
 		{
 			return true;
@@ -14156,8 +14383,8 @@ public void Event_ServerSpawn(Handle event, const char[] eventName, bool dontBro
 
 bool Mod_ShouldApplyNavMeshPatch()
 {
-	char map[32];
-	GetCurrentMap(map, sizeof(map));
+	char map[PLATFORM_MAX_PATH];
+	GetMapName(map, sizeof(map));
 	
 	if(strcmp(map, "plr_hightower_event", false) == 0) return false; // Don't patch NavMesh on Helltower so skeletons will work.
 
@@ -14169,15 +14396,12 @@ void Mod_DetermineGameMode()
 	eGameMode gameMode = GameMode_Tank; // Fall back on regular payload.
 
 	// First, look for the plr_ map prefix.
-	char map[32];
-	GetCurrentMap(map, sizeof(map));
+	char map[PLATFORM_MAX_PATH];
+	GetMapName(map, sizeof(map));
 	if(strncmp(map, "plr_", 4, false) == 0)
 	{
 		gameMode = GameMode_Race;
-	}
-
-	// Check for this plr_ specific entity.
-	if(FindEntityByClassname(MaxClients+1, "tf_logic_multiple_escort") > MaxClients)
+	}else if(FindEntityByClassname(MaxClients+1, "tf_logic_multiple_escort") > MaxClients) // Check for this plr_ specific entity.
 	{
 		gameMode = GameMode_Race;
 	}
@@ -14214,4 +14438,27 @@ void Mod_ToggleTags(bool enable)
 			SetConVarString(g_cvar_sv_tags, tags);
 		}
 	}
+}
+
+void GetMapName(char[] mapName, int maxlength)
+{
+	GetCurrentMap(mapName, maxlength);
+
+	// Parse the display name out of workshop maps.
+	int ugcPos;
+	if(strncmp(mapName, "workshop/", 9, true) == 0 && (ugcPos = StrContains(mapName, ".ugc", true)) > 9)
+	{
+		mapName[ugcPos] = '\0';
+		strcopy(mapName, maxlength, mapName[9]);
+	}
+}
+
+public MRESReturn CBaseEntity_PhysicsSolidMaskForEntity(int entity, Handle returnStruct)
+{
+	// This overridees the default value of: 33570827 or MASK_SOLID -> (CONTENTS_SOLID|CONTENTS_MOVEABLE|CONTENTS_WINDOW|CONTENTS_MONSTER|CONTENTS_GRATE)
+
+	// This prevents tank_boss from blocking other entities with physics based movement: func_tracktrain, func_movelinear, func_door, etc..
+	DHookSetReturn(returnStruct, CONTENTS_WATER);
+
+	return MRES_Supercede;
 }
