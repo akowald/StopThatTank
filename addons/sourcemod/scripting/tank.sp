@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-#define DEBUG
+//#define DEBUG
 
 #define PLUGIN_VERSION 				"1.4"
 
