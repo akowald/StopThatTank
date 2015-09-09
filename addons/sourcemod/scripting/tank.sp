@@ -3744,8 +3744,6 @@ void Train_FindPropsByPhysConstraint(int team)
 	if(train > MaxClients)
 	{
 		char trainName[64];
-		char name1[64];
-		char name2[64];
 		GetEntPropString(train, Prop_Data, "m_iName", trainName, sizeof(trainName));
 		if(strlen(trainName) > 0)
 		{
@@ -3757,12 +3755,14 @@ void Train_FindPropsByPhysConstraint(int team)
 				if(offset <= 0) continue;
 				Address pointer = view_as<Address>(LoadFromAddress(GetEntityAddress(constraint)+view_as<Address>(offset), NumberType_Int32));
 				if(!IsValidAddress(pointer)) continue;
+				char name1[64];
 				LoadStringFromAddress(name1, sizeof(name1), pointer);				
 
 				offset = FindDataMapInfo(constraint, "m_nameAttach2");
 				if(offset <= 0) continue;
 				pointer = view_as<Address>(LoadFromAddress(GetEntityAddress(constraint)+view_as<Address>(offset), NumberType_Int32));
 				if(!IsValidAddress(pointer)) continue;
+				char name2[64];
 				LoadStringFromAddress(name2, sizeof(name2), pointer);
 
 				if(strlen(name1) <= 0 || strlen(name2) <= 0) continue;
@@ -10672,7 +10672,7 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "Jul-23: Anti-stalemate PLR timer");
+	DrawPanelText(hPanel, "Sep-9: Improved map support!");
 	if(GetConVarBool(g_hCvarOfficialServer))
 	{
 		DrawPanelText(hPanel, "Type !invite to join our Steam Group!");
