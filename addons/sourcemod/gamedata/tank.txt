@@ -128,7 +128,7 @@
 			{
 				"library"		"server"
 				"linux"		"@_ZN15CTFPlayerShared15FindHealerIndexEP11CBaseEntity"
-				"windows"		"\x55\x8B\xEC\x53\x56\x57\x8B\xB9\x34\x08\x00\x00\x33\xD2"
+				"windows"		"\x55\x8B\xEC\x53\x56\x57\x8B\xB9\x44\x08\x00\x00\x33\xD2"
 			}
 			"CTFGameStats::Event_LevelInit"
 			{
