@@ -6928,52 +6928,28 @@ void SDK_Init()
 		}
 	}
 
-	// This patch allows the bomb carrier to deploy uber.
-	Address addrMedigun = GameConfGetAddress(hGamedata, "Patch_Medigun");
-	if(addrMedigun == Address_Null)
+	// This patch allows the bomb carrier to deploy and be under the effects of uber.
+	Address addrChargeEffect = GameConfGetAddress(hGamedata, "Patch_ChargeEffect");
+	if(addrChargeEffect == Address_Null)
 	{
-		LogMessage("Failed to find address: Patch_Medigun!");
+		LogMessage("Failed to find address: Patch_ChargeEffect!");
 	}else{
-		int patchOffset = GameConfGetOffset(hGamedata, "Patch_Medigun");
+		int patchOffset = GameConfGetOffset(hGamedata, "Patch_ChargeEffect");
 		if(patchOffset <= -1)
 		{
-			LogMessage("Failed to find offset: Patch_Medigun!");
+			LogMessage("Failed to find offset: Patch_ChargeEffect!");
 		}else{
-			int patchPayload = GameConfGetOffset(hGamedata, "Payload_Medigun");
+			int patchPayload = GameConfGetOffset(hGamedata, "Payload_ChargeEffect");
 			if(patchPayload <= -1)
 			{
-				LogMessage("Failed to find payload: Payload_Medigun!");
+				LogMessage("Failed to find payload: Payload_ChargeEffect!");
 			}else{
 				int payload[1];
 				payload[0] = patchPayload;
 
-				g_patchMedigun = new MemoryPatch(addrMedigun+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+				g_patchChargeEffect = new MemoryPatch(addrChargeEffect+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
 			}
-		}		
-	}
-
-	// This patch fixes uber effects on the normal bomb carrier.
-	Address addrMedigun2 = GameConfGetAddress(hGamedata, "Patch_Medigun2");
-	if(addrMedigun2 == Address_Null)
-	{
-		LogMessage("Failed to find address: Patch_Medigun2!");
-	}else{
-		int patchOffset = GameConfGetOffset(hGamedata, "Patch_Medigun2");
-		if(patchOffset <= -1)
-		{
-			LogMessage("Failed to find offset: Patch_Medigun2!");
-		}else{
-			int patchPayload = GameConfGetOffset(hGamedata, "Payload_Medigun2");
-			if(patchPayload <= -1)
-			{
-				LogMessage("Failed to find payload: Payload_Medigun2!");
-			}else{
-				int payload[1];
-				payload[0] = patchPayload;
-
-				g_patchMedigun2 = new MemoryPatch(addrMedigun2+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
-			}
-		}		
+		}
 	}
 
 	// This patch fixes crash #1 - a nav-related crash. The bottom patch should cover this.
@@ -10457,57 +10433,7 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
-		int train = Entity_FindEntityByName("well_platform_train", "func_tracktrain");
-		if(train > MaxClients)
-		{
-			PrintToServer("train = %d 0x%X", train, GetEntityAddress(train));
-
-			int offset = FindDataMapInfo(train, "m_pPhysicsObject");
-			PrintToServer("offset = %d", offset);
-			PrintToServer("m_CollisionGroup = %d", GetEntProp(train, Prop_Send, "m_CollisionGroup"));
-			PrintToServer("m_nSolidType = %d", GetEntProp(train, Prop_Send, "m_nSolidType"));
-			PrintToServer("m_usSolidFlags = %d", GetEntProp(train, Prop_Send, "m_usSolidFlags"));
-
-			//SetEntProp(train, Prop_Send, "m_usSolidFlags", FSOLID_NOT_SOLID);
-
-
-
-			/*
-			Address physicsObject = view_as<Address>(LoadFromAddress(GetEntityAddress(train)+view_as<Address>(offset), NumberType_Int32));
-			PrintToServer("m_pPhysicsObject = 0x%X", physicsObject);
-			if(IsValidAddress(physicsObject))
-			{
-				if(g_hSDKEnableCollisions != INVALID_HANDLE)
-				{
-					PrintToServer("Calling CPhysicsObject::SetContents..");
-					SDKCall(g_hSDKEnableCollisions, physicsObject, 0x400);
-				}
-			}
-			*/
-		}
-
-		int tank = EntRefToEntIndex(g_iRefTank[TFTeam_Blue]);
-		if(tank > MaxClients)
-		{
-			PrintToServer("tank = %d", tank);
-			PrintToServer("m_CollisionGroup = %d", GetEntProp(tank, Prop_Send, "m_CollisionGroup"));
-			PrintToServer("m_nSolidType = %d", GetEntProp(tank, Prop_Send, "m_nSolidType"));
-			PrintToServer("m_usSolidFlags = %d", GetEntProp(tank, Prop_Send, "m_usSolidFlags"));
-
-			if(g_hSDKSolidMask != INVALID_HANDLE)
-			{
-				PrintToServer("Hooking on tank....");
-				DHookEntity(g_hSDKSolidMask, false, tank);
-			}
-		}
-
-		char map[PLATFORM_MAX_PATH];
-		GetMapName(map, sizeof(map));
-		PrintToServer("map = \"%s\"", map);
-
-		PrintToServer("m_nSolidType = %d", GetEntProp(EntRefToEntIndex(g_iRefTank[TFTeam_Blue]), Prop_Send, "m_nSolidType"));
-
-
+		SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
 	}
 
 	return Plugin_Handled;
@@ -14255,15 +14181,10 @@ void Mod_Toggle(bool enable)
 			LogMessage("Patching Knockback at 0x%X..", g_patchKnockback.Get(MemoryIndex_Address));
 			g_patchKnockback.enablePatch();
 		}
-		if(g_patchMedigun != null && !g_patchMedigun.isEnabled())
+		if(g_patchChargeEffect != null && !g_patchChargeEffect.isEnabled())
 		{
-			LogMessage("Patching Medigun at 0x%X..", g_patchMedigun.Get(MemoryIndex_Address));
-			g_patchMedigun.enablePatch();
-		}
-		if(g_patchMedigun2 != null && !g_patchMedigun2.isEnabled())
-		{
-			LogMessage("Patching Medigun2 at 0x%X..", g_patchMedigun2.Get(MemoryIndex_Address));
-			g_patchMedigun2.enablePatch();
+			LogMessage("Patching ChargeEffect at 0x%X..", g_patchChargeEffect.Get(MemoryIndex_Address));
+			g_patchChargeEffect.enablePatch();
 		}
 		if(Mod_ShouldApplyNavMeshPatch())
 		{
@@ -14306,15 +14227,10 @@ void Mod_Toggle(bool enable)
 			LogMessage("Un-patching Knockback at 0x%X..", g_patchKnockback.Get(MemoryIndex_Address));
 			g_patchKnockback.disablePatch();
 		}
-		if(g_patchMedigun != null && g_patchMedigun.isEnabled())
+		if(g_patchChargeEffect != null && g_patchChargeEffect.isEnabled())
 		{
-			LogMessage("Un-patching Medigun at 0x%X..", g_patchMedigun.Get(MemoryIndex_Address));
-			g_patchMedigun.disablePatch();
-		}
-		if(g_patchMedigun2 != null && g_patchMedigun2.isEnabled())
-		{
-			LogMessage("Un-patching Medigun2 at 0x%X..", g_patchMedigun2.Get(MemoryIndex_Address));
-			g_patchMedigun2.disablePatch();
+			LogMessage("Un-patching ChargeEffect at 0x%X..", g_patchChargeEffect.Get(MemoryIndex_Address));
+			g_patchChargeEffect.disablePatch();
 		}
 		if(g_patchNavMesh != null && g_patchNavMesh.isEnabled())
 		{
