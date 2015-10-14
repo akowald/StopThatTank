@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5"
+#define PLUGIN_VERSION 				"1.4"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -223,7 +223,7 @@
 #define ITEM_KAZOTSKY_KICK 1157
 #define ITEM_BOX_TROT 30615
 
-#define ATTRIB_MAX_HEALTH_ADDITIVE_BONUS 26
+#define ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED 140
 #define ATTRIB_MAXAMMO_PRIMARY_INCREASED 76
 #define ATTRIB_MAXAMMO_SECONDARY_INCREASED 78
 #define ATTRIB_FLAME_LIFE_BONUS 164

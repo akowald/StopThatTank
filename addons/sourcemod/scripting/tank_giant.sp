@@ -569,7 +569,7 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 
 	// Set the max health attribute on the player to give the giant incresed health
 	int iHealth = RoundToNearest(float(g_nGiants[iIndex][g_iGiantHealth]) * Giant_GetScaleForPlayers(iOppositeTeam)) + extraHealth;
-	Tank_SetAttributeValue(client, ATTRIB_MAX_HEALTH_ADDITIVE_BONUS, float(iHealth));
+	Tank_SetAttributeValue(client, ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED, float(iHealth));
 
 	// Apply increased ammo attributes on the player
 	Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_PRIMARY_INCREASED, config.LookupFloat(g_hCvarGiantAmmoMultiplier));
@@ -1100,7 +1100,7 @@ void Giant_Clear(int client, int reason=0)
 		TF2_RemoveCondition(client, view_as<TFCond>(iValues[ArrayCond_Index]));
 	}
 
-	Tank_RemoveAttribute(client, ATTRIB_MAX_HEALTH_ADDITIVE_BONUS);
+	Tank_RemoveAttribute(client, ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED);
 	Tank_RemoveAttribute(client, ATTRIB_MAXAMMO_PRIMARY_INCREASED);
 	Tank_RemoveAttribute(client, ATTRIB_MAXAMMO_SECONDARY_INCREASED);
 	Tank_RemoveAttribute(client, ATTRIB_MAJOR_MOVE_SPEED_BONUS);
