@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.4"
+#define PLUGIN_VERSION 				"1.5"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -223,7 +223,7 @@
 #define ITEM_KAZOTSKY_KICK 1157
 #define ITEM_BOX_TROT 30615
 
-#define ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED 140
+#define ATTRIB_MAX_HEALTH_ADDITIVE_BONUS 26
 #define ATTRIB_MAXAMMO_PRIMARY_INCREASED 76
 #define ATTRIB_MAXAMMO_SECONDARY_INCREASED 78
 #define ATTRIB_FLAME_LIFE_BONUS 164
@@ -1050,8 +1050,8 @@ public void OnPluginStart()
 	g_hCvarPointsDamageTank = CreateConVar("tank_points_damage_tank", "1000", "Tank damage required to be rewarded with scoreboard points.");
 	g_hCvarPointsDamageGiant = CreateConVar("tank_bomb_points_giant", "1000", "Giant damage required to be rewarded with scoreboard points.");
 
-	g_hCvarAttribHaulSpeed = CreateConVar("tank_haul_speed", "1.1111", "Haul speed modifier for RED engineers or ALL on plr_.");
-	g_hCvarAttribMetalMult = CreateConVar("tank_metal_mult", "1.65", "Metal multiplier for RED engineers or ALL on plr_.");
+	g_hCvarAttribHaulSpeed = CreateConVar("tank_haul_speed", "1.1111", "Haul speed modifier for RED engineers on pl_ or ALL engineers on plr_.");
+	g_hCvarAttribMetalMult = CreateConVar("tank_metal_mult", "1.7", "Metal multiplier for RED engineers on pl_ or ALL engineers on plr_.");
 	g_hCvarTankStuckTime = CreateConVar("tank_stuck_time", "2.0", "Seconds a player must be stuck in a tank to be teleported back out.");
 	g_hCvarZapPenalty = CreateConVar("tank_zap_penalty", "200", "Metal penalty for zapping Sir Nukesalot's projectile with the short circuit.");
 	g_hCvarSirNukesCap = CreateConVar("tank_sirnukes_cap", "500", "Cap for sir nukesalot's deflected projectiles self damage.");
@@ -8918,7 +8918,7 @@ public Action Timer_CheckTeams(Handle hTimer)
 		TF2_SetRespawnTime(TFTeam_Red, flRespawnRace);		
 	}
 
-	// Faking tournament mode allows the advanced spectate gui, shows team limits in the class selection menu, shows team names on the scoreboard, and allows the players to set the team name at the start of the map.
+	// Faking tournament mode allows the advanced spectate gui, shows class limits in the class selection menu, shows team names on the scoreboard, and allows the players to set the team name at the start of the map.
 	for(int i=1; i<=MaxClients; i++)
 	{
 		if(IsClientInGame(i) && !IsFakeClient(i)) SendConVarValue(i, g_hCvarTournament, "1");
