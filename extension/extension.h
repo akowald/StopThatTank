@@ -56,8 +56,6 @@ struct inputdata_t
 	int nOutputID;					// The unique ID of the output that was fired.
 };
 
-#pragma pack(push, 4)
-
 class CEconItemAttribute
 {
 public:
@@ -67,6 +65,8 @@ public:
 	float m_flValue; //8
 	int32 m_nRefundableCurrency; //12
 };
+
+#pragma pack(push, 4)
 
 class CEconItemHandle
 {
@@ -92,7 +92,9 @@ public:
 	uint64 m_iItemID; //16
 	uint32 m_iItemIDHigh; //24
 	uint32 m_iItemIDLow; //28
+
 	uint32 m_iAccountID; //32
+
 	uint32 m_iInventoryPosition; //36
 	
 	CEconItemHandle m_ItemHandle; //40 (44, 48, 52, 56, 60)
@@ -103,28 +105,20 @@ public:
 	uint32	m_unRGB; //76
 	uint32	m_unAltRGB; //80
 
-	ITexture *m_pWeaponSkinBase; //84
-	ITextureCompositor *m_pWeaponSkinBaseCompositor; //88
+	int32 m_iTeamNumber; //84
 
-	// no love given here
-	uint32 m_Unk1; //92
-	uint32 m_Unk2; //94
-	uint32 m_Unk3; //100
+	bool m_bInitialized; //88
 
-	int32 m_iTeamNumber; //104
+	//CAttributeList m_AttributeList; //92 (96, 100, 104, 108, 112, 116)
+	//CAttributeList m_NetworkedDynamicAttributesForDemos; //120 (124, 128, 132, 136, 140, 144)
+	uint32 padding[14]; //92-144
 
-	bool m_bInitialized; //108
-
-	//CAttributeList m_AttributeList; //112 (116, 120, 124, 128, 132, 136)
-	//CAttributeList m_NetworkedDynamicAttributesForDemos; //140 (144, 148, 152, 156, 160, 164)
-	uint32 padding[14]; //112...164
-
-	bool m_bDoNotIterateStaticAttributes; //168
+	bool m_bDoNotIterateStaticAttributes; //148
 };
 
 #pragma pack(pop)
 
-static_assert(sizeof(CEconItemView) == 172, "CEconItemView - incorrect size on this compiler");
+static_assert(sizeof(CEconItemView) == 152, "CEconItemView - incorrect size on this compiler");
 static_assert(sizeof(CEconItemHandle) == 24, "CEconItemHandle - incorrect size on this compiler");
 
 /**
