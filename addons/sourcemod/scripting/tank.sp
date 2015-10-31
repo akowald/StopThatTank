@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.4.1"
+#define PLUGIN_VERSION 				"1.4.2"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -222,6 +222,7 @@
 #define ITEM_CONGA 1118
 #define ITEM_KAZOTSKY_KICK 1157
 #define ITEM_BOX_TROT 30615
+#define ITEM_ZOOMIN_BROOM 30672
 
 #define ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED 140
 #define ATTRIB_MAXAMMO_PRIMARY_INCREASED 76
@@ -502,6 +503,7 @@ Handle g_hCvarTags;
 Handle g_hCvarTeleportStartRed;
 Handle g_hCvarTeleportStartBlue;
 Handle g_hCvarTeleportGoal;
+Handle g_hCvarGiantHHHCap;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -549,6 +551,7 @@ enum eMapHack
 	MapHack_Nightfall,
 	MapHack_CactusCanyon,
 	MapHack_Borneo,
+	MapHack_MillstoneEvent,
 };
 eMapHack g_nMapHack = MapHack_None;
 bool g_bEnableMapHack[MAX_TEAMS];
@@ -1130,6 +1133,7 @@ public void OnPluginStart()
 	g_hCvarTeamBluePlr = CreateConVar("tank_team_blue_plr", "BLU-BOTS", "Team name of the BLUE team in plr.");
 
 	g_hCvarHellTowerTimeGate = CreateConVar("tank_helltower_time_gates_open", "40.0", "Seconds after hell starts that the gates open in hell. This triggers the relay which will then delay an additional 29 seconds.");
+	g_hCvarGiantHHHCap = CreateConVar("tank_giant_hhh_cap", "250.0", "Damage cap for the HHH Halloween boss against the giant.");
 
 	g_hCvarClassLimits[TFTeam_Red][1] = CreateConVar("tank_classlimit_red_scout", "2", "Class limit for scout. Set to -1 for no limit.");
 	g_hCvarClassLimits[TFTeam_Red][2] = CreateConVar("tank_classlimit_red_sniper", "2", "Class limit for sniper. Set to -1 for no limit.");
@@ -1389,6 +1393,9 @@ public void OnMapStart()
 	}else if(strcmp(strMap, "pl_borneo", false) == 0)
 	{
 		g_nMapHack = MapHack_Borneo;
+	}else if(strcmp(strMap, "pl_millstone_event", false) == 0)
+	{
+		g_nMapHack = MapHack_MillstoneEvent;
 	}
 
 	g_nGameMode = GameMode_Unknown;
@@ -2108,7 +2115,7 @@ public void Event_RoundStart(Handle hEvent, char[] strEventName, bool bDontBroad
 
 	Timers_KillAll();
 
-	// Find the model of the payload cart itself, usually a "prop_phyiscs_*", but can be prop_dyanmic, depends on the map
+	// Find the model of the payload cart itself, usually a "prop_phyiscs_*", but can be prop_dynamic, depends on the map
 	Train_FindProps();
 
 	// The teams have just been scrambled so notify all the players with a sound when the round starts
@@ -2215,6 +2222,9 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 	Train_FindPropsByPhysConstraint(TFTeam_Blue);
 	if(g_nGameMode == GameMode_Race) Train_FindPropsByPhysConstraint(TFTeam_Red);
 
+	Train_FindPropsByParenting(TFTeam_Blue);
+	if(g_nGameMode == GameMode_Race) Train_FindPropsByParenting(TFTeam_Red);
+
 	// Find BLUE's first path_track
 	if(Tank_FindPathStart(TFTeam_Blue) <= MaxClients)
 	{
@@ -2244,6 +2254,9 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 
 	g_iRefTrackTrain2[TFTeam_Red] = 0;
 	g_iRefTrackTrain2[TFTeam_Blue] = 0;
+
+	Train_RemoveTriggerStun(TFTeam_Blue);
+	if(g_nGameMode == GameMode_Race) Train_RemoveTriggerStun(TFTeam_Red);
 
 	switch(g_nMapHack)
 	{
@@ -2566,6 +2579,29 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		PrintToServer("(Event_RoundActive) No team_round_timer found, assuming no setup so launching round..");
 #endif
 		Event_SetupFinished(INVALID_HANDLE, "teamplay_setup_finished", false);
+	}
+
+#if defined DEBUG
+		PrintToServer("(Event_RoundActive) Number of train props: %d", g_trainProps.Length);
+#endif
+}
+
+void Train_RemoveTriggerStun(int team)
+{
+	int train = EntRefToEntIndex(g_iRefTrackTrain[team]);
+	if(train >= MaxClients)
+	{
+		int trigger = MaxClients+1;
+		while((trigger = FindEntityByClassname(trigger, "trigger_stun")) > MaxClients)
+		{
+			if(GetEntPropEnt(trigger, Prop_Send, "moveparent") == train)
+			{
+#if defined DEBUG
+				PrintToServer("(Train_RemoveTriggerStun) Removing \"trigger_stun\" (%d) that is parented to team %d's cart (%d)..", trigger, team, train);
+#endif
+				AcceptEntityInput(trigger, "Kill");
+			}
+		}
 	}
 }
 
@@ -3649,8 +3685,7 @@ void Train_FindProps()
 	char cartModel[MAXLEN_CART_PATH];
 	int size = g_cartModels.Length;
 
-	int maxEntities = GetMaxEntities();
-	for(int entity=MaxClients+1; entity<maxEntities; entity++)
+	for(int entity=MaxClients+1,maxEntities=GetMaxEntities(); entity<maxEntities; entity++)
 	{
 		if(IsValidEntity(entity))
 		{
@@ -3735,6 +3770,26 @@ void LoadStringFromAddress(char[] buffer, int maxlength, Address address)
 		}
 	}
 	if(!terminated) buffer[maxlength-1] = '\0';	
+}
+
+void Train_FindPropsByParenting(int team)
+{
+	// Finds all props that are parented to the func_tracktrain and makes them transparent.
+	int train = EntRefToEntIndex(g_iRefTrackTrain[team]);
+	if(train > MaxClients)
+	{
+		int prop = MaxClients+1;
+		while((prop = FindEntityByClassname(prop, "prop_dynamic")) > MaxClients)
+		{
+			if(GetEntPropEnt(prop, Prop_Send, "moveparent") == train)
+			{
+#if defined DEBUG
+				PrintToServer("(Train_FindPropsByParenting) Found \"prop_dynamic\" (%d) parented to team %d's cart (%d)..", prop, team, train);
+#endif
+				Train_AddProp(prop);
+			}
+		}
+	}
 }
 
 void Train_FindPropsByPhysConstraint(int team)
@@ -4146,8 +4201,6 @@ int Train_MoveBack(int team)
 		PrintToServer("(Train_MoveBack) #%d Captured: %d Distance to goal: %0.1f/%0.1f", i, bCaptured, flDistanceToGoal, config.LookupFloat(g_hCvarDistanceMove));
 #endif
 		float flDistanceMax = config.LookupFloat(g_hCvarDistanceMove);
-		if(g_nMapHack == MapHack_CactusCanyon) flDistanceMax = 4000.0; // Ensure that the cart moves back to the first control point
-
 		if(bCaptured && flDistanceToGoal > flDistanceMax)
 		{
 			g_iCurrentControlPoint[team] = i+1;
@@ -4179,20 +4232,25 @@ void Train_MoveTo(int iTrackTrain, int iPathTrack)
 	PrintToServer("(Train_MoveTo) Moving train %d to path %d..", iTrackTrain, iPathTrack);
 #endif
 
-	// Let's now move the cart back
-	// Probably could replace this with CFuncTrackTrain's TeleportToPathTrack input
-	SetEntData(iTrackTrain, Offset_GetPathOffset(iTrackTrain), GetEntityAddress(iPathTrack));
-	
-	float flPathPos[3];
-	GetEntPropVector(iPathTrack, Prop_Send, "m_vecOrigin", flPathPos);
-	float flPathAng[3];
-	GetEntPropVector(iPathTrack, Prop_Send, "m_angRotation", flPathAng);
-	
-	TeleportEntity(iTrackTrain, flPathPos, flPathAng, NULL_VECTOR);
-	
-	// Maps disable paths when control points are captured so the tank can't move backwards past a control point so re-enable them all
-	int iEntity = MaxClients+1;
-	while((iEntity = FindEntityByClassname(iEntity, "path_track")) > MaxClients) AcceptEntityInput(iEntity, "EnablePath");
+	// Enable all the path_tracks between the cart and the goal.
+	AcceptEntityInput(iPathTrack, "EnablePath");
+	int goalPath = EntRefToEntIndex(g_iRefPathGoal[TFTeam_Blue]);
+	if(goalPath > MaxClients)
+	{
+		int nextPath;
+		int currentPath = iPathTrack;
+		while((nextPath = GetEntDataEnt2(currentPath, Offset_GetNextOffset(iPathTrack))) > MaxClients)
+		{
+			AcceptEntityInput(nextPath, "EnablePath");
+
+			currentPath = nextPath;
+			if(currentPath == goalPath) break;
+		}
+	}
+
+	// Let's now move the cart back.
+	SetVariantEntity(iPathTrack);
+	AcceptEntityInput(iTrackTrain, "TeleportToPathTrack");
 	
 	int iPathPrevious = GetEntDataEnt2(iPathTrack, Offset_GetPreviousOffset(iPathTrack));
 	if(iPathPrevious > MaxClients)
@@ -4752,6 +4810,9 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 	
 	if(!g_bEnabled) return Plugin_Continue;
 
+	char inflictorClass[32];
+	if(inflictor >= 0) GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
+
 	// Increase knockback on victim for melee damage
 	if(attacker >= 1 && attacker <= MaxClients && g_nSpawner[attacker][g_bSpawnerEnabled] && g_nSpawner[attacker][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(attacker, Prop_Send, "m_bIsMiniBoss"))
 	{
@@ -4793,9 +4854,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		// Keep track of what players are hurt by the sentry buster's env_explosion so we can avoid hurting them again.
 		if(Spawner_HasGiantTag(attacker, GIANTTAG_SENTRYBUSTER) && inflictor > MaxClients && victim != attacker && victim >= 1 && victim <= MaxClients && IsClientInGame(victim))
 		{
-			char className[32];
-			GetEdictClassname(inflictor, className, sizeof(className));
-			if(strcmp(className, "env_explosion") == 0)
+			if(strcmp(inflictorClass, "env_explosion") == 0)
 			{
 #if defined DEBUG
 				PrintToServer("(Player_OnTakeDamage) %N was hurt by the sentry buster..", victim);
@@ -4807,6 +4866,15 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 
 	if(victim >= 1 && victim <= MaxClients && g_nSpawner[victim][g_bSpawnerEnabled] && g_nSpawner[victim][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(victim, Prop_Send, "m_bIsMiniBoss"))
 	{
+		// Catch when the giant comes out of the minify magic spell and block the damage.
+		if(victim == attacker && victim == inflictor && damagetype == 1 && weapon == -1 && damagecustom == 0 && damage == 9999.0)
+		{
+#if defined DEBUG
+			PrintToServer("(Player_OnTakeDamage) %N took damage coming out of a minify magic spell..", victim);
+#endif
+			return Plugin_Stop;
+		}
+
 		// Catch when the sentry buster hits one health and self-destruct
 		if(g_nGiants[g_nSpawner[victim][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
 		{
@@ -4846,23 +4914,32 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		}
 
 		// Catch when the giant falls into lava in hell and bounce them back out.
-		if(g_nMapHack == MapHack_HightowerEvent && g_hellTeamWinner >= 2 && damage == 500.0 && attacker > MaxClients && attacker == inflictor)
+		if(g_nMapHack == MapHack_HightowerEvent && g_hellTeamWinner >= 2 && damage == 500.0 && attacker > MaxClients && attacker == inflictor && strcmp(inflictorClass, "trigger_hurt") == 0)
 		{
-			char inflictorClass[32];
-			GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
-			if(strcmp(inflictorClass, "trigger_hurt") == 0)
+#if defined DEBUG
+			PrintToServer("(Player_OnTakeDamage) %N hurt by lava in hell, boosting him out..", victim);
+#endif
+			float vel[3];
+			vel[0] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[0]");
+			vel[1] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[1]");
+			vel[2] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[2]");
+			float push = config.LookupFloat(g_hCvarLavaPush);
+			if(vel[2] < push) vel[2] = push;
+
+			TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, vel);
+		}
+
+		// Cap the damage that the HHH can do against giant robots.
+		if(attacker > MaxClients && attacker == inflictor && damagecustom == TF_CUSTOM_DECAPITATION_BOSS && strcmp(inflictorClass, "headless_hatman") == 0)
+		{
+			float damageCap = GetConVarFloat(g_hCvarGiantHHHCap);
+			if(damage > damageCap)
 			{
 #if defined DEBUG
-				PrintToServer("(Player_OnTakeDamage) %N hurt by lava in hell, boosting him out..", victim);
+				PrintToServer("(Player_OnTakeDamage) Giant %N took too much damage (%1.2f) from HHH boss, capping at %1.2f..", victim, damage, damageCap);
 #endif
-				float vel[3];
-				vel[0] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[0]");
-				vel[1] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[1]");
-				vel[2] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[2]");
-				float push = config.LookupFloat(g_hCvarLavaPush);
-				if(vel[2] < push) vel[2] = push;
-
-				TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, vel);
+				damage = damageCap;
+				return Plugin_Changed;
 			}
 		}
 
@@ -4871,8 +4948,6 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 			// Only track sentry damage to giant players.
 			if(inflictor > MaxClients)
 			{
-				char inflictorClass[32];
-				GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
 				//PrintToServer("inflictor: \"%s\"", inflictorClass);
 				if(strcmp(inflictorClass, "obj_sentrygun") == 0 || strcmp(inflictorClass, "tf_projectile_sentryrocket") == 0)
 				{
@@ -4904,10 +4979,10 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 			if(weapon > MaxClients)
 			{
 				// Note: that the weapon param may not be a weapon, such is the case of monoculus's rockets
-				char strWeapon[32];
-				GetEdictClassname(weapon, strWeapon, sizeof(strWeapon));
+				char weaponClass[32];
+				GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
 
-				if(damagecustom == TF_CUSTOM_BACKSTAB && damagetype & DMG_CRIT && strcmp(strWeapon, "tf_weapon_knife") == 0) // damagecustom TF_CUSTOM_BACKSTAB as an alternative??
+				if(damagecustom == TF_CUSTOM_BACKSTAB && damagetype & DMG_CRIT && strcmp(weaponClass, "tf_weapon_knife") == 0) // damagecustom TF_CUSTOM_BACKSTAB as an alternative??
 				{
 					// Someone just backstabbed the giant so set a custom damage and apply a less severe force
 					damage = config.LookupFloat(g_hCvarGiantKnifeDamage) / 3.0; // Crits multiply damage force by 3
@@ -4941,11 +5016,9 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 					}
 
 					return Plugin_Changed;
-				}else if(inflictor > MaxClients && damagetype & DMG_PREVENT_PHYSICS_FORCE && strcmp(strWeapon, "tf_weapon_flaregun") == 0 && GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex") == ITEM_SCORCH_SHOT)
+				}else if(inflictor > MaxClients && damagetype & DMG_PREVENT_PHYSICS_FORCE && strcmp(weaponClass, "tf_weapon_flaregun") == 0 && GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex") == ITEM_SCORCH_SHOT)
 				{
 					// The Scorch Shot flare shot on burning enemies has the projectile as the inflictor.
-					char inflictorClass[32];
-					GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
 					//PrintToServer("inflictor = %s", inflictorClass);
 					if(strcmp(inflictorClass, "tf_projectile_flare") == 0)
 					{
@@ -4976,37 +5049,32 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 				}
 
 				// Prevent the crash knockback that occurs to the giant from the Loose Cannon.
-				if(inflictor > MaxClients)
+				if(inflictor > MaxClients && strcmp(inflictorClass, "tf_projectile_pipe") == 0)
 				{
-					char inflictorClass[32];
-					GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
-					if(strcmp(inflictorClass, "tf_projectile_pipe") == 0)
+					int iOrigLauncher = GetEntPropEnt(inflictor, Prop_Send, "m_hOriginalLauncher");
+					if(iOrigLauncher > MaxClients && GetEntProp(iOrigLauncher, Prop_Send, "m_iItemDefinitionIndex") == ITEM_LOOSE_CANNON)
 					{
-						int iOrigLauncher = GetEntPropEnt(inflictor, Prop_Send, "m_hOriginalLauncher");
-						if(iOrigLauncher > MaxClients && GetEntProp(iOrigLauncher, Prop_Send, "m_iItemDefinitionIndex") == ITEM_LOOSE_CANNON)
-						{
 #if defined DEBUG
-							PrintToServer("(Player_OnTakeDamage) Giant %N was hit by the loose cannon..", victim);
+						PrintToServer("(Player_OnTakeDamage) Giant %N was hit by the loose cannon..", victim);
 #endif
-							int owner = GetEntPropEnt(iOrigLauncher, Prop_Send, "m_hOwner");
-							if(owner >= 1 && owner <= MaxClients && victim == owner)
-							{
-								// If the projectile is reflected, cap the damage that can be done to the giant.
-								float flDamageCap = config.LookupFloat(g_hCvarSirNukesCap);
-								if(damagetype & DMG_CRIT) flDamageCap = config.LookupFloat(g_hCvarSirNukesCap) / 3.0;
+						int owner = GetEntPropEnt(iOrigLauncher, Prop_Send, "m_hOwner");
+						if(owner >= 1 && owner <= MaxClients && victim == owner)
+						{
+							// If the projectile is reflected, cap the damage that can be done to the giant.
+							float flDamageCap = config.LookupFloat(g_hCvarSirNukesCap);
+							if(damagetype & DMG_CRIT) flDamageCap = config.LookupFloat(g_hCvarSirNukesCap) / 3.0;
 
-								if(damage > flDamageCap) damage = flDamageCap;
-							}
-
-							damagetype |= DMG_PREVENT_PHYSICS_FORCE;
-							float vel[3];
-							vel[0] = GetRandomFloat(-100.0, 100.0);
-							vel[1] = GetRandomFloat(-100.0, 100.0);
-							vel[2] = 300.0;
-							TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, vel);
-
-							return Plugin_Changed;
+							if(damage > flDamageCap) damage = flDamageCap;
 						}
+
+						damagetype |= DMG_PREVENT_PHYSICS_FORCE;
+						float vel[3];
+						vel[0] = GetRandomFloat(-100.0, 100.0);
+						vel[1] = GetRandomFloat(-100.0, 100.0);
+						vel[2] = 300.0;
+						TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, vel);
+
+						return Plugin_Changed;
 					}
 				}
 			}
@@ -5671,7 +5739,7 @@ void Tank_Think(int iTank)
 			if(iControlPoint > MaxClients)
 			{
 				// Check if the point is already capped by BLU
-				if(GetEntProp(iControlPoint, Prop_Send, "m_nSkin") == 1)
+				if(GetEntProp(iControlPoint, Prop_Data, "m_iTeamNum") == TFTeam_Blue)
 				{
 					for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && !IsFakeClient(i)) ClientCommand(i, "playgamesound %s", SOUND_CHECKPOINT);
 				}
@@ -5710,15 +5778,19 @@ void Tank_Think(int iTank)
 		}
 	}
 	
-	// Update the health bar to indicate the health of the tank
-	int iHealthBar = HealthBar_FindOrCreate();
-	if(iHealthBar > MaxClients)
+	// Update the health bar to indicate the health of the tank.
+	int healthBar = HealthBar_FindOrCreate();
+	if(healthBar > MaxClients)
 	{
-		float flHealth = float(GetEntProp(iTank, Prop_Data, "m_iHealth"));
-		float flMaxHealth = float(GetEntProp(iTank, Prop_Data, "m_iMaxHealth"));
-		
-		SetEntProp(iHealthBar, Prop_Send, "m_iBossHealthPercentageByte", RoundToCeil(flHealth / flMaxHealth * 255.0));
-		SetEntProp(iHealthBar, Prop_Send, "m_iBossState", bIsTankHealing ? 1 : 0);
+		int health = GetEntProp(iTank, Prop_Data, "m_iHealth");
+		int maxHealth = GetEntProp(iTank, Prop_Data, "m_iMaxHealth");
+
+		bool greenBar = (bIsTankHealing || health > maxHealth);
+		int healthBarValue = RoundToCeil(float(health) / float(maxHealth) * 255.0);
+		if(healthBarValue > 255) healthBarValue = 255;
+
+		SetEntProp(healthBar, Prop_Send, "m_iBossHealthPercentageByte", healthBarValue);
+		SetEntProp(healthBar, Prop_Send, "m_iBossState", (greenBar == true) ? 1 : 0);
 	}
 	
 	float flDistanceToGoal = Train_RealDistanceToGoal(team);
@@ -6997,7 +7069,7 @@ void SDK_Init()
 	{
 		if(Mod_ShouldApplyNavMeshPatch())
 		{
-			if(GetConVarBool(g_hCvarNavMesh) && g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
+			if(g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
 			{
 				LogMessage("Patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
 				g_patchNavMesh.enablePatch();
@@ -7274,9 +7346,10 @@ float Path_GetTotalDistance(int team)
 float Path_GetDistance(int iPathStart, int iPathEnd)
 {
 	// Iterate through all the path_track's and return the distance of the path
-	float flDistance;
+	float flDistance = 0.0;
 	int iNumTracks;
-	
+	bool pathsAreConnected = false;
+
 	if(iPathStart > MaxClients && iPathEnd > MaxClients && iPathStart != iPathEnd)
 	{
 		int iPathCur = iPathStart;
@@ -7296,8 +7369,29 @@ float Path_GetDistance(int iPathStart, int iPathEnd)
 			
 			iPathCur = iPathNext;
 			// We've hit the end of the stage
-			if(iPathCur == iPathEnd) break;
+			if(iPathCur == iPathEnd)
+			{
+				pathsAreConnected = true;
+				break;
+			}
 		}
+	}
+
+	// If the paths are not connected, then return the straight distance between the two path_track's.
+	if(!pathsAreConnected)
+	{
+		if(iPathStart > MaxClients && iPathEnd > MaxClients)
+		{
+			float pos1[3];
+			GetEntPropVector(iPathStart, Prop_Send, "m_vecOrigin", pos1);
+			float pos2[3];
+			GetEntPropVector(iPathEnd, Prop_Send, "m_vecOrigin", pos2);
+
+			flDistance = GetVectorDistance(pos1, pos2);
+#if defined DEBUG
+			PrintToServer("(Path_GetDistance) Non-connected path given, using straight distance (%1.2f) instead!", flDistance);
+#endif
+		}	
 	}
 	
 	return flDistance;
@@ -7371,9 +7465,12 @@ void Train_KillSparks(int iTrackTrain)
 
 public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLATFORM_MAX_PATH], int &entity, int &channel, float &volume, int &level, int &pitch, int &flags)
 {
-	//char strClass[32];
-	//if(entity >= 1 && IsValidEntity(entity)) GetEdictClassname(entity, strClass, sizeof(strClass));
-	//PrintToServer("Entity: %d \"%s\" Ch: %d Sound: %s, volume: %0.2f, pitch: %0.2f, time: %0.5f", entity, strClass, channel, sample, volume, pitch, GetEngineTime());
+	/*
+	char strClass[32];
+	if(entity >= 1 && IsValidEntity(entity)) GetEdictClassname(entity, strClass, sizeof(strClass));
+	PrintToServer("Entity: %d \"%s\" Ch: %d Sound: %s, volume: %0.2f, pitch: %0.2f, time: %0.5f", entity, strClass, channel, sample, volume, pitch, GetEngineTime());
+	int removeMe;
+	*/
 
 	int hitWithScorch = g_hitWithScorchShot;
 	bool overrideSound = g_overrideSound;
@@ -7573,9 +7670,9 @@ public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLAT
 		return Plugin_Stop;
 	}
 
-	if(g_nMapHack == MapHack_HightowerEvent && entity > MaxClients)
+	// Get notified when a player uses a teleport spell
+	if(entity > MaxClients)
 	{
-		// Get notified when a player uses a teleport spell
 		if(strcmp(sample, ")weapons/teleporter_ready.wav") == 0)
 		{
 			char className[64];
@@ -9039,6 +9136,8 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 		}else{
 			// Hook currency touch to award crits to the red team
 			SDKHook(iEntity, SDKHook_Touch, CritCash_OnTouch);
+			// After the 2015 Halloween update, currency packs will not spawn if there's no nav mesh. This allows Crit Cash to spawn on maps without a nav mesh!
+			SetEntProp(iEntity, Prop_Send, "m_bDistributed", true);
 		}
 	}else if(g_iCreatingCartDispenser > 0 && strcmp(classname, "dispenser_touch_trigger") == 0)
 	{
@@ -10433,7 +10532,17 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
-		SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
+		//SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
+
+		int watcher = EntRefToEntIndex(g_iRefTrainWatcher[TFTeam_Blue]);
+		if(watcher > MaxClients)
+		{
+			SetEntPropFloat(watcher, Prop_Send, "m_flTotalProgress", 0.5);
+		}
+
+		//float pos[3];
+		//GetEntPropVector(EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]), Prop_Send, "m_vecOrigin", pos);
+		//TeleportEntity(client, pos, NULL_VECTOR, NULL_VECTOR);
 	}
 
 	return Plugin_Handled;
@@ -10672,8 +10781,6 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 	int team = GetEntProp(iControlPoint, Prop_Send, "m_iTeamNum");
 	if(team != TFTeam_Blue) return;
 
-	// Swap the boring old RED hologram with the robot carrier hologram
-
 	// Find the control point's index
 	int iIndexCP = -1;
 	for(int i=0; i<MAX_LINKS; i++)
@@ -10690,6 +10797,16 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 	int iPathTrack = EntRefToEntIndex(g_iRefLinkedPaths[team][iIndexCP]);
 	if(iPathTrack <= MaxClients) return;
 
+	// Hellstone removes the starting path track when the first control point is captured so pick another path_track to act as our start.
+	if(g_nMapHack == MapHack_MillstoneEvent && iIndexCP == 0)
+	{
+#if defined DEBUG
+		PrintToServer("(Output_OnBlueCapture) First point captured on Hellstone, modifying start path_track to %d!", iPathTrack);
+#endif
+		g_iRefPathStart[team] = EntIndexToEntRef(iPathTrack);
+	}
+
+	// Swap the boring old RED hologram with the robot carrier hologram.
 	float flAng[3];
 	Path_GetOrientation(iPathTrack, flAng);
 	SetEntityModel(iControlPoint, MODEL_ROBOT_HOLOGRAM);
@@ -11231,6 +11348,41 @@ void Path_GetOrientation(int iPathTrack, float flAng[3], bool pointBackwards=fal
 		nextPath = GetEntDataEnt2(iPathTrack, Offset_GetNextOffset(iPathTrack));
 	}
 
+	if(nextPath <= MaxClients)
+	{
+		// Can't find a next path so use the linked paths to generate an angle.
+		int index = -1;
+		int team;
+		for(team=2; team<=3; team++)
+		{
+			for(int i=0; i<MAX_LINKS; i++)
+			{
+				if(EntRefToEntIndex(g_iRefLinkedPaths[team][i]) == iPathTrack)
+				{
+					index = i;
+					break;
+				}
+			}
+			if(index != -1) break;
+		}
+
+		if(index != -1)
+		{
+			// Point to the next linked path_track.
+			if(pointBackwards)
+			{
+				index--;
+			}else{
+				index++;
+			}
+
+			if(index >= 0 && index < MAX_LINKS)
+			{
+				nextPath = EntRefToEntIndex(g_iRefLinkedPaths[team][index]);
+			}
+		}
+	}
+
 	if(nextPath > MaxClients)
 	{
 		float flPosNext[3];
@@ -11570,6 +11722,11 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 							SetEntPropFloat(client, Prop_Send, "m_flCurrentTauntMoveSpeed", 100.0);
 							SetEntProp(client, Prop_Send, "m_bAllowMoveDuringTaunt", true);
 						}
+						case ITEM_ZOOMIN_BROOM:
+						{
+							SetEntPropFloat(client, Prop_Send, "m_flCurrentTauntMoveSpeed", 200.0);
+							SetEntProp(client, Prop_Send, "m_bAllowMoveDuringTaunt", true);
+						}
 					}
 				}
 			}
@@ -11644,6 +11801,35 @@ public void TF2_OnConditionRemoved(int client, TFCond condition)
 					FloatToString(scale, modelScale, sizeof(modelScale));
 					SetVariantString(modelScale);
 					AcceptEntityInput(client, "SetModelScale");
+				}
+
+				// Ensure that player is not stuck after re-scaling.
+				float pos[3];
+				GetClientAbsOrigin(client, pos);
+				
+				float mins[3];
+				float maxs[3];
+				GetClientMins(client, mins);
+				GetClientMaxs(client, maxs);
+
+				int team = GetClientTeam(client);
+				int mask = MASK_RED;
+				if(team != TFTeam_Red) mask = MASK_BLUE;
+
+				TR_TraceHullFilter(pos, pos, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+				if(TR_DidHit())
+				{
+#if defined DEBUG
+					PrintToServer("(TF2_OnConditionRemoved) Detected that %N may be stuck after minify spell!", client);
+#endif
+					// Player is probably stuck so teleport them to a new position
+					if(!Player_FindFreePosition2(client, pos, mins, maxs))
+					{
+#if defined DEBUG
+						PrintToServer("(TF2_OnConditionRemoved) Failed to find a free spot for %N!", client);
+#endif
+						//
+					}
 				}
 			}
 		}
@@ -14188,7 +14374,7 @@ void Mod_Toggle(bool enable)
 		}
 		if(Mod_ShouldApplyNavMeshPatch())
 		{
-			if(GetConVarBool(g_hCvarNavMesh) && g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
+			if(g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
 			{
 				LogMessage("Patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
 				g_patchNavMesh.enablePatch();
@@ -14275,7 +14461,7 @@ public void Event_ServerSpawn(Handle event, const char[] eventName, bool dontBro
 	{
 		if(Mod_ShouldApplyNavMeshPatch())
 		{
-			if(GetConVarBool(g_hCvarNavMesh) && g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
+			if(g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
 			{
 				LogMessage("Patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
 				g_patchNavMesh.enablePatch();
@@ -14299,10 +14485,13 @@ public void Event_ServerSpawn(Handle event, const char[] eventName, bool dontBro
 
 bool Mod_ShouldApplyNavMeshPatch()
 {
+	if(GetConVarBool(g_hCvarNavMesh) == false) return false;
+
 	char map[PLATFORM_MAX_PATH];
 	GetMapName(map, sizeof(map));
 	
 	if(strcmp(map, "plr_hightower_event", false) == 0) return false; // Don't patch NavMesh on Helltower so skeletons will work.
+	if(strcmp(map, "pl_millstone_event", false) == 0) return false;
 
 	return true;
 }

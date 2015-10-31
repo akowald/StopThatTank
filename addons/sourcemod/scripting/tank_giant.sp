@@ -564,12 +564,24 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 		50, // spy
 		50, // engineer
 	};
-	int extraHealth = 0;
-	if(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) extraHealth = busterExtraHealth[giantClass];
+	int shimHealth = 0;
+	if(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) shimHealth = busterExtraHealth[giantClass];
 
 	// Set the max health attribute on the player to give the giant incresed health
-	int iHealth = RoundToNearest(float(g_nGiants[iIndex][g_iGiantHealth]) * Giant_GetScaleForPlayers(iOppositeTeam)) + extraHealth;
-	Tank_SetAttributeValue(client, ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED, float(iHealth));
+	int maxHealth = RoundToNearest(float(g_nGiants[iIndex][g_iGiantHealth]) * Giant_GetScaleForPlayers(iOppositeTeam)) + shimHealth;
+	// Apply the "tank_giant_health_multiplier" config value.
+	if(!(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
+	{
+		float healthMult = config.LookupFloat(g_hCvarGiantHealthMultiplier);
+		if(healthMult != 1.0)
+		{
+#if defined DEBUG
+			PrintToServer("(Giant_MakeGiantRobot) Scaling maxHealth from %d to %d!", maxHealth, RoundToNearest(float(maxHealth)*healthMult));
+#endif
+			maxHealth = RoundToNearest(float(maxHealth)*healthMult);
+		}
+	}
+	Tank_SetAttributeValue(client, ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED, float(maxHealth));
 
 	// Apply increased ammo attributes on the player
 	Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_PRIMARY_INCREASED, config.LookupFloat(g_hCvarGiantAmmoMultiplier));
@@ -916,32 +928,21 @@ void Giant_GiveWeapons(int client)
 	// Make sure the player's maxhealth is correct
 	int overheal = RoundToNearest(float(g_nGiants[iIndex][g_iGiantOverheal]) * Giant_GetScaleForPlayers(iOppositeTeam));
 	int maxHealth = SDK_GetMaxHealth(client);
-
-	// Apply the "giant_health_multiplier" config value.
-	
+	// Apply the "tank_giant_health_multiplier" config value.
 	if(!(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
 	{
 		float healthMult = config.LookupFloat(g_hCvarGiantHealthMultiplier);
 		if(healthMult != 1.0)
 		{
 	#if defined DEBUG
-			PrintToServer("(Giant_GiveWeapons) Scaling health: maxHealth from %d to %d,  overheal from %d to %d.", maxHealth, RoundToNearest(float(maxHealth)*healthMult), overheal, RoundToNearest(float(overheal)*healthMult));
+			PrintToServer("(Giant_GiveWeapons) Scaling overheal health from %d to %d!", overheal, RoundToNearest(float(overheal)*healthMult));
 	#endif
 			overheal = RoundToNearest(float(overheal)*healthMult);
-			maxHealth = RoundToNearest(float(maxHealth)*healthMult);
 		}
 	}
 	if(overheal < 0) overheal = 0;
 	SetEntityHealth(client, maxHealth+overheal);
 
-	/*
-	if(overheal > 0)
-	{
-		PrintToChatAll("%s %N\x01 became: \x07FFD700%s  \x07CF7336%d\x01 HP + \x04%d\x01 HP", g_strTeamColors[GetClientTeam(client)], client, g_nGiants[iIndex][g_strGiantName], maxHealth, overheal);
-	}else{
-		PrintToChatAll("%s %N\x01 became: \x07FFD700%s  \x07CF7336%d\x01 HP", g_strTeamColors[GetClientTeam(client)], client, g_nGiants[iIndex][g_strGiantName], maxHealth+overheal);
-	}
-	*/
 	PrintToChatAll("%t", "Tank_Chat_Giant_Spawned", g_strTeamColors[team], client, 0x01, "\x07FFD700", g_nGiants[iIndex][g_strGiantName], "\x07CF7336", maxHealth+overheal, 0x01);
 
 	Player_FixVaccinator(client);
@@ -1576,14 +1577,18 @@ void Giant_Think(int team)
 			if(g_nGameMode == GameMode_BombDeploy && g_nTeamGiant[team][g_bTeamGiantAlive])
 			{
 				
-				int iHealthBar = HealthBar_FindOrCreate();
-				if(iHealthBar > MaxClients)
+				int healthBar = HealthBar_FindOrCreate();
+				if(healthBar > MaxClients)
 				{
-					float flHealth = float(GetClientHealth(client));
-					float flMaxHealth = float(SDK_GetMaxHealth(client));
+					int health = GetClientHealth(client);
+					int maxHealth = SDK_GetMaxHealth(client);
+
+					bool greenBar = (TF2_IsPlayerInCondition(client, TFCond_Healing) || health > maxHealth);
+					int healthBarValue = RoundToCeil(float(health) / float(maxHealth) * 255.0);
+					if(healthBarValue > 255) healthBarValue = 255;
 					
-					SetEntProp(iHealthBar, Prop_Send, "m_iBossHealthPercentageByte", RoundToCeil(flHealth / flMaxHealth * 255.0));
-					SetEntProp(iHealthBar, Prop_Send, "m_iBossState", TF2_IsPlayerInCondition(client, TFCond_Healing) ? 1 : 0);
+					SetEntProp(healthBar, Prop_Send, "m_iBossHealthPercentageByte", healthBarValue);
+					SetEntProp(healthBar, Prop_Send, "m_iBossState", (greenBar == true) ? 1 : 0);
 				}
 			}else{
 				HealthBar_Hide();
