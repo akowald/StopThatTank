@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-//#define DEBUG
+#define DEBUG
 
 #define PLUGIN_VERSION 				"1.4.2"
 
@@ -1798,16 +1798,13 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				}
 
 				// If we are hightower, we need to remove the outline when the giant uses the invis spell.
-				if(g_nGameMode == GameMode_Race && g_nMapHack == MapHack_HightowerEvent)
+				if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
 				{
-					if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
+					if(TF2_IsPlayerInCondition(client, TFCond_Stealthed))
 					{
-						if(TF2_IsPlayerInCondition(client, TFCond_Stealthed))
-						{
-							SetEntProp(client, Prop_Send, "m_bGlowEnabled", false);
-						}else{
-							SetEntProp(client, Prop_Send, "m_bGlowEnabled", true);
-						}
+						SetEntProp(client, Prop_Send, "m_bGlowEnabled", false);
+					}else{
+						SetEntProp(client, Prop_Send, "m_bGlowEnabled", true);
 					}
 				}
 
@@ -1988,6 +1985,20 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 							TF2_AddCondition(client, TFCond_SpeedBuffAlly, 0.001);
 						}
 						Tank_RemoveAttribute(client, ATTRIB_MAJOR_INCREASED_JUMP_HEIGHT);
+					}
+				}
+
+				// Block the giant from being spooked by the HHH.
+				if(TF2_IsPlayerInCondition(client, TFCond_Dazed))
+				{
+					// The stun flags for the HHH scare: 192 (TF_STUNFLAGS_GHOSTSCARE)
+					// The stun flags for a regular ghost scare: 193 (TF_STUNFLAGS_GHOSTSCARE|TF_STUNFLAG_SLOWDOWN)
+					if(GetEntProp(client, Prop_Send, "m_iStunFlags") == TF_STUNFLAGS_GHOSTSCARE && GetEntPropEnt(client, Prop_Send, "m_hStunner") == -1)
+					{
+#if defined DEBUG
+						PrintToServer("(OnPlayerRunCmd) Cancelling out stun to giant %N!", client);
+#endif
+						TF2_RemoveCondition(client, TFCond_Dazed);
 					}
 				}
 			}
@@ -2258,6 +2269,13 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 	Train_RemoveTriggerStun(TFTeam_Blue);
 	if(g_nGameMode == GameMode_Race) Train_RemoveTriggerStun(TFTeam_Red);
 
+	// Hook when giants come activate trigger_teleport entities to prevent them from becoming stuck on the other side.
+	int trigger = MaxClients+1;
+	while((trigger = FindEntityByClassname(trigger, "trigger_teleport")) > MaxClients)
+	{
+		HookSingleEntityOutput(trigger, "OnEndTouch", EntityOutput_TriggerTeleport, false);
+	}
+
 	switch(g_nMapHack)
 	{
 		case MapHack_Frontier:
@@ -2282,7 +2300,7 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 
 			// Disable the trigger_hurt that kills the player if they stand in front of the cart
 			// It's parented to the chew chew prop
-			int trigger = MaxClients+1;
+			trigger = MaxClients+1;
 			while((trigger = FindEntityByClassname(trigger, "trigger_hurt")) > MaxClients)
 			{
 				int parent = GetEntPropEnt(trigger, Prop_Send, "moveparent");
@@ -2350,7 +2368,7 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 				LogMessage("Failed to find \"%s\" entity!", HELL_GATES_TARGETNAME);
 			}
 
-			int trigger = Entity_FindEntityByName("underworld_skull_zap_hurt", "trigger_hurt");
+			trigger = Entity_FindEntityByName("underworld_skull_zap_hurt", "trigger_hurt");
 			if(trigger != -1)
 			{
 				SetVariantInt(700);
@@ -14566,4 +14584,49 @@ public MRESReturn CBaseEntity_PhysicsSolidMaskForEntity(int entity, Handle retur
 	DHookSetReturn(returnStruct, CONTENTS_WATER);
 
 	return MRES_Supercede;
+}
+
+public void EntityOutput_TriggerTeleport(const char[] output, int caller, int activator, float delay)
+{
+	if(!g_bEnabled) return;
+	
+#if defined DEBUG
+	PrintToServer("(EntityOutput_TriggerTeleport) %s: caller = %d, activator = %d, delay = %f.", output, caller, activator, delay);
+#endif
+	// Make sure the giant doesn't come out of a trigger_teleport stuck.
+	int client = activator;
+	if(client >= 1 && client <= MaxClients && IsClientInGame(client))
+	{
+		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] != Spawn_Tank && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+		{
+			// Ensure that player is not stuck after re-scaling.
+			float pos[3];
+			GetClientAbsOrigin(client, pos);
+			
+			float mins[3];
+			float maxs[3];
+			GetClientMins(client, mins);
+			GetClientMaxs(client, maxs);
+
+			int team = GetClientTeam(client);
+			int mask = MASK_RED;
+			if(team != TFTeam_Red) mask = MASK_BLUE;
+
+			TR_TraceHullFilter(pos, pos, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+			if(TR_DidHit())
+			{
+#if defined DEBUG
+				PrintToServer("(EntityOutput_TriggerTeleport) Detected that %N may be stuck after minify spell!", client);
+#endif
+				// Player is probably stuck so teleport them to a new position
+				if(!Player_FindFreePosition2(client, pos, mins, maxs))
+				{
+#if defined DEBUG
+					PrintToServer("(EntityOutput_TriggerTeleport) Failed to find a free spot for %N!", client);
+#endif
+					//
+				}
+			}
+		}
+	}
 }
