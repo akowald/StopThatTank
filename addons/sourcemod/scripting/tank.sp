@@ -1110,7 +1110,7 @@ public void OnPluginStart()
 
 	g_hCvarBusterExplodeMagnitude = CreateConVar("tank_buster_explode_damage", "2500", "Damage dealt inside explosion radius.");
 	g_hCvarBusterExplodeRadius = CreateConVar("tank_buster_explode_radius", "300", "Explosion radius.");
-	g_hCvarBusterTriggerTank = CreateConVar("tank_buster_trigger_tank", "2700", "A sentry buster can spawn when this damage is dealt to the tank by a sentry.");
+	g_hCvarBusterTriggerTank = CreateConVar("tank_buster_trigger_tank", "2500", "A sentry buster can spawn when this damage is dealt to the tank by a sentry.");
 	g_hCvarBusterTriggerGiant = CreateConVar("tank_buster_trigger_giant", "2000", "A sentry buster can spawn when this damage is dealt to the giant by a sentry.");
 	g_hCvarBusterTriggerRobots = CreateConVar("tank_buster_trigger_robot", "6", "A sentry buster can spawn after the specified robot kills.");
 	g_hCvarBusterTimeWarn = CreateConVar("tank_buster_time_warn", "3.0", "Time (seconds) duration where a player will be warned that he will become a sentry buster and have a chance to pass.");
