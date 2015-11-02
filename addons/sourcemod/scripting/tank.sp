@@ -14664,8 +14664,8 @@ public void EntityOutput_TriggerTeleport(const char[] output, int caller, int ac
 public MRESReturn CMonsterResource_SetBossHealthPercentage(int pThis, Handle hReturn, Handle hParams)
 {
 	if(!g_bEnabled) return MRES_Ignored;
+	if(g_nGameMode != GameMode_Tank && g_nGameMode != GameMode_BombDeploy) return MRES_Ignored;
 
-	PrintToServer("Blocked SetBossHealthPercentage.");
 	// Block anything trying to update the monster_resource health bar.
 	return MRES_Supercede;
 }
