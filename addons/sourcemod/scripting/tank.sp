@@ -10844,13 +10844,32 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 	int iPathTrack = EntRefToEntIndex(g_iRefLinkedPaths[team][iIndexCP]);
 	if(iPathTrack <= MaxClients) return;
 
-	// Hellstone removes the starting path track when the first control point is captured so pick another path_track to act as our start.
-	if(g_nMapHack == MapHack_MillstoneEvent && iIndexCP == 0)
+	if(g_nMapHack == MapHack_MillstoneEvent)
 	{
+		switch(iIndexCP)
+		{
+			// Hellstone removes the starting path track when the first control point is captured so pick another path_track to act as our start.
+			case 0:
+			{
 #if defined DEBUG
-		PrintToServer("(Output_OnBlueCapture) First point captured on Hellstone, modifying start path_track to %d!", iPathTrack);
+				PrintToServer("(Output_OnBlueCapture) First point captured on Hellstone, modifying start path_track to %d!", iPathTrack);
 #endif
-		g_iRefPathStart[team] = EntIndexToEntRef(iPathTrack);
+				g_iRefPathStart[team] = EntIndexToEntRef(iPathTrack);
+			}
+			// Remove BLU's spawn barriers when the third control point is captured.
+			// BLU has spawn barriers that are removed when a certain path_track is passed. This never happen if the tank dies early.
+			case 2:
+			{
+				int relay = Entity_FindEntityByName("elementti_2", "logic_relay");
+				if(relay != -1)
+				{
+#if defined DEBUG
+					PrintToServer("(Output_OnBlueCapture) Third control point captured on Hellstone, removing BLU spawn barrier via logic_relay (%d)..", relay);
+#endif
+					AcceptEntityInput(relay, "Trigger");
+				}
+			}
+		}
 	}
 
 	// Swap the boring old RED hologram with the robot carrier hologram.
