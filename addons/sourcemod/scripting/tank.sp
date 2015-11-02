@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-#define DEBUG
+//#define DEBUG
 
 #define PLUGIN_VERSION 				"1.4.2"
 
@@ -530,6 +530,7 @@ Handle g_hSDKWeaponSwitch;
 Handle g_hSDKLaunchGrenadePre;
 Handle g_hSDKLaunchGrenadePost;
 Handle g_hSDKSolidMask;
+Handle g_hSDKSetBossHealth;
 
 Handle g_cookieInfoPanel;
 
@@ -2276,6 +2277,16 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		HookSingleEntityOutput(trigger, "OnEndTouch", EntityOutput_TriggerTeleport, false);
 	}
 
+	if(g_hSDKSetBossHealth != INVALID_HANDLE)
+	{
+		// Create a hook to block any updating of the boss health bar.
+		int bossbar = MaxClients+1;
+		while((bossbar = FindEntityByClassname(bossbar, "monster_resource")) > MaxClients)
+		{
+			DHookEntity(g_hSDKSetBossHealth, false, bossbar); // Don't need to worry if the entity is already hooked.
+		}
+	}
+
 	switch(g_nMapHack)
 	{
 		case MapHack_Frontier:
@@ -2381,14 +2392,14 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		{
 			// Find the train trigger for Stage 3 that surrounds the front of the train
 			// We will hook touch and Trigger the crash_relay to end stage 3
-			int iTrainTrigger = Entity_FindEntityByName("objective_train_hurt", "trigger_hurt");
-			if(iTrainTrigger > MaxClients)
+			trigger = Entity_FindEntityByName("objective_train_hurt", "trigger_hurt");
+			if(trigger > MaxClients)
 			{
 #if defined DEBUG
-				PrintToServer("(Event_RoundActive) Found \"objective_train_hurt\", hooking touch: %d!", iTrainTrigger);
+				PrintToServer("(Event_RoundActive) Found \"objective_train_hurt\", hooking touch: %d!", trigger);
 #endif
 				// This triggers hurts players that get hit by the front of the train
-				SDKHook(iTrainTrigger, SDKHook_StartTouch, CactusCanyon_TrainTouch);
+				SDKHook(trigger, SDKHook_StartTouch, CactusCanyon_TrainTouch);
 			}
 		}
 	}
@@ -2790,7 +2801,7 @@ public void Event_Inventory(Handle hEvent, char[] strEventName, bool bDontBroadc
 		// Give the new weapon inspect feature to everyone because why not!
 		if(config.LookupInt(g_hCvarWeaponInspect) == 2)
 		{
-			for(int slot=0; slot<2; slot++)
+			for(int slot=0; slot<3; slot++)
 			{
 				int weapon = GetPlayerWeaponSlot(client, slot);
 				if(weapon > MaxClients)
@@ -6722,6 +6733,10 @@ void SDK_Init()
 	{
 		g_hSDKLaunchGrenadePre = DHookCreate(offset, HookType_Entity, ReturnType_Int, ThisPointer_CBaseEntity, CTFCompoundBow_LaunchGrenade_Pre);
 		g_hSDKLaunchGrenadePost = DHookCreate(offset, HookType_Entity, ReturnType_Int, ThisPointer_CBaseEntity, CTFCompoundBow_LaunchGrenade_Post);
+		if(g_hSDKLaunchGrenadePre == INVALID_HANDLE || g_hSDKLaunchGrenadePost == INVALID_HANDLE)
+		{
+			LogMessage("Failed to create DHook handle: CTFCompoundBow::LaunchGrenade!");
+		}
 	}else{
 		LogMessage("Failed to get offset: CTFCompoundBow::LaunchGrenade!");
 	}
@@ -6737,8 +6752,26 @@ void SDK_Init()
 	if(offset > 0)
 	{
 		g_hSDKSolidMask = DHookCreate(offset, HookType_Entity, ReturnType_Int, ThisPointer_CBaseEntity, CBaseEntity_PhysicsSolidMaskForEntity);
+		if(g_hSDKSolidMask == INVALID_HANDLE)
+		{
+			LogMessage("Failed to create DHook handle: CBaseEntity::PhysicsSolidMaskForEntity!");
+		}
 	}else{
 		LogMessage("Failed to get offset: CBaseEntity::PhysicsSolidMaskForEntity!");
+	}
+
+	offset = GameConfGetOffset(hGamedata, "CMonsterResource::SetBossHealthPercentage");
+	if(offset > 0)
+	{
+		g_hSDKSetBossHealth = DHookCreate(offset, HookType_Entity, ReturnType_Void, ThisPointer_CBaseEntity, CMonsterResource_SetBossHealthPercentage);
+		if(g_hSDKSetBossHealth != INVALID_HANDLE)
+		{
+			DHookAddParam(g_hSDKSetBossHealth, HookParamType_Float);
+		}else{
+			LogMessage("Failed to create DHook handle: CMonsterResource::SetBossHealthPercentage!");
+		}
+	}else{
+		LogMessage("Failed to get offset: CMonsterResource::SetBossHealthPercentage!");
 	}
 
 	// This call is used to translate a memory address into an entity index
@@ -7363,12 +7396,14 @@ float Path_GetTotalDistance(int team)
 
 float Path_GetDistance(int iPathStart, int iPathEnd)
 {
+	if(iPathStart == iPathEnd) return 0.0;
+
 	// Iterate through all the path_track's and return the distance of the path
 	float flDistance = 0.0;
 	int iNumTracks;
 	bool pathsAreConnected = false;
 
-	if(iPathStart > MaxClients && iPathEnd > MaxClients && iPathStart != iPathEnd)
+	if(iPathStart > MaxClients && iPathEnd > MaxClients)
 	{
 		int iPathCur = iPathStart;
 		
@@ -7407,7 +7442,7 @@ float Path_GetDistance(int iPathStart, int iPathEnd)
 
 			flDistance = GetVectorDistance(pos1, pos2);
 #if defined DEBUG
-			PrintToServer("(Path_GetDistance) Non-connected path given, using straight distance (%1.2f) instead!", flDistance);
+			PrintToServer("(Path_GetDistance) Non-connected path given (%d to %d), using straight distance (%1.2f) instead!", iPathStart, iPathEnd, flDistance);
 #endif
 		}	
 	}
@@ -10552,12 +10587,6 @@ public Action Command_Test2(int client, int args)
 	{
 		//SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
 
-		int watcher = EntRefToEntIndex(g_iRefTrainWatcher[TFTeam_Blue]);
-		if(watcher > MaxClients)
-		{
-			SetEntPropFloat(watcher, Prop_Send, "m_flTotalProgress", 0.5);
-		}
-
 		//float pos[3];
 		//GetEntPropVector(EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]), Prop_Send, "m_vecOrigin", pos);
 		//TeleportEntity(client, pos, NULL_VECTOR, NULL_VECTOR);
@@ -10725,7 +10754,7 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "Sep-9: Improved map support!");
+	DrawPanelText(hPanel, "Nov-1: Added Hellstone support!");
 	if(GetConVarBool(g_hCvarOfficialServer))
 	{
 		DrawPanelText(hPanel, "Type !invite to join our Steam Group!");
@@ -14629,4 +14658,14 @@ public void EntityOutput_TriggerTeleport(const char[] output, int caller, int ac
 			}
 		}
 	}
+}
+
+// void CMonsterResource::SetBossStunPercentage(CMonsterResource *this, float)
+public MRESReturn CMonsterResource_SetBossHealthPercentage(int pThis, Handle hReturn, Handle hParams)
+{
+	if(!g_bEnabled) return MRES_Ignored;
+
+	PrintToServer("Blocked SetBossHealthPercentage.");
+	// Block anything trying to update the monster_resource health bar.
+	return MRES_Supercede;
 }
