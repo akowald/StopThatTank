@@ -319,6 +319,11 @@
 				"linux"		"481"
 				"windows"		"471"
 			}
+			"CMonsterResource::SetBossHealthPercentage"
+			{
+				"linux"		"190"
+				"windows"		"189"
+			}
 		}
 	}
 }
