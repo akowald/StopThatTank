@@ -876,9 +876,9 @@ methodmap GiantTracker < StringMap
 		int cooldown;
 		if(g_nGameMode == GameMode_Race)
 		{
-			cooldown = GetConVarInt(g_hCvarGiantCooldownPlr);
+			cooldown = RoundToNearest(GetConVarFloat(g_hCvarGiantCooldownPlr)*60.0);
 		}else{
-			cooldown = GetConVarInt(g_hCvarGiantCooldown);
+			cooldown = RoundToNearest(GetConVarFloat(g_hCvarGiantCooldown)*60.0);
 		}
 
 		this.SetValue(auth, GetTime()+cooldown, true);		

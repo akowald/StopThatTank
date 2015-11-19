@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 #define DEBUG
 
-#define PLUGIN_VERSION 				"1.4.2"
+#define PLUGIN_VERSION 				"1.5"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
