@@ -183,18 +183,6 @@
 				"linux"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x89\x1C\x24\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\x55\x0C"
 				"windows"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\xCF"
 			}
-			"Patch_ChargeEffect_xxx"
-			{
-				"library"		"server"
-				"linux"		"\x80\xBA\x2A\x2A\x2A\x2A\x00\x75\x2A\x83\xF9\x06\x0F\x94\xC0\x8B\x4D\x0C"
-				"windows"		"\x80\xB8\x2A\x2A\x2A\x2A\x00\x0F\x45\x2A\x8B\x4D\x08\x83\xF9\x02"
-			}
-			"Patch_RecomputeInternalData"
-			{
-				"library"		"server"
-				"linux"		"\xE8\x2A\x2A\x2A\x2A\x89\x1C\x24\xE8\x2A\x2A\x2A\x2A\x89\x1C\x24\xE8\x2A\x2A\x2A\x2A\x8B\x83\x2A\x2A\x2A\x2A\x83\xF8\x01\x0F\x86"
-				"windows"		"\xE8\x2A\x2A\x2A\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x8B\x86\x2A\x2A\x2A\x2A\x85\xC0\x74"
-			}
 			"Patch_DisableNavMesh"
 			{
 				"library"		"server"
@@ -215,14 +203,6 @@
 			"Patch_Knockback"
 			{
 				"signature"	"Patch_Knockback"
-			}
-			"Patch_ChargeEffect"
-			{
-				"signature"	"Patch_ChargeEffect"
-			}
-			"Patch_RecomputeInternalData"
-			{
-				"signature"	"Patch_RecomputeInternalData"
 			}
 			"Patch_DisableNavMesh"
 			{
@@ -250,11 +230,6 @@
 				"linux"		"7"
 				"windows"		"7"
 			}
-			"Patch_ChargeEffect"
-			{
-				"linux"		"7"
-				"windows"		"8"
-			}
 			"Patch_DisableNavMesh"
 			{
 				"linux"		"4"
@@ -264,11 +239,6 @@
 			{
 				"linux"		"113" // SHORT JNO
 				"windows"		"113" // SHORT JNO
-			}
-			"Payload_ChargeEffect"
-			{
-				"linux"		"113" // SHORT JNO
-				"windows"		"65" // CMOVNO
 			}
 			"Payload_DisableNavMesh"
 			{

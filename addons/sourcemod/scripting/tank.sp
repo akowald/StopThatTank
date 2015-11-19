@@ -7066,45 +7066,6 @@ void SDK_Init()
 		}
 	}
 
-	// This patch allows the bomb carrier to deploy and be under the effects of uber.
-	Address addrChargeEffect = GameConfGetAddress(hGamedata, "Patch_ChargeEffect");
-	if(addrChargeEffect == Address_Null)
-	{
-		LogMessage("Failed to find address: Patch_ChargeEffect!");
-	}else{
-		int patchOffset = GameConfGetOffset(hGamedata, "Patch_ChargeEffect");
-		if(patchOffset <= -1)
-		{
-			LogMessage("Failed to find offset: Patch_ChargeEffect!");
-		}else{
-			int patchPayload = GameConfGetOffset(hGamedata, "Payload_ChargeEffect");
-			if(patchPayload <= -1)
-			{
-				LogMessage("Failed to find payload: Payload_ChargeEffect!");
-			}else{
-				int payload[1];
-				payload[0] = patchPayload;
-
-				g_patchChargeEffect = new MemoryPatch(addrChargeEffect+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
-			}
-		}
-	}
-
-	// This patch fixes crash #1 - a nav-related crash. The bottom patch should cover this.
-	/*
-	Address addrRecompute = GameConfGetAddress(hGamedata, "Patch_RecomputeInternalData");
-	if(addrRecompute == Address_Null)
-	{
-		LogMessage("Failed to find address: Patch_RecomputeInternalData!");
-	}else{
-		LogMessage("Patching RecomputeInternalData at 0x%X..", addrRecompute);
-		for(int i=0; i<5; i++)
-		{
-			StoreToAddress(addrRecompute+view_as<Address>(i), OpCode_NOP, NumberType_Int8);
-		}
-	}
-	*/
-
 	// This patch should fix all related nav crashes by completely disabling the nav mesh system.
 	Address addrNavMesh = GameConfGetAddress(hGamedata, "Patch_DisableNavMesh");
 	if(addrNavMesh == Address_Null)
