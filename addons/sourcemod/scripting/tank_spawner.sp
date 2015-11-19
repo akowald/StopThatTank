@@ -528,7 +528,10 @@ public Action Spawner_Timer_Spawn(Handle hTimer, any client)
 				}
 
 				// Giants in plr_ show an outline to all players indicating their health
-				if(g_nGameMode == GameMode_Race) SetEntProp(client, Prop_Send, "m_bGlowEnabled", true);
+				if(g_nGameMode == GameMode_Race && iIndexClass != view_as<int>(TFClass_Spy))
+				{
+					SetEntProp(client, Prop_Send, "m_bGlowEnabled", true);
+				}
 
 				if(g_nSpawner[client][g_iSpawnerFlags] & SPAWNERFLAG_RAGEMETER)
 				{

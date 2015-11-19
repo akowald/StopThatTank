@@ -669,8 +669,9 @@ void Buster_Explode(int client, float heightOffset=110.0, const char[] explosion
 	// void UTIL_ScreenShake(float center[3], float amplitude, float frequency, float duration, float radius, int command, bool airShake)
 	UTIL_ScreenShake(pos, 25.0, 5.0, 5.0, 1000.0, 0, true);
 
-	// Make sure the sentry buster expires
-	g_bBlockRagdoll = true; // Set a flag to remove this player's ragdoll (since tf_gibsforced is probably 0)
+	// Make sure the sentry buster expires.
+	g_bBlockRagdoll = true; // Set a flag to remove this player's ragdoll (since tf_gibsforced is probably 0).
+	g_timeSentryBusterDied = GetEngineTime();
 	// Make sure the sentry buster dies..
 	ForcePlayerSuicide(client);
 	FakeClientCommand(client, "explode");

@@ -678,7 +678,7 @@ float Giant_GetScaleForPlayers(int team)
 		result = 0.5;
 	}else if(iNumPlayers <= 8)
 	{
-		result = 0.75;
+		result = 0.65;
 	}else if(iNumPlayers <= 10)
 	{
 		result = 0.85;
@@ -1505,7 +1505,7 @@ void Giant_Think(int team)
 			// Save the time when the giant is spawned so we can watch over the giant and choose another if he becomes invalid before the cutoff time
 			g_nTeamGiant[team][g_flTeamGiantTimeSpawned] = flTime;
 
-			// Set a flag so this player won't be chosen again for the current map
+			// Set a flag so this player won't be chosen again for awhile.
 			g_giantTracker.applyCooldown(client);
 		}else{
 			// Giant has already started spawned

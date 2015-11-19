@@ -36,7 +36,6 @@
 
 ArrayList g_chatTips;
 ArrayList g_cartModels;
-
 ArrayList g_parentList;
 enum
 {
@@ -86,6 +85,34 @@ methodmap BlockedCosmetics < StringMap
 	}
 };
 BlockedCosmetics g_blockedCosmetics = null;
+
+methodmap CustomProps < ArrayList
+{
+	public CustomProps()
+	{
+		return view_as<CustomProps>(new ArrayList());
+	}
+
+	/**
+	 * Makes sure any spawned custom props are removed and clears the ArrayList.
+	 *
+	 */
+	public void Clear()
+	{
+		int size = this.Length;
+		for(int i=0; i<size; i++)
+		{
+			int prop = EntRefToEntIndex(this.Get(i));
+			if(prop > MaxClients)
+			{
+				AcceptEntityInput(prop, "Kill");
+			}
+		}
+
+		this.Clear();
+	}
+};
+CustomProps g_customProps = null;
 
 methodmap Config < StringMap
 {
@@ -222,6 +249,7 @@ methodmap Config < StringMap
 		g_parentList.Clear(); // Clear the tank parenting settings.
 		g_cartModels.Clear(); // Clear the list of cart models.
 		g_giantSpawns.Clear(); // Clear the list of giant spawn overrides.
+		g_customProps.Clear(); // Clear the custom props spawned into the map.
 
 		char configPath[PLATFORM_MAX_PATH];
 		char map[PLATFORM_MAX_PATH];
@@ -693,7 +721,6 @@ public void Config_LoadPropSection(KeyValues kv, const char[] sectionName)
 				{
 					if(kv.GotoFirstSubKey(false))
 					{
-						int numProps = 0;
 						do
 						{
 							// Get model to spawn
@@ -733,12 +760,12 @@ public void Config_LoadPropSection(KeyValues kv, const char[] sectionName)
 #if defined DEBUG
 								PrintToServer("(Config_LoadPropSection) Spawned map prop: %s", bufferName);
 #endif
-								numProps++;
+								g_customProps.Push(EntIndexToEntRef(prop));
 							}
 
 						}while(kv.GotoNextKey(true));
 
-						LogMessage("Spawned %d prop(s) set by config file.", numProps);
+						LogMessage("Spawned %d prop(s) set by config file.", g_customProps.Length);
 
 						kv.GoBack();
 					}
@@ -791,16 +818,15 @@ methodmap GiantTracker < StringMap
 		char buffer[MAXLEN_LASTGIANT];
 		int numKeys = snapshot.Length;
 		int currentTime = GetTime();
-		int cooldownTime = RoundToNearest(config.LookupFloat(g_hCvarGiantCooldown)*60.0);
 		for(int i=0; i<numKeys; i++)
 		{
 			snapshot.GetKey(i, buffer, sizeof(buffer));
 
 			// If the time is outside the cooldown, delete the key
-			int timeLastGiant;
-			if(this.GetValue(buffer, timeLastGiant))
+			int timeCooldownExpired;
+			if(this.GetValue(buffer, timeCooldownExpired))
 			{
-				if(timeLastGiant + cooldownTime <= currentTime)
+				if(currentTime > timeCooldownExpired)
 				{
 					this.Remove(buffer);
 				}
@@ -818,16 +844,13 @@ methodmap GiantTracker < StringMap
 	 */
 	public bool canPlayGiant(int client)
 	{
-		int currentTime = GetTime();
-		int cooldownTime = RoundToNearest(config.LookupFloat(g_hCvarGiantCooldown)*60.0);
-
 		char auth[MAXLEN_LASTGIANT];
 		GetClientAuthId(client, AuthId_Steam3, auth, sizeof(auth));
 
-		int timeLastGiant;
-		if(this.GetValue(auth, timeLastGiant))
+		int timeCooldownExpired;
+		if(this.GetValue(auth, timeCooldownExpired))
 		{
-			if(timeLastGiant + cooldownTime > currentTime)
+			if(GetTime() < timeCooldownExpired)
 			{
 				// Cooldown is still in effect
 				return false;
@@ -849,7 +872,16 @@ methodmap GiantTracker < StringMap
 		char auth[MAXLEN_LASTGIANT];
 		GetClientAuthId(client, AuthId_Steam3, auth, sizeof(auth));
 
-		this.SetValue(auth, GetTime(), true);		
+		// Store a timestamp of when they can become a giant again. Typically, this will be lower on plr_ maps.
+		int cooldown;
+		if(g_nGameMode == GameMode_Race)
+		{
+			cooldown = GetConVarInt(g_hCvarGiantCooldownPlr);
+		}else{
+			cooldown = GetConVarInt(g_hCvarGiantCooldown);
+		}
+
+		this.SetValue(auth, GetTime()+cooldown, true);		
 	}
 };
 GiantTracker g_giantTracker = null;

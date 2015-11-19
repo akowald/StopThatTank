@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.4.2"
+#define PLUGIN_VERSION 				"1.4.2a"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -504,6 +504,7 @@ Handle g_hCvarTeleportStartRed;
 Handle g_hCvarTeleportStartBlue;
 Handle g_hCvarTeleportGoal;
 Handle g_hCvarGiantHHHCap;
+Handle g_hCvarGiantCooldownPlr;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -884,6 +885,8 @@ float g_timeLastHealedGiant[MAXPLAYERS+1];
 float g_timeTankSeparation[MAX_TEAMS]; // Keeps track of how long the tank has been separated from the cart.
 float g_lastClientTick[MAXPLAYERS+1];
 
+float g_timeSentryBusterDied;
+
 enum
 {
 	Interest_None=0,
@@ -1022,7 +1025,7 @@ public void OnPluginStart()
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.2", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams.");
-	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "7.0", "Respawn time for BLU when a giant is out. Note: This will be scaled to playercount: x/24*this = final respawn time."); // 4.0 default
+	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU when a giant is out. Note: This will be scaled to playercount: x/24*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: x/24*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: x/24*this = final respawn time.");
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
@@ -1085,6 +1088,7 @@ public void OnPluginStart()
 	g_hCvarGiantWarnCutoff = CreateConVar("tank_giant_cutoff_time", "17.0", "Seconds after a bomb deploy round begins that a giant can no longer replace an afk/disconnected giant. (May need to add 5.0s, round start is when the countdown begins)");
 	g_hCvarGiantTimeAFK = CreateConVar("tank_giant_time_afk", "7.0", "Seconds after spawning when a giant will be considered AFK.");
 	g_hCvarGiantCooldown = CreateConVar("tank_giant_cooldown", "30.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again.");
+	g_hCvarGiantCooldownPlr = CreateConVar("tank_giant_cooldown_plr", "20.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again in payload race.");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -1133,7 +1137,7 @@ public void OnPluginStart()
 	g_hCvarTeamBlue = CreateConVar("tank_team_blue", "ROBOTS", "Team name of the BLUE team.");
 	g_hCvarTeamBluePlr = CreateConVar("tank_team_blue_plr", "BLU-BOTS", "Team name of the BLUE team in plr.");
 
-	g_hCvarHellTowerTimeGate = CreateConVar("tank_helltower_time_gates_open", "40.0", "Seconds after hell starts that the gates open in hell. This triggers the relay which will then delay an additional 29 seconds.");
+	g_hCvarHellTowerTimeGate = CreateConVar("tank_helltower_time_gates_open", "30.0", "Seconds after hell starts that the gates open in hell. This triggers the relay which will then delay an additional 29 seconds.");
 	g_hCvarGiantHHHCap = CreateConVar("tank_giant_hhh_cap", "250.0", "Damage cap for the HHH Halloween boss against the giant.");
 
 	g_hCvarClassLimits[TFTeam_Red][1] = CreateConVar("tank_classlimit_red_scout", "2", "Class limit for scout. Set to -1 for no limit.");
@@ -1297,6 +1301,7 @@ public void OnPluginStart()
 	config = new Config();
 	g_blockedCosmetics = new BlockedCosmetics();
 	g_giantTracker = new GiantTracker();
+	g_customProps = new CustomProps();
 
 	HookConVarChange(g_hCvarTimeTip, ConVarChanged_ChatTips);
 
@@ -1801,11 +1806,15 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				// If we are hightower, we need to remove the outline when the giant uses the invis spell.
 				if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
 				{
-					if(TF2_IsPlayerInCondition(client, TFCond_Stealthed))
+					// m_bGlowEnabled should only be set on non-spy giants in plr mode.
+					if(g_nGameMode == GameMode_Race && TF2_GetPlayerClass(client) != TFClass_Spy)
 					{
-						SetEntProp(client, Prop_Send, "m_bGlowEnabled", false);
-					}else{
-						SetEntProp(client, Prop_Send, "m_bGlowEnabled", true);
+						if(TF2_IsPlayerInCondition(client, TFCond_Stealthed))
+						{
+							SetEntProp(client, Prop_Send, "m_bGlowEnabled", false);
+						}else{
+							SetEntProp(client, Prop_Send, "m_bGlowEnabled", true);
+						}
 					}
 				}
 
@@ -5309,6 +5318,7 @@ public void OnGameFrame()
 	}
 	
 	// Allow the giants to be ubered by the medigun
+	/*
 	for(int i=1; i<=MaxClients; i++)
 	{
 		if(IsClientInGame(i) && GetClientTeam(i) >= 2 && IsPlayerAlive(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
@@ -5366,6 +5376,7 @@ public void OnGameFrame()
 			}
 		}
 	}
+	*/
 
 	// Logic for the giant engineer teleporter
 	for(int iTeam=2; iTeam<=3; iTeam++)
@@ -5380,6 +5391,8 @@ public void OnGameFrame()
 	SentryVision_Think();
 
 	if(g_nGameMode == GameMode_Race) Announcer_Think();
+
+	g_timeSentryBusterDied = 0.0;
 }
 
 void Tank_CheckForStuckPlayers(int iTank, int team)
@@ -7442,7 +7455,7 @@ float Path_GetDistance(int iPathStart, int iPathEnd)
 
 			flDistance = GetVectorDistance(pos1, pos2);
 #if defined DEBUG
-			PrintToServer("(Path_GetDistance) Non-connected path given (%d to %d), using straight distance (%1.2f) instead!", iPathStart, iPathEnd, flDistance);
+			//PrintToServer("(Path_GetDistance) Non-connected path given (%d to %d), using straight distance (%1.2f) instead!", iPathStart, iPathEnd, flDistance);
 #endif
 		}	
 	}
@@ -8315,7 +8328,7 @@ public Action CritCash_OnTouch(int entity, int client)
 				}
 
 				// Replenish engineer metal
-				int iMaxMetal =MaxMetal_Get(client);
+				int iMaxMetal = MaxMetal_Get(client);
 				if(class == TFClass_Engineer && GetEntProp(client, Prop_Send, "m_iAmmo", 4, 3) < iMaxMetal)
 				{
 					SetEntProp(client, Prop_Send, "m_iAmmo", iMaxMetal, 4, 3);
@@ -9226,6 +9239,27 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 	{
 		// Fixes for the arrow penetration attribute
 		SDKHook(iEntity, SDKHook_Touch, Arrow_OnTouch);
+	}else if(g_timeSentryBusterDied > 0.0 && strcmp(classname, "tf_ammo_pack") == 0 && GetEngineTime() - g_timeSentryBusterDied < 0.05)
+	{
+		// Block the sentry buster from dropping an ammo pack.
+#if defined DEBUG
+		PrintToServer("(OnEntityCreated) Blocking sentry buster's tf_ammo_pack..: %f", GetEngineTime() - g_timeSentryBusterDied);
+#endif
+		g_timeSentryBusterDied = 0.0;
+		
+		AcceptEntityInput(iEntity, "Kill");
+	}
+}
+
+public void NextFrame_AmmoPack(int ref)
+{
+	int ammoPack = EntRefToEntIndex(ref);
+	if(ammoPack > MaxClients)
+	{
+		PrintToServer("tf_ammo_pack: m_hOwnerEntity = %d", GetEntPropEnt(ammoPack, Prop_Send, "m_hOwnerEntity"));
+
+		int client = GetEntPropEnt(ammoPack, Prop_Send, "m_hOwnerEntity");
+		if(client >= 1 && client <= MaxClients) PrintToServer("%d %d %d", g_nSpawner[client][g_bSpawnerEnabled], g_nSpawner[client][g_nSpawnerType], GetEntProp(client, Prop_Send, "m_bIsMiniBoss"));
 	}
 }
 
@@ -11772,7 +11806,7 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 		case TFCond_Taunting:
 		{
 			// Fix conga taunt for robot models.
-			if(config.LookupBool(g_hCvarRobot))
+			if(config.LookupBool(g_hCvarRobot) && !GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 			{
 				if(g_nGameMode == GameMode_Race || GetClientTeam(client) == TFTeam_Blue)
 				{
