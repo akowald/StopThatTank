@@ -151,7 +151,7 @@ native void Tank_ClearCache(int entity);
  * @param droppedWeapon The weapon index of the dropped weapon.
  * @param result 		The value to override return with.
  *
- * @return 				Return Pl_Continue to run the function as normal. Anything else will return with the value set in result.
+ * @return 				Return Plugin_Continue to run the function as normal. Anything else will return with the value set in result.
  */
 forward Action Tank_OnWeaponPickup(int client, int droppedWeapon, bool &result);
 
@@ -164,7 +164,7 @@ forward Action Tank_OnWeaponPickup(int client, int droppedWeapon, bool &result);
  * @param itemIdLow				The lower bits of the item id.
  * @param item 					The address of the CEconItemView class the dropped weapon is built on.
  *
- * @return 						Return anything but Pl_Continue to block the weapon from being dropped.
+ * @return 						Return anything but Plugin_Continue to block the weapon from being dropped.
  */
 forward Action Tank_OnWeaponDropped(int itemDefinitionIndex, int accountId, int itemIdHigh, int itemIdLow, Address item);
 
@@ -179,6 +179,28 @@ forward Action Tank_OnWeaponDropped(int itemDefinitionIndex, int accountId, int 
  * @return 			Something other than Plugin_Continue to have the game use the result parameter.
  */
 forward Action Tank_PassFilter(int ent1, int ent2, bool &result);
+
+enum
+{
+	MedigunChargeEffect_Healing=-1,
+	MedigunChargeEffect_Uber,
+	MedigunChargeEffect_Kritz,
+	MedigunChargeEffect_Quickfix,
+	MedigunChargeEffect_VaccinatorBullet,
+	MedigunChargeEffect_VaccinatorBlast,
+	MedigunChargeEffect_VaccinatorFire,
+};
+
+/**
+ * Called whenever medigun effects are being applied on a player. This can be used to allow or deny uber effects.
+ * 
+ * @param client 				Client index.
+ * @param medigunChargeType		The type of medigun charge effect. (kritz/uber/vaccinator)
+ * @param result 				The value to override return with.
+ *
+ * @return 						Return Plugin_Continue to run the function as normal. Anything else will return with the value set in result.
+ */
+forward Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunChargeType, bool &result);
 
 /**
  * Do not edit below this line!

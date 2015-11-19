@@ -29,6 +29,7 @@ CDetour *statsDetour;
 CDetour *dropCreateDetour;
 CDetour *dropPickupDetour;
 CDetour *entityFilterDetour;
+CDetour *uberEffectsDetour;
 
 IGameConfig *g_pGameConf = NULL;
 IBinTools *g_pBinTools = NULL;
@@ -39,6 +40,7 @@ IForward *g_pForwardShouldTransmit = NULL;
 IForward *g_pForwardOnWeaponPickup = NULL;
 IForward *g_pForwardOnWeaponCreate = NULL;
 IForward *g_pForwardPassFilter = NULL;
+IForward *g_pForwardUberEffects = NULL;
 
 void *g_addr_GetItemSchema = NULL;
 void *g_addr_GetAttributeDefinition = NULL;
@@ -48,6 +50,7 @@ void *g_addr_GetAttributeDefinitionByName = NULL;
 void *g_addr_IncrementStat = NULL;
 
 int g_vtbl_ClearCache = 0;
+int g_offsetPlayerShared = 0;
 
 void *g_pCTFGameStats = NULL;
 
@@ -215,6 +218,28 @@ DETOUR_DECL_STATIC2(PassServerEntityFilterFunc, bool, const IHandleEntity *, pTo
 	return DETOUR_STATIC_CALL(PassServerEntityFilterFunc)(pTouch, pPass);
 }
 
+// Detour for bool CTFPlayerShared::CanRecieveMedigunChargeEffect(medigun_charge_types)const
+DETOUR_DECL_MEMBER1(CanRecieveMedigunChargeEffect, bool, int, medigunChargeType)
+{
+	// This detour will allow the giant to deploy uber and be under its effects.
+	if(g_offsetPlayerShared > 0 && g_pForwardUberEffects != NULL && g_pForwardUberEffects->GetFunctionCount() > 0)
+	{
+		int client = gamehelpers->EntityToBCompatRef((CBaseEntity *)((uint8_t *)this-g_offsetPlayerShared));
+		
+		cell_t overrideValue = 0;
+		g_pForwardUberEffects->PushCell(client);
+		g_pForwardUberEffects->PushCell(medigunChargeType);
+		g_pForwardUberEffects->PushCellByRef(&overrideValue);
+
+		cell_t result = Pl_Continue;
+		g_pForwardUberEffects->Execute(&result);
+
+		if(result != Pl_Continue) return (overrideValue != 0);
+	}
+
+	return DETOUR_MEMBER_CALL(CanRecieveMedigunChargeEffect)(medigunChargeType);
+}
+
 bool LookupSignature(char const *key, void **addr)
 {
 	if(!g_pGameConf->GetMemSig(key, addr))
@@ -264,15 +289,15 @@ CBaseEntity *GetCBaseEntityFromIndex(int num, bool onlyPlayers)
 	return pUnk->GetBaseEntity();
 }
 
-bool LookupOffset(char const *classname, char const *offset, int &iOffset, bool bVerbose)
+bool LookupSendPropOffset(char const *classname, char const *prop, int &offset, bool verbose=true)
 {
 	sm_sendprop_info_t info_t;
-	if(!gamehelpers->FindSendPropInfo(classname, offset, &info_t))
+	if(!gamehelpers->FindSendPropInfo(classname, prop, &info_t))
 	{
-		if(bVerbose) g_pSM->LogMessage(myself, "Offset Error: %s::%s.", classname, offset);
+		if(verbose) g_pSM->LogMessage(myself, "Failed to find offset: %s::%s", classname, prop);
+		offset = -1;
 	}else{
-		iOffset = info_t.actual_offset;
-		if(bVerbose) g_pSM->LogMessage(myself, "Offset: %s::%s = %d.", classname, offset, iOffset);
+		offset = info_t.actual_offset;
 		return true;
 	}
 
@@ -291,7 +316,7 @@ int FindEntityOffset(CBaseEntity *pEntity, const char *strOffset)
 	if(!pClass) return 0;
 
 	int iOffset;
-	if(!LookupOffset(pClass->GetName(), strOffset, iOffset, false)) return 0;
+	if(!LookupSendPropOffset(pClass->GetName(), strOffset, iOffset, false)) return 0;
 
 	return iOffset;
 }
@@ -877,21 +902,6 @@ void Tank::OnEntityDestroyed(CBaseEntity *pEntity)
 	}
 }
 
-bool LookupOffset(char const *classname, char const *offset, int &iOffset)
-{
-	sm_sendprop_info_t info_t;
-	if(!gamehelpers->FindSendPropInfo(classname, offset, &info_t))
-	{
-		g_pSM->LogMessage(myself, "Failed to find offset: %s::%s", classname, offset);
-		iOffset = -1;
-	}else{
-		iOffset = info_t.actual_offset;
-		return true;
-	}
-
-	return false;
-}
-
 bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 {
 	if(strcmp(g_pSM->GetGameFolderName(), "tf") != 0)
@@ -960,12 +970,21 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		entityFilterDetour->EnableDetour();
 	}
 
+	uberEffectsDetour = DETOUR_CREATE_MEMBER(CanRecieveMedigunChargeEffect, "CTFPlayerShared::CanRecieveMedigunChargeEffect");
+	if(uberEffectsDetour == NULL)
+	{
+		g_pSM->LogMessage(myself, "Could not initalize CanRecieveMedigunChargeEffect detour. Will continue to run!");
+	}else{
+		uberEffectsDetour->EnableDetour();
+	}
+
 	LookupSignature("GetItemSchema", &g_addr_GetItemSchema);
 	LookupSignature("CEconItemSchema::GetAttributeDefinition", &g_addr_GetAttributeDefinition);
 	LookupSignature("CEconItemSchema::GetAttributeDefinitionByName", &g_addr_GetAttributeDefinitionByName);
 	LookupSignature("CAttributeList::SetRuntimeAttributeValue", &g_addr_SetRuntimeAttributeValue);
 	LookupSignature("CAttributeList::RemoveAttribute", &g_addr_RemoveAttribute);
 	LookupSignature("CTFGameStats::IncrementStat", &g_addr_IncrementStat);
+	LookupSendPropOffset("CTFPlayer", "m_Shared", g_offsetPlayerShared);
 
 	if(!g_pGameConf->GetOffset("CAttributeManager::OnAttributeValuesChanged", &g_vtbl_ClearCache))
 	{
@@ -977,6 +996,7 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	g_pForwardOnWeaponPickup = forwards->CreateForward("Tank_OnWeaponPickup", ET_Event, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
 	g_pForwardOnWeaponCreate = forwards->CreateForward("Tank_OnWeaponDropped", ET_Event, 5, NULL, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
 	g_pForwardPassFilter = forwards->CreateForward("Tank_PassFilter", ET_Hook, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
+	g_pForwardUberEffects = forwards->CreateForward("Tank_OnCanRecieveMedigunChargeEffect", ET_Event, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
 
 	int iOffset;
 	if(!g_pGameConf->GetOffset("CBaseEntity::ShouldTransmit", &iOffset))
@@ -1064,12 +1084,17 @@ void Tank::SDK_OnUnload()
 	{
 		entityFilterDetour->Destroy();
 	}
+	if(uberEffectsDetour != NULL)
+	{
+		uberEffectsDetour->Destroy();
+	}
 
 	forwards->ReleaseForward(g_pForwardUpgrades);
 	forwards->ReleaseForward(g_pForwardShouldTransmit);
 	forwards->ReleaseForward(g_pForwardOnWeaponPickup);
 	forwards->ReleaseForward(g_pForwardOnWeaponCreate);
 	forwards->ReleaseForward(g_pForwardPassFilter);
+	forwards->ReleaseForward(g_pForwardUberEffects);
 	
 	if(g_pSDKHooks != NULL)
 	{

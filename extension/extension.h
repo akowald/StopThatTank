@@ -99,26 +99,29 @@ public:
 	
 	CEconItemHandle m_ItemHandle; //40 (44, 48, 52, 56, 60)
 
-	bool	m_bColorInit; //64
-	uint32	m_unHalloweenRGB; //68
-	uint32	m_unHalloweenAltRGB; //72
-	uint32	m_unRGB; //76
-	uint32	m_unAltRGB; //80
+	bool m_bColorInit; //64
+	bool m_bPaintOverrideInit; //65
+	bool m_bHasPaintOverride; //66
+	//67
 
-	int32 m_iTeamNumber; //84
+	float m_flOverrideIndex; //68
+	uint32 m_unRGB; //72
+	uint32 m_unAltRGB; //76
 
-	bool m_bInitialized; //88
+	int32 m_iTeamNumber; //80
 
-	//CAttributeList m_AttributeList; //92 (96, 100, 104, 108, 112, 116)
-	//CAttributeList m_NetworkedDynamicAttributesForDemos; //120 (124, 128, 132, 136, 140, 144)
-	uint32 padding[14]; //92-144
+	bool m_bInitialized; //84
 
-	bool m_bDoNotIterateStaticAttributes; //148
+	//CAttributeList m_AttributeList; //88 (92, 96, 100, 104, 108, 112)
+	//CAttributeList m_NetworkedDynamicAttributesForDemos; //116 (120, 124, 128, 132, 136, 140)
+	uint32 padding[14]; // 88-140
+
+	bool m_bDoNotIterateStaticAttributes; //144
 };
 
 #pragma pack(pop)
 
-static_assert(sizeof(CEconItemView) == 152, "CEconItemView - incorrect size on this compiler");
+static_assert(sizeof(CEconItemView) == 148, "CEconItemView - incorrect size on this compiler");
 static_assert(sizeof(CEconItemHandle) == 24, "CEconItemHandle - incorrect size on this compiler");
 
 /**

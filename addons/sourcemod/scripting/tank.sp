@@ -40,9 +40,9 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-//#define DEBUG
+#define DEBUG
 
-#define PLUGIN_VERSION 				"1.4.2a"
+#define PLUGIN_VERSION 				"1.4.2"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -79,7 +79,7 @@
 #define SOUND_GIANT_EXPLODE		"mvm/sentrybuster/mvm_sentrybuster_explode.wav"
 #define SOUND_GIANT_START		"music/mvm_start_last_wave.wav"
 #define SOUND_EXPLOSION			"items/cart_explode.wav"
-#define SOUND_FIZZLE			"weapons/barret_arm_fizzle.wav"
+#define SOUND_FIZZLE			"ambient/energy/weld2.wav"
 #define SOUND_DELIVER			"mvm/mvm_tele_deliver.wav"
 #define SOUND_BACKSTAB			"player/spy_shield_break.wav"
 #define SOUND_HOLOGRAM_START	"misc/hologram_start.wav"
@@ -753,6 +753,7 @@ float g_flBombGameEnd;
 bool g_bBombSentDropNotice;
 bool g_bBombGone;
 float g_flTimeBombFell;
+bool g_bombAtFinalCheckpoint;
 
 Handle g_hHudSync;
 
@@ -4558,6 +4559,7 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 				// Initialize some misc. variables for the bomb round
 				g_bBombPlayedNearHatch = false;
 				g_bBombEnteredGoal = false;
+				g_bombAtFinalCheckpoint = false;
 				g_flBombPlantStart = 0.0;
 				for(int i=0; i<MAXPLAYERS+1; i++)
 				{
@@ -9491,7 +9493,8 @@ void Bomb_Think(int iBomb)
 
 	int iControlPoint, iPathTrack;
 	int iIndexCP = -1;
-	bool bIsGoal;
+	bool bIsGoal = false;
+	g_bombAtFinalCheckpoint = false;
 	// Find the next control point that needs to be capped
 	for(int i=0; i<MAX_LINKS; i++)
 	{
@@ -9560,7 +9563,7 @@ void Bomb_Think(int iBomb)
 	if(flDistanceToGoal < config.LookupFloat(g_hCvarBombDistanceWarn))
 	{
 		// Disable quick-fix effects when the giant approaches the final control point
-		if(bIsGoal && (TF2_IsPlayerInCondition(client, TFCond_MegaHeal) || TF2_IsPlayerInCondition(client, TFCond_Ubercharged)))
+		if(bIsGoal && TF2_IsPlayerInCondition(client, TFCond_MegaHeal))
 		{
 			// Quick-fix removes stun on bomb deployment so it must go
 			for(int i=1; i<=MaxClients; i++)
@@ -9574,7 +9577,7 @@ void Bomb_Think(int iBomb)
 						if(GetEntProp(iMedigun, Prop_Send, "m_bChargeRelease") && (i == client || GetEntPropEnt(iMedigun, Prop_Send, "m_hHealingTarget") == client))
 						{
 							int def = GetEntProp(iMedigun, Prop_Send, "m_iItemDefinitionIndex");
-							if(def == ITEM_QUICK_FIX || (def != ITEM_VACCINATOR && def != ITEM_KRITZKRIEG))
+							if(def == ITEM_QUICK_FIX)
 							{
 #if defined DEBUG
 								PrintToServer("(Bomb_Think) Removing quick-fix or uber on %N..", i);
@@ -9588,6 +9591,8 @@ void Bomb_Think(int iBomb)
 				}
 			}
 		}
+
+		if(bIsGoal) g_bombAtFinalCheckpoint = true;
 
 		if(bIsGoal && !g_bBombPlayedNearHatch)
 		{
@@ -10533,6 +10538,8 @@ void Bomb_Cleanup()
 	Giant_Cleanup(TFTeam_Blue);
 
 	HealthBar_Hide();
+
+	g_bombAtFinalCheckpoint = false;
 }
 
 void TF2_SetRespawnTime(int team, float flRespawnTime)
@@ -10619,7 +10626,7 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
-		//SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
+		SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
 
 		//float pos[3];
 		//GetEntPropVector(EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]), Prop_Send, "m_vecOrigin", pos);
@@ -14721,4 +14728,32 @@ public MRESReturn CMonsterResource_SetBossHealthPercentage(int pThis, Handle hRe
 
 	// Block anything trying to update the monster_resource health bar.
 	return MRES_Supercede;
+}
+
+public Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunChargeType, bool &result)
+{
+	//PrintToServer("(Tank_OnCanRecieveMedigunChargeEffect) client=%d, medigunChargeType=%d", client, medigunChargeType);
+	if(!g_bEnabled) return Plugin_Continue;
+
+	// We are only able to block the stock uber effect with this detour so we don't need to worry about blocking other medigun charge effects.
+	// The default behavior will block the stock uber effect on bomb carriers due to a check for: CTFGameRules::m_bPlayingMannVsMachine.
+	// When the bomb carrier is near the hatch, return false, otherwise return true.
+	if(g_nGameMode == GameMode_BombDeploy && g_iRefBombFlag != 0 && client >= 1 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == TFTeam_Blue)
+	{
+		// Confirm the player is the bomb carrier.
+		int bomb = EntRefToEntIndex(g_iRefBombFlag);
+		if(bomb > MaxClients && GetEntPropEnt(bomb, Prop_Send, "moveparent") == client)
+		{
+			if(g_bombAtFinalCheckpoint)
+			{
+				result = false;
+				return Plugin_Handled;
+			}
+
+			result = true;
+			return Plugin_Handled;
+		}
+	}
+
+	return Plugin_Continue;
 }
