@@ -1473,13 +1473,17 @@ void Giant_Think(int team)
 
 				for(int i=1; i<=MaxClients; i++)
 				{
-					if(IsClientInGame(i) && GetClientTeam(i) == team && g_settings[i][g_settingsShowInfoPanel])
+					if(IsClientInGame(i) && GetClientTeam(i) == team)
 					{
-						Giant_ShowDesc(i, g_nTeamGiant[team][g_iTeamGiantTemplateIndex], false, client);
+						if(Settings_ShouldShowGiantInfoPanel(i))
+						{
+							Giant_ShowDesc(i, g_nTeamGiant[team][g_iTeamGiantTemplateIndex], false, client);
+						}else{
+							PrintToChat(i, "%t", "Tank_Chat_ShowGiantInfo", 0x01, g_strTeamColors[team], client, 0x01, g_strRankColors[Rank_Unique], g_nGiants[g_nTeamGiant[team][g_iTeamGiantTemplateIndex]][g_strGiantName],0x01);
+						}
 					}
 				}
 			}
-			
 		}
 
 		return;

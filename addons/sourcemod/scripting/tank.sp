@@ -676,7 +676,7 @@ enum
 	Rank_Genuine,
 	Rank_Unusual,
 	Rank_Community,
-	Rank_Valve
+	Rank_Valve,
 };
 char g_strRankColors[][] = {"\x07B2B2B2", "\x07FFD700", "\x07476291", "\x0738F3AB", "\x07CF6A32", "\x074D7455", "\x078650AC", "\x0770B04A", "\x07A50F79"};
 
@@ -950,9 +950,17 @@ enum eAnnouncerStruct
 };
 int g_announcer[eAnnouncerStruct];
 
+enum
+{
+	ShowInfoPanel_Always=0,
+	ShowInfoPanel_PayloadOnly,
+	ShowInfoPanel_PayloadRaceOnly,
+	ShowInfoPanel_Never,
+};
+#define MAX_SHOW_INFO_PANEL 3
 enum eSettingsStruct
 {
-	bool:g_settingsShowInfoPanel,		// Whether or not to show the giant info panel when a team giant is selected.
+	g_settingsShowInfoPanel,								// When to show the giant info panel when a team giant is selected.
 };
 int g_settings[MAXPLAYERS+1][eSettingsStruct];
 
@@ -1226,7 +1234,7 @@ public void OnPluginStart()
 	
 	RegConsoleCmd("stt", Command_Updates);
 	
-	g_cookieInfoPanel = RegClientCookie("stt.show_info_panel", "Show the info panel when a giant has been selected.", CookieAccess_Private);
+	g_cookieInfoPanel = RegClientCookie("stt.show_info_panel", "When to show the info panel when a giant has been selected.", CookieAccess_Private);
 	SetCookieMenuItem(Settings_ItemSelected, 0, "Stop That Tank");
 	
 	AddNormalSoundHook(NormalSoundHook);
@@ -13369,18 +13377,27 @@ void Settings_Load(int client)
 	if(IsFakeClient(client)) return;
 
 	char cookie[12];
-	GetClientCookie(client, g_cookieInfoPanel, cookie, sizeof(cookie));
 
-	if(strcmp(cookie, "no") == 0)
+	GetClientCookie(client, g_cookieInfoPanel, cookie, sizeof(cookie));
+	g_settings[client][g_settingsShowInfoPanel] = StringToInt(cookie);
+}
+
+bool Settings_ShouldShowGiantInfoPanel(int client)
+{
+	switch(g_settings[client][g_settingsShowInfoPanel])
 	{
-		g_settings[client][g_settingsShowInfoPanel] = false;
+		case ShowInfoPanel_PayloadOnly: return (g_nGameMode != GameMode_Race);
+		case ShowInfoPanel_PayloadRaceOnly: return (g_nGameMode == GameMode_Race);
+		case ShowInfoPanel_Never: return false;
 	}
+
+	return true; // Always show.
 }
 
 void Settings_Clear(int client)
 {
 	// Set the default value for each setting here..
-	g_settings[client][g_settingsShowInfoPanel] = true;
+	g_settings[client][g_settingsShowInfoPanel] = ShowInfoPanel_Always;
 }
 
 public void Settings_ItemSelected(int client, CookieMenuAction action, any info, char[] buffer, int maxlen)
@@ -13398,13 +13415,16 @@ void Settings_MainMenu(int client)
 	SetMenuTitle(menu, "%T", "Tank_Menu_Settings_Title", client);
 
 	char buffer[256];
-	if(g_settings[client][g_settingsShowInfoPanel])
+	char trans[64];
+	switch(g_settings[client][g_settingsShowInfoPanel])
 	{
-		Format(buffer, sizeof(buffer), "%T", "Tank_Menu_Settings_ShowGiantInfoPanel", client, "Tank_Yes", client);
-	}else{
-		Format(buffer, sizeof(buffer), "%T", "Tank_Menu_Settings_ShowGiantInfoPanel", client, "Tank_No", client);
-
+		case ShowInfoPanel_PayloadOnly: trans = "Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadOnly";
+		case ShowInfoPanel_PayloadRaceOnly: trans = "Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadRaceOnly";
+		case ShowInfoPanel_Never: trans = "Tank_Menu_Settings_ShowGiantInfoPanel_State_Never";
+		default: trans = "Tank_Menu_Settings_ShowGiantInfoPanel_State_AlwaysShow";
 	}
+
+	Format(buffer, sizeof(buffer), "%T", "Tank_Menu_Settings_ShowGiantInfoPanel", client, trans, client);
 	AddMenuItem(menu, "", buffer);
 
 	SetMenuExitBackButton(menu, true);
@@ -13426,15 +13446,14 @@ public int MenuHandler_SettingsMain(Menu menu, MenuAction action, int client, in
 		{
 			case MainMenu_InfoPanel:
 			{
-				// Toggle the value of the info panel setting
-				if(g_settings[client][g_settingsShowInfoPanel])
-				{
-					g_settings[client][g_settingsShowInfoPanel] = false;
-					SetClientCookie(client, g_cookieInfoPanel, "no");
-				}else{
-					g_settings[client][g_settingsShowInfoPanel] = true;
-					SetClientCookie(client, g_cookieInfoPanel, "");
-				}
+				// Toggle the value of the info panel setting.
+				g_settings[client][g_settingsShowInfoPanel]++;
+
+				if(g_settings[client][g_settingsShowInfoPanel] < 0 || g_settings[client][g_settingsShowInfoPanel] > MAX_SHOW_INFO_PANEL) g_settings[client][g_settingsShowInfoPanel] = ShowInfoPanel_Always;
+				
+				char cookie[12];
+				IntToString(g_settings[client][g_settingsShowInfoPanel], cookie, sizeof(cookie));
+				SetClientCookie(client, g_cookieInfoPanel, cookie);
 			}
 		}
 

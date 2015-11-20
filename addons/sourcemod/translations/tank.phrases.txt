@@ -255,13 +255,26 @@
 		"#format"		"{1:T}"
 		"en"			"Show giant info panel: {1}"
 	}
-	"Tank_Yes"
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_AlwaysShow"
 	{
-		"en"			"Yes"
+		"en"			"Always show"
 	}
-	"Tank_No"
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadOnly"
 	{
-		"en"			"No"
+		"en"			"Payload only"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadRaceOnly"
+	{
+		"en"			"Payload race only"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_Never"
+	{
+		"en"			"Never"
+	}
+	"Tank_Chat_ShowGiantInfo"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c},{5:s},{6:s},{7:c}"
+		"en"			"{1} {2}{3}{4} will become: {5}{6}{7}"
 	}
 	"Tank_Menu_Giant_Main_Title"
 	{
