@@ -61,10 +61,11 @@
 #define GIANTTAG_CAN_DROP_BOMB				(1 << 13)
 #define GIANTTAG_AIRBLAST_KILLS_STICKIES	(1 << 14)
 #define GIANTTAG_HUNTSMAN_IN_AIR 			(1 << 15)
+#define GIANTTAG_NO_GIB 					(1 << 16)
 
 char g_strGiantTags[][] =
 {
-	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "huntsman_in_air"
+	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "huntsman_in_air", "no_gib",
 };
 
 enum
@@ -1030,7 +1031,15 @@ void Giant_Clear(int client, int reason=0)
 	if(!Spawner_HasGiantTag(client, GIANTTAG_SENTRYBUSTER) && (reason != GiantCleared_Misc))
 	{
 		// Pick an MVP only when the giant dies or disconnects
-		Giant_PickMVP(client, reason);		
+		Giant_PickMVP(client, reason);
+
+		// Spawn some gibs when the giant robot is defeated.
+		if(reason == GiantCleared_Death)
+		{
+			Giant_SpawnGibs(client);
+
+			g_bBlockRagdoll = true;
+		}
 	}
 
 	Spawner_Cleanup(client);
@@ -2076,3 +2085,125 @@ public Action SendProxy_ToggleGiantHealthMeter(int entity, char[] propName, int 
 	return Plugin_Changed;
 }
 #endif
+
+void Giant_SpawnGibs(int client)
+{
+	if(!config.LookupBool(g_hCvarGiantGibs)) return;
+
+	if(!g_nSpawner[client][g_bSpawnerEnabled] || g_nSpawner[client][g_nSpawnerType] != Spawn_GiantRobot) return;
+
+	int index = g_nSpawner[client][g_iSpawnerGiantIndex];
+	if(g_nGiants[index][g_iGiantTags] & GIANTTAG_SENTRYBUSTER || g_nGiants[index][g_iGiantTags] & GIANTTAG_NO_GIB) return;
+
+	TFClassType class = g_nGiants[index][g_nGiantClass];
+	int skin = GetClientTeam(client)-2;
+
+	float playerPos[3];
+	GetClientAbsOrigin(client, playerPos);
+
+	float playerAng[3];
+	GetClientEyeAngles(client, playerAng);
+
+	float mins[3];
+	float maxs[3];
+	GetClientMins(client, mins);
+	GetClientMaxs(client, maxs);
+
+	float centerPos[3];
+	for(int i=0; i<2; i++) centerPos[i] = playerPos[i];
+	centerPos[2] = playerPos[2] + (maxs[2] - mins[2]) / 2.2;
+	
+	if(g_iParticleBotDeath != -1)
+	{
+		TE_Particle(g_iParticleBotDeath, centerPos);
+		TE_SendToAll();
+	}	
+
+	char model[PLATFORM_MAX_PATH];
+	
+	// Spawn head gib.
+	float pos[3];
+	for(int i=0; i<3; i++) pos[i] = centerPos[i];
+	pos[2] -= 100.0;
+
+	float ang[3];
+	ang[1] = playerAng[1]; // Have the head facing the same angle as the player.
+
+	float vel[3];
+	vel[2] = 325.0; // Have the head shoot upwards.
+
+	switch(class)
+	{
+		case TFClass_DemoMan: strcopy(model, sizeof(model), g_demoBossGibs[0]);
+		case TFClass_Heavy: strcopy(model, sizeof(model), g_heavyBossGibs[0]);
+		case TFClass_Pyro: strcopy(model, sizeof(model), g_pyroBossGibs[0]);
+		case TFClass_Scout: strcopy(model, sizeof(model), g_scoutBossGibs[0]);
+		case TFClass_Soldier: strcopy(model, sizeof(model), g_soldierBossGibs[0]);
+		case TFClass_Spy: strcopy(model, sizeof(model), g_spyBossGibs[0]);
+		case TFClass_Sniper: strcopy(model, sizeof(model), g_sniperBossGibs[0]);
+		case TFClass_Medic: strcopy(model, sizeof(model), g_medicBossGibs[0]);
+		case TFClass_Engineer: strcopy(model, sizeof(model), g_engyBossGibs[0]);
+	}
+
+	if(strlen(model) > 0)
+	{
+		Giant_InitGib(model, pos, ang, vel, skin, true);
+	}
+
+	// Spawn arm/leg/torso gibs.
+	for(int numGibs=0; numGibs<5; numGibs++)
+	{
+		for(int i=0; i<2; i++) pos[i] += GetRandomFloat(-42.0, 42.0);
+
+		ang[1] = GetRandomFloat(-180.0, 180.0);
+
+		for(int i=0; i<2; i++) vel[i] += GetRandomFloat(-100.0, 100.0);
+		vel[2] = 300.0;
+
+		switch(class)
+		{
+			case TFClass_DemoMan: strcopy(model, sizeof(model), g_demoBossGibs[GetRandomInt(1, sizeof(g_demoBossGibs)-1)]);
+			case TFClass_Heavy: strcopy(model, sizeof(model), g_heavyBossGibs[GetRandomInt(1, sizeof(g_heavyBossGibs)-1)]);
+			case TFClass_Pyro: strcopy(model, sizeof(model), g_pyroBossGibs[GetRandomInt(1, sizeof(g_pyroBossGibs)-1)]);
+			case TFClass_Scout: strcopy(model, sizeof(model), g_scoutBossGibs[GetRandomInt(1, sizeof(g_scoutBossGibs)-1)]);
+			case TFClass_Soldier: strcopy(model, sizeof(model), g_soldierBossGibs[GetRandomInt(1, sizeof(g_soldierBossGibs)-1)]);
+			case TFClass_Spy: strcopy(model, sizeof(model), g_scoutBossGibs[GetRandomInt(1, sizeof(g_scoutBossGibs)-1)]); // No gib models for these classes so reuse.
+			case TFClass_Sniper: strcopy(model, sizeof(model), g_scoutBossGibs[GetRandomInt(1, sizeof(g_scoutBossGibs)-1)]);
+			case TFClass_Medic: strcopy(model, sizeof(model), g_scoutBossGibs[GetRandomInt(1, sizeof(g_scoutBossGibs)-1)]);
+			case TFClass_Engineer: strcopy(model, sizeof(model), g_soldierBossGibs[GetRandomInt(1, sizeof(g_soldierBossGibs)-1)]);
+		}
+
+		if(strlen(model) > 0)
+		{
+			Giant_InitGib(model, pos, ang, vel, skin);
+		}
+	}
+}
+
+void Giant_InitGib(const char[] model, float pos[3], float ang[3]=NULL_VECTOR, float vel[3]=NULL_VECTOR, int skin=0, bool headGib=false)
+{
+	int gib = CreateEntityByName("prop_physics_multiplayer");
+	if(gib > MaxClients)
+	{
+		DispatchKeyValue(gib, "model", model);
+		DispatchKeyValue(gib, "physicsmode", "2");
+
+		DispatchSpawn(gib);
+
+		SetEntProp(gib, Prop_Send, "m_CollisionGroup", 1); // 24
+		SetEntProp(gib, Prop_Send, "m_usSolidFlags", 0); // 8
+		SetEntProp(gib, Prop_Send, "m_nSolidType", 2); // 6
+		SetEntProp(gib, Prop_Send, "m_nSkin", skin);
+
+		int effects = EF_NOSHADOW|EF_NORECEIVESHADOW;
+		if(headGib)
+		{
+			effects |= EF_ITEM_BLINK;
+		}
+		SetEntProp(gib, Prop_Send, "m_fEffects", effects);
+
+		TeleportEntity(gib, pos, ang, vel);
+
+		CreateTimer(20.0, Timer_EntityCleanup, EntIndexToEntRef(gib), TIMER_FLAG_NO_MAPCHANGE);
+	}
+}

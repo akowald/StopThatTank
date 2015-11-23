@@ -251,11 +251,21 @@
 #define EF_PARITY_BITS	3
 #define EF_PARITY_MASK  ((1<<EF_PARITY_BITS)-1)
 
-#define EF_BONEMERGE        (1 << 0)
-#define EF_NOSHADOW			(1 << 4)
-#define EF_NODRAW 			(1 << 5)
-#define EF_NORECEIVESHADOW	(1 << 6)
-#define EF_PARENT_ANIMATES	(1 << 9)
+#define EF_BONEMERGE			0x001 	// Performs bone merge on client side
+#define	EF_BRIGHTLIGHT 			0x002	// DLIGHT centered at entity origin
+#define	EF_DIMLIGHT 			0x004	// player flashlight
+#define	EF_NOINTERP				0x008	// don't interpolate the next frame
+#define	EF_NOSHADOW				0x010	// Don't cast no shadow
+#define	EF_NODRAW				0x020	// don't draw entity
+#define	EF_NORECEIVESHADOW		0x040	// Don't receive no shadow
+#define	EF_BONEMERGE_FASTCULL	0x080	// For use with EF_BONEMERGE. If this is set, then it places this ent's origin at its
+										// parent and uses the parent's bbox + the max extents of the aiment.
+										// Otherwise, it sets up the parent's bones every frame to figure out where to place
+										// the aiment, which is inefficient because it'll setup the parent's bones even if
+										// the parent is not in the PVS.
+#define	EF_ITEM_BLINK			0x100	// blink an item so that the user notices it.
+#define	EF_PARENT_ANIMATES		0x200	// always assume that the parent entity is animating
+#define	EF_MAX_BITS = 10
 
 #define FL_EDICT_CHANGED	(1<<0)	// Game DLL sets this when the entity state changes
 									// Mutually exclusive with FL_EDICT_PARTIAL_CHANGE.
@@ -505,6 +515,8 @@ Handle g_hCvarTeleportStartBlue;
 Handle g_hCvarTeleportGoal;
 Handle g_hCvarGiantHHHCap;
 Handle g_hCvarGiantCooldownPlr;
+Handle g_hCvarRespawnScaleMin;
+Handle g_hCvarGiantGibs;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -666,6 +678,16 @@ char g_soundBusterStabbed[][] = {"vo/spy_laughevil01.mp3", "vo/spy_laughevil02.m
 
 char g_soundArrowImpact[][] = {"mvm/melee_impacts/arrow_impact_robo01.wav", "mvm/melee_impacts/arrow_impact_robo02.wav", "mvm/melee_impacts/arrow_impact_robo03.wav"};
 
+char g_demoBossGibs[][] = {"models/bots/gibs/demobot_gib_boss_head.mdl", "models/bots/gibs/demobot_gib_boss_arm1.mdl", "models/bots/gibs/demobot_gib_boss_arm2.mdl", "models/bots/gibs/demobot_gib_boss_leg1.mdl", "models/bots/gibs/demobot_gib_boss_leg2.mdl", "models/bots/gibs/demobot_gib_boss_leg3.mdl", "models/bots/gibs/demobot_gib_boss_pelvis.mdl"};
+char g_heavyBossGibs[][] = {"models/bots/gibs/heavybot_gib_boss_head.mdl", "models/bots/gibs/heavybot_gib_boss_arm.mdl", "models/bots/gibs/heavybot_gib_boss_arm2.mdl", "models/bots/gibs/heavybot_gib_boss_chest.mdl", "models/bots/gibs/heavybot_gib_boss_leg.mdl", "models/bots/gibs/heavybot_gib_boss_leg2.mdl", "models/bots/gibs/heavybot_gib_boss_pelvis.mdl"};
+char g_pyroBossGibs[][] = {"models/bots/gibs/pyrobot_gib_boss_head.mdl", "models/bots/gibs/pyrobot_gib_boss_arm1.mdl", "models/bots/gibs/pyrobot_gib_boss_arm2.mdl", "models/bots/gibs/pyrobot_gib_boss_arm3.mdl", "models/bots/gibs/pyrobot_gib_boss_chest.mdl", "models/bots/gibs/pyrobot_gib_boss_chest2.mdl", "models/bots/gibs/pyrobot_gib_boss_leg.mdl", "models/bots/gibs/pyrobot_gib_boss_pelvis.mdl"};
+char g_scoutBossGibs[][] = {"models/bots/gibs/scoutbot_gib_boss_head.mdl", "models/bots/gibs/scoutbot_gib_boss_arm1.mdl", "models/bots/gibs/scoutbot_gib_boss_arm2.mdl", "models/bots/gibs/scoutbot_gib_boss_chest.mdl", "models/bots/gibs/scoutbot_gib_boss_leg1.mdl", "models/bots/gibs/scoutbot_gib_boss_leg2.mdl", "models/bots/gibs/scoutbot_gib_boss_pelvis.mdl"};
+char g_soldierBossGibs[][] = {"models/bots/gibs/soldierbot_gib_boss_head.mdl", "models/bots/gibs/soldierbot_gib_boss_arm1.mdl", "models/bots/gibs/soldierbot_gib_boss_arm2.mdl", "models/bots/gibs/soldierbot_gib_boss_chest.mdl", "models/bots/gibs/soldierbot_gib_boss_leg1.mdl", "models/bots/gibs/soldierbot_gib_boss_leg2.mdl", "models/bots/gibs/soldierbot_gib_boss_pelvis.mdl"};
+char g_spyBossGibs[][] = {"models/bots/gibs/spybot_gib_head.mdl"};
+char g_sniperBossGibs[][] = {"models/bots/gibs/sniperbot_gib_head.mdl"};
+char g_medicBossGibs[][] = {"models/bots/gibs/medicbot_gib_head.mdl"};
+char g_engyBossGibs[][] = {"models/bots/gibs/pyrobot_gib_boss_pelvis.mdl"}; // No engy bot head gib.
+
 enum
 {
 	Rank_Normal=0,
@@ -727,7 +749,7 @@ Handle g_cvar_sv_tags;
 // Class restriction global variables
 Handle g_hCvarClassLimits[MAX_TEAMS][10];
 Handle g_hCvarTournamentClassLimits[10];
-char g_strSoundNo[10][24] = {"", "vo/scout_no03.mp3",   "vo/sniper_no04.mp3", "vo/soldier_no01.mp3", "vo/demoman_no03.mp3", "vo/medic_no03.mp3", "vo/heavy_no02.mp3", "vo/pyro_no01.mp3", "vo/spy_no02.mp3", "vo/engineer_no03.mp3"};
+char g_strSoundNo[10][24] = {"", "vo/scout_no03.mp3", "vo/sniper_no04.mp3", "vo/soldier_no01.mp3", "vo/demoman_no03.mp3", "vo/medic_no03.mp3", "vo/heavy_no02.mp3", "vo/pyro_no01.mp3", "vo/spy_no02.mp3", "vo/engineer_no03.mp3"};
 int g_iClassOverride;
 
 float g_flTimeRoundStarted;
@@ -841,6 +863,7 @@ int g_iParticleFireworks[MAX_TEAMS] = {-1, ...};
 int g_iParticleFetti = -1;
 int g_iSpriteBeam = -1;
 int g_iSpriteHalo = -1;
+int g_iParticleBotDeath = -1;
 
 int g_modelRomevisionTank = -1;
 int g_modelRomevisionTrackL = -1;
@@ -1037,6 +1060,7 @@ public void OnPluginStart()
 	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU when a giant is out. Note: This will be scaled to playercount: x/24*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: x/24*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: x/24*this = final respawn time.");
+	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.5", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
 	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.1", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
 	g_hCvarScrambleEnabled = CreateConVar("tank_scramble_enabled", "1", "0/1 - Enable or disable triggering team scrambles.");
@@ -1058,7 +1082,7 @@ public void OnPluginStart()
 	g_hCvarTeleportStartRed = CreateConVar("tank_teleport_start_red", "", "The targetname of the path_track to teleport the cart to when the round begins. Leaving this blank will use start_node from the team_train_watcher. Set this to \"disabled\" to disable teleporting.");
 	g_hCvarTeleportStartBlue = CreateConVar("tank_teleport_start_blue", "", "The targetname of the path_track to teleport the cart to when the round begins. Leaving this blank will use start_node from the team_train_watcher. Set this to \"disabled\" to disable teleporting.");
 	g_hCvarTeleportGoal = CreateConVar("tank_teleport_goal", "", "The targetname of the path_track to teleport the cart to when the bomb is deployed. The cart will start moving forward from this position and trigger a win.");
-
+	
 	g_hCvarPointsForTank = CreateConVar("tank_points_for_tank", "2", "Scoreboard points awarded when enough damage is done to the tank.");
 	g_hCvarPointsForTankPlr = CreateConVar("tank_points_for_tank_plr", "1", "Scoreboard points awarded when enough damage is done to the tank.");
 	g_hCvarPointsForGiant = CreateConVar("tank_points_for_giant", "2", "Scoreboard points awarded when enough damage is done to the giant.");
@@ -1098,6 +1122,7 @@ public void OnPluginStart()
 	g_hCvarGiantTimeAFK = CreateConVar("tank_giant_time_afk", "7.0", "Seconds after spawning when a giant will be considered AFK.");
 	g_hCvarGiantCooldown = CreateConVar("tank_giant_cooldown", "30.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again.");
 	g_hCvarGiantCooldownPlr = CreateConVar("tank_giant_cooldown_plr", "20.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again in payload race.");
+	g_hCvarGiantGibs = CreateConVar("tank_giant_gibs", "1", "0/1 - Enable or disable the spawning of gibs when a Giant Robot is destroyed.");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -1577,64 +1602,46 @@ public void OnMapStart()
 	}
 
 	// Precache robot models
-	for(int i=0; i<sizeof(g_strModelRobots); i++)
-	{
-		g_iModelIndexRobots[i] = 0;
-		if(strlen(g_strModelRobots[i]) > 0)
-		{
-			if(FileExists(g_strModelRobots[i], true))
-			{
-				g_iModelIndexRobots[i] = PrecacheModel(g_strModelRobots[i]);
-			}else{
-				LogMessage("Missing robot model: %s!", g_strModelRobots[i]);
-			}
-		}
-	}
+	for(int i=0; i<sizeof(g_strModelRobots); i++) g_iModelIndexRobots[i] = Tank_PrecacheModel(g_strModelRobots[i]);
 	
 	// Precache human player model indices
-	for(int i=0; i<sizeof(g_strModelHumans); i++)
-	{
-		g_iModelIndexHumans[i] = 0;
-		if(strlen(g_strModelHumans[i]) > 0)
-		{
-			if(FileExists(g_strModelHumans[i], true))
-			{
-				g_iModelIndexHumans[i] = PrecacheModel(g_strModelHumans[i]);
-			}else{
-				LogMessage("Missing human model: %s!", g_strModelHumans[i]);
-			}
-		}
-	}
+	for(int i=0; i<sizeof(g_strModelHumans); i++) g_iModelIndexHumans[i] = Tank_PrecacheModel(g_strModelHumans[i]);
 
-	if(FileExists(MODEL_ROBOT_HOLOGRAM, true))
-	{
-		PrecacheModel(MODEL_ROBOT_HOLOGRAM);
-	}else{
-		LogMessage("Missing robot hologram: %s!", MODEL_ROBOT_HOLOGRAM);
-	}
+	// Precache robot gibs.
+	for(int i=0; i<sizeof(g_demoBossGibs); i++) Tank_PrecacheModel(g_demoBossGibs[i]);
+	for(int i=0; i<sizeof(g_heavyBossGibs); i++) Tank_PrecacheModel(g_heavyBossGibs[i]);
+	for(int i=0; i<sizeof(g_pyroBossGibs); i++) Tank_PrecacheModel(g_pyroBossGibs[i]);
+	for(int i=0; i<sizeof(g_scoutBossGibs); i++) Tank_PrecacheModel(g_scoutBossGibs[i]);
+	for(int i=0; i<sizeof(g_soldierBossGibs); i++) Tank_PrecacheModel(g_soldierBossGibs[i]);
+	for(int i=0; i<sizeof(g_spyBossGibs); i++) Tank_PrecacheModel(g_spyBossGibs[i]);
+	for(int i=0; i<sizeof(g_sniperBossGibs); i++) Tank_PrecacheModel(g_sniperBossGibs[i]);
+	for(int i=0; i<sizeof(g_medicBossGibs); i++) Tank_PrecacheModel(g_medicBossGibs[i]);
+	for(int i=0; i<sizeof(g_engyBossGibs); i++) Tank_PrecacheModel(g_engyBossGibs[i]);
+
+	Tank_PrecacheModel(MODEL_ROBOT_HOLOGRAM);
 
 	for(int i=0; i<sizeof(g_entitiesOfInterest); i++) g_entitiesOfInterest[i] = Interest_None;
 	
 	// Precache currency models so they don't have to late precache
-	PrecacheModel("models/items/currencypack_large.mdl");
-	PrecacheModel("models/items/currencypack_medium.mdl");
-	PrecacheModel("models/items/currencypack_small.mdl");
+	Tank_PrecacheModel("models/items/currencypack_large.mdl");
+	Tank_PrecacheModel("models/items/currencypack_medium.mdl");
+	Tank_PrecacheModel("models/items/currencypack_small.mdl");
 	// Precache flagtrail for the bomb, even though the trail_effect is set to 3 (color only)
 	PrecacheGeneric("materials/effects/flagtrail_blu.vmt");
 	PrecacheGeneric("materials/effects/flagtrail_red.vmt");
 
-	PrecacheModel(MODEL_BOMB);
-	PrecacheModel(MODEL_REVIVE_MARKER);
+	Tank_PrecacheModel(MODEL_BOMB);
+	Tank_PrecacheModel(MODEL_REVIVE_MARKER);
 
-	PrecacheModel(MODEL_TANK);
-	PrecacheModel(MODEL_TRACK_L);
-	PrecacheModel(MODEL_TRACK_R);
-	PrecacheModel(MODEL_TANK_STATIC);
+	Tank_PrecacheModel(MODEL_TANK);
+	Tank_PrecacheModel(MODEL_TRACK_L);
+	Tank_PrecacheModel(MODEL_TRACK_R);
+	Tank_PrecacheModel(MODEL_TANK_STATIC);
 
-	g_modelRomevisionTank = PrecacheModel(MODEL_ROMEVISION_TANK);
-	g_modelRomevisionTrackL = PrecacheModel(MODEL_ROMEVISION_TRACK_L);
-	g_modelRomevisionTrackR = PrecacheModel(MODEL_ROMEVISION_TRACK_R);
-	PrecacheModel(MODLE_ROMEVISION_STATIC);
+	g_modelRomevisionTank = Tank_PrecacheModel(MODEL_ROMEVISION_TANK);
+	g_modelRomevisionTrackL = Tank_PrecacheModel(MODEL_ROMEVISION_TRACK_L);
+	g_modelRomevisionTrackR = Tank_PrecacheModel(MODEL_ROMEVISION_TRACK_R);
+	Tank_PrecacheModel(MODLE_ROMEVISION_STATIC);
 
 	Timers_KillAll();
 
@@ -1656,9 +1663,10 @@ public void OnMapStart()
 	g_iParticleFireworks[TFTeam_Red] = Particle_GetTableIndex("utaunt_firework_teamcolor_red");
 	g_iParticleFireworks[TFTeam_Blue] = Particle_GetTableIndex("utaunt_firework_teamcolor_blue");
 	g_iParticleFetti = Particle_GetTableIndex("bday_confetti");
+	g_iParticleBotDeath = Particle_GetTableIndex("bot_death");
 
-	g_iSpriteBeam = PrecacheModel("materials/sprites/laser.vmt");
-	g_iSpriteHalo = PrecacheModel("materials/sprites/halo01.vmt");
+	g_iSpriteBeam = Tank_PrecacheModel("materials/sprites/laser.vmt");
+	g_iSpriteHalo = Tank_PrecacheModel("materials/sprites/halo01.vmt");
 
 	Giant_LoadTemplates();
 
@@ -9008,15 +9016,33 @@ public Action Timer_CheckTeams(Handle hTimer)
 	}
 	
 	// Scale respawn times with player count
-	float flRespawnBase = config.LookupFloat(g_hCvarRespawnBase);
 	int iPlayerCount = 0;
 	for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) >= 2) iPlayerCount++;
 	if(iPlayerCount < 1) iPlayerCount = 1;
 
-	float flRespawnGiant = float(iPlayerCount) / 24.0 * config.LookupFloat(g_hCvarRespawnGiant);
-	float flRespawnBombRed = float(iPlayerCount) / 24.0 * config.LookupFloat(g_hCvarRespawnBombRed);
-	float flRespawnRace = float(iPlayerCount) / 24.0 * config.LookupFloat(g_hCvarRespawnRace);
-	// Scaled respawn times can never go lower than the base respawn time
+	// Get the base respawn time.
+	float flRespawnGiant = config.LookupFloat(g_hCvarRespawnGiant);
+	float flRespawnBombRed = config.LookupFloat(g_hCvarRespawnBombRed);
+	float flRespawnRace = config.LookupFloat(g_hCvarRespawnRace);
+
+	// Get the respawn times scaled for player count.
+	flRespawnGiant = float(iPlayerCount) / 24.0 * flRespawnGiant;
+	flRespawnBombRed = float(iPlayerCount) / 24.0 * flRespawnBombRed;
+	flRespawnRace = float(iPlayerCount) / 24.0 * flRespawnRace;
+
+	// Get the minimum respawn time when scaling for player count.
+	float respawnScaleMin = config.LookupFloat(g_hCvarRespawnScaleMin);
+	float respawnGiantMin = flRespawnGiant * respawnScaleMin;
+	float respawnBombRedMin = flRespawnBombRed * respawnScaleMin;
+	float respawnRaceMin = flRespawnRace * respawnScaleMin;
+
+	// Enforce a minimum respawn time for the scaled respawn times.
+	if(flRespawnGiant < respawnGiantMin) flRespawnGiant = respawnGiantMin;
+	if(flRespawnBombRed < respawnBombRedMin) flRespawnBombRed = respawnBombRedMin;
+	if(flRespawnRace < respawnRaceMin) flRespawnRace = respawnRaceMin;
+
+	// Scaled respawn times can never go lower than the base respawn time.
+	float flRespawnBase = config.LookupFloat(g_hCvarRespawnBase);
 	if(flRespawnGiant < flRespawnBase) flRespawnGiant = flRespawnBase;
 	if(flRespawnBombRed < flRespawnBase) flRespawnBombRed = flRespawnBase;
 	if(flRespawnRace < flRespawnBase) flRespawnRace = flRespawnBase;
@@ -10595,7 +10621,18 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
-		SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
+		Giant_SpawnGibs(client);
+
+		//float pos[3];
+		//GetClientAbsOrigin(client, pos);
+		//pos[2] += 25.0;
+		// void TE_PhysicsProp(int modelIndex, int skin, int flags, int effects, float pos[3])
+		//int model = PrecacheModel("models/bots/gibs/soldierbot_gib_boss_chest.mdl");
+		//TE_PhysicsProp(model, GetClientTeam(client)-2, 4, EF_NOSHADOW|EF_NORECEIVESHADOW, pos);
+		//TE_BreakModel(model, pos);
+		//TE_SendToAll();
+
+		//SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
 
 		//float pos[3];
 		//GetEntPropVector(EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]), Prop_Send, "m_vecOrigin", pos);
@@ -12194,6 +12231,16 @@ void TE_Particle(int iParticleIndex, float origin[3]=NULL_VECTOR, float start[3]
     TE_WriteNum("m_bResetParticles", resetParticles ? 1 : 0);
 }
 
+stock void TE_PhysicsProp(int modelIndex, int skin, int flags, int effects, float pos[3])
+{
+	TE_Start("physicsprop");
+	TE_WriteNum("m_nModelIndex", modelIndex);
+	TE_WriteNum("m_nSkin", skin);
+	TE_WriteNum("m_nFlags", flags);
+	TE_WriteNum("m_nEffects", effects);
+	TE_WriteVector("m_vecOrigin", pos);
+}
+
 public Action TempEntHook_Blood(const char[] te_name, int[] players, int numPlayers, float delay)
 {
 	if(!g_bEnabled) return Plugin_Continue;
@@ -13248,20 +13295,20 @@ public Action TF2_OnPlayerTeleport(int client, int teleporter, bool &result)
 {
 	if(!g_bEnabled) return Plugin_Continue;
 
-	if(GetEntProp(teleporter, Prop_Send, "m_iObjectMode") != view_as<int>(TFObjectMode_Entrance)) return Plugin_Continue; // This gets called when the player stands on the exit as well
-
-	// Block the giant from taking a teleporter. It is too easy for them to get stuck.
-	if(GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+	if(teleporter > MaxClients && client >= 1 && client <= MaxClients)
 	{
-		result = false;
-		return Plugin_Handled;
-	}
+		if(GetEntProp(teleporter, Prop_Send, "m_iObjectMode") != view_as<int>(TFObjectMode_Entrance)) return Plugin_Continue; // This gets called when the player stands on the exit as well
 
-	// Block players that are becoming a giant, from taking the teleporter. This lasts around 5 seconds.
-	if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot)
-	{
-		result = false;
-		return Plugin_Handled;
+		// Block giants and players that are becoming a giant from taking the teleporter. This lasts around 5 seconds.
+		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot)
+		{
+			// Allow the Super Spy to take the teleporter after he spawns in.
+			if(!(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_CAN_DROP_BOMB) || !GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+			{
+				result = false;
+				return Plugin_Handled;
+			}
+		}
 	}
 
 	return Plugin_Continue;
@@ -13283,7 +13330,7 @@ public Action Command_ResetBomb(int client, int args)
 		ShowActivity2(client, "[SM] ", "%N reset the bomb.", client);
 		AcceptEntityInput(bomb, "ForceReset");
 	}else{
-		ReplyToCommand(client, "Failed to find the item_teamflag bomb entity.");
+		ReplyToCommand(client, "Failed to find the \"item_teamflag\" bomb entity.");
 	}
 
 	return Plugin_Handled;
@@ -14736,4 +14783,19 @@ public Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunCharge
 	}
 
 	return Plugin_Continue;
+}
+
+int Tank_PrecacheModel(const char[] model)
+{
+	if(strlen(model) > 4)
+	{
+		if(FileExists(model, true))
+		{
+			return PrecacheModel(model);
+		}else{
+			LogMessage("Failed to precache model: %s", model);
+		}
+	}
+
+	return 0;
 }
