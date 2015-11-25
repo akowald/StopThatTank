@@ -990,5 +990,4 @@ methodmap MemoryPatch < ArrayList
 MemoryPatch g_patchPhysics = null;
 MemoryPatch g_patchUpgrade = null;
 MemoryPatch g_patchKnockback = null;
-MemoryPatch g_patchChargeEffect = null;
 MemoryPatch g_patchNavMesh = null;

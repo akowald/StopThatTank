@@ -14416,11 +14416,6 @@ void Mod_Toggle(bool enable)
 			LogMessage("Patching Knockback at 0x%X..", g_patchKnockback.Get(MemoryIndex_Address));
 			g_patchKnockback.enablePatch();
 		}
-		if(g_patchChargeEffect != null && !g_patchChargeEffect.isEnabled())
-		{
-			LogMessage("Patching ChargeEffect at 0x%X..", g_patchChargeEffect.Get(MemoryIndex_Address));
-			g_patchChargeEffect.enablePatch();
-		}
 		if(Mod_ShouldApplyNavMeshPatch())
 		{
 			if(g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
@@ -14461,11 +14456,6 @@ void Mod_Toggle(bool enable)
 		{
 			LogMessage("Un-patching Knockback at 0x%X..", g_patchKnockback.Get(MemoryIndex_Address));
 			g_patchKnockback.disablePatch();
-		}
-		if(g_patchChargeEffect != null && g_patchChargeEffect.isEnabled())
-		{
-			LogMessage("Un-patching ChargeEffect at 0x%X..", g_patchChargeEffect.Get(MemoryIndex_Address));
-			g_patchChargeEffect.disablePatch();
 		}
 		if(g_patchNavMesh != null && g_patchNavMesh.isEnabled())
 		{
