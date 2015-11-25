@@ -28,6 +28,9 @@
 #error This plugin must be compiled from tank.sp
 #endif
 
+#define SPAWNER_TIME_TANK 	3.0
+#define SPAWNER_TIME_GIANT 	2.0
+
 int g_iNumGiantSpawns[MAX_TEAMS][MAX_NUM_TEMPLATES];
 
 void Spawner_Cleanup(int client=-1)
@@ -35,7 +38,7 @@ void Spawner_Cleanup(int client=-1)
 	if(client == -1)
 	{
 		// Clear everything
-		for(int i=0; i<MAXPLAYERS+1; i++)
+		for(int i=0; i<SPAWNER_SIZE; i++)
 		{
 			Spawner_CleanupData(i);
 		}
@@ -114,7 +117,10 @@ void Spawner_CheckGiantSpawns(int team, int pointIndex, float pos[3], float ang[
 void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 {
 	// Gets the spawn position of the object and saves it for later.
-	int team = GetClientTeam(client);
+	int team = 0;
+	if(spawnType == Spawn_GiantRobot) team = GetClientTeam(client);
+	if(spawnType == Spawn_Tank) team = client-MAXPLAYERS;
+
 	float pos[3];
 	float ang[3];
 
@@ -124,7 +130,7 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 		g_nSpawner[client][g_flSpawnerAng][i] = 0.0;		
 	}
 
-	// The tank will always spawn where the cart resides.
+	// The tank will always spawn where the team's cart resides.
 	if(spawnType == Spawn_Tank)
 	{
 		int trackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
@@ -306,9 +312,21 @@ void Spawner_GetSpawnPosition(int client, float pos[3], float ang[3])
 
 void Spawner_Spawn(int client, eSpawnerType spawnType, int giantType=-1, int flags=0)
 {
-	if(spawnType == Spawn_GiantRobot && giantType < 0 || giantType >= MAX_NUM_TEMPLATES || !g_nGiants[giantType][g_bGiantTemplateEnabled])
+	if(spawnType == Spawn_GiantRobot && (giantType < 0 || giantType >= MAX_NUM_TEMPLATES || !g_nGiants[giantType][g_bGiantTemplateEnabled]))
 	{
-		LogMessage("Invalid giant robot template index %d (type %d) specified! Are too many templates disabled/missing?", giantType, view_as<int>(spawnType));
+		LogMessage("(Spawner_Spawn) Invalid giant robot template index %d (type %d) specified! Are too many templates disabled/missing?", giantType, view_as<int>(spawnType));
+		return;
+	}
+
+	if(spawnType != Spawn_GiantRobot && spawnType != Spawn_Tank)
+	{
+		LogMessage("(Spawner_Spawn) Invalid spawnType %d!", spawnType);
+		return;
+	}
+
+	if(client < 0 || client >= SPAWNER_SIZE)
+	{
+		LogMessage("(Spawner_Spawn) Invalid client index %d!", client);
 		return;
 	}
 
@@ -316,17 +334,17 @@ void Spawner_Spawn(int client, eSpawnerType spawnType, int giantType=-1, int fla
 	{
 		if(client < 1 || client > MaxClients || !IsClientInGame(client))
 		{
-			LogMessage("Invalid client index %d: not a player!", client);
+			LogMessage("(Spawner_Spawn) Invalid client index %d: not a player!", client);
 			return;
 		}
 		int team = GetClientTeam(client);
 		if(team != TFTeam_Red && team != TFTeam_Blue)
 		{
-			LogMessage("Invalid client index %d: not on RED or BLU!", client);
+			LogMessage("(Spawner_Spawn) Invalid client index %d: not on RED or BLU!", client);
 			return;
 		}
 
-		// If the player is already a giant robot, we need to force a suicide to clear them
+		// If the player is already a giant robot, we need to force a suicide to clear them.
 		if(GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 		{
 #if defined DEBUG
@@ -337,9 +355,9 @@ void Spawner_Spawn(int client, eSpawnerType spawnType, int giantType=-1, int fla
 		}
 	}
 
-	if(spawnType == Spawn_Tank && client != 0)
+	if(spawnType == Spawn_Tank && client-MAXPLAYERS != TFTeam_Red && client-MAXPLAYERS != TFTeam_Blue)
 	{
-		LogMessage("Invalid client index %d: must be 0 for tank!", client);
+		LogMessage("(Spawner_Spawn) Invalid client index %d for tank: must be %d for RED or %d for BLU!", client, MAXPLAYERS+TFTeam_Red, MAXPLAYERS+TFTeam_Blue);
 		return;
 	}
 
@@ -365,31 +383,37 @@ void Spawner_Spawn(int client, eSpawnerType spawnType, int giantType=-1, int fla
 	float flAng[3];
 	Spawner_GetSpawnPosition(client, flPos, flAng);
 
-	float flTime = 4.0;
-	if(spawnType == Spawn_GiantRobot && g_nGiants[giantType][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) flTime = 1.9;
-	if(!(g_nSpawner[client][g_iSpawnerFlags] & SPAWNERFLAG_NOPUSHAWAY)) PushAway_Create(flPos, flTime);
-
-	// Spawn a particle effect to make it clear they are being pushed
-	int iEntity = CreateEntityByName("info_particle_system");
-	if(iEntity > MaxClients)
+	float pushAwayTime = 4.0;
+	if(spawnType == Spawn_GiantRobot && g_nGiants[giantType][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) pushAwayTime = 1.9;
+	if(!(g_nSpawner[client][g_iSpawnerFlags] & SPAWNERFLAG_NOPUSHAWAY))
 	{
-		TeleportEntity(iEntity, flPos, NULL_VECTOR, NULL_VECTOR);
-		
-		DispatchKeyValue(iEntity, "effect_name", "merasmus_spawn");
-		
-		DispatchSpawn(iEntity);
-		ActivateEntity(iEntity);
-		AcceptEntityInput(iEntity, "Start");
-		
-		CreateTimer(4.0, Timer_EntityCleanup, EntIndexToEntRef(iEntity));
+		PushAway_Create(flPos, pushAwayTime);
+
+		// Spawn a particle effect to make it clear they are being pushed
+		int iEntity = CreateEntityByName("info_particle_system");
+		if(iEntity > MaxClients)
+		{
+			TeleportEntity(iEntity, flPos, NULL_VECTOR, NULL_VECTOR);
+			
+			DispatchKeyValue(iEntity, "effect_name", "merasmus_spawn");
+			
+			DispatchSpawn(iEntity);
+			ActivateEntity(iEntity);
+			AcceptEntityInput(iEntity, "Start");
+			
+			CreateTimer(pushAwayTime, Timer_EntityCleanup, EntIndexToEntRef(iEntity));
+		}
 	}
+
+	float spawnTime = SPAWNER_TIME_GIANT;
+	if(spawnType == Spawn_Tank) spawnTime = SPAWNER_TIME_TANK;
 
 	// Start a timer to spawn in the object when ready
 	Spawner_KillTimer(client);
-	g_nSpawner[client][g_hSpawnerTimer] = CreateTimer(2.0, Spawner_Timer_Spawn, client, TIMER_REPEAT);
+	g_nSpawner[client][g_hSpawnerTimer] = CreateTimer(spawnTime, Spawner_Timer_Spawn, client, TIMER_REPEAT);
 }
 
-public Action Spawner_Timer_Spawn(Handle hTimer, any client)
+public Action Spawner_Timer_Spawn(Handle hTimer, int client)
 {
 	g_nSpawner[client][g_flSpawnerTimeSpawned] = GetEngineTime();
 	float flTime = 3.0;
@@ -398,17 +422,78 @@ public Action Spawner_Timer_Spawn(Handle hTimer, any client)
 	{
 		case Spawn_Tank:
 		{
-			// Spawns a new tank where the cart resides
-			int iTank = Tank_CreateTank(TFTeam_Blue);
-			if(iTank > MaxClients)
+			int team = client-MAXPLAYERS;
+			// Spawns a new tank where the team's cart resides.
+			if(g_nGameMode == GameMode_Race && g_bRaceIntermission)
 			{
-				g_iRefTank[TFTeam_Blue] = EntIndexToEntRef(iTank);
-				
-				Tank_SetNoTarget(TFTeam_Blue, true);
-				
-				// Find the tracks associated with this tank
-				Tank_FindParts(TFTeam_Blue);
+				// For the end of intermission, silently replace the cart that already exists.
+				int oldTank = EntRefToEntIndex(g_iRefTank[team]);
+				if(oldTank > MaxClients)
+				{
+					// The tank can get stuck if it is moved or changes speed abruptly.
+					// Spawn a new tank where the cart is to avoid this problem.
+					int newTank = Tank_CreateTankEntity(team); // Spawns a new tank where the cart is.
+					if(newTank > MaxClients)
+					{
+						g_iRefTank[team] = EntIndexToEntRef(newTank);
+						
+						Tank_FindParts(team); // Find the tracks associated with this tank.
+						Tank_SetDefaultHealth(team);
+
+						g_tankRespawned[team] = true; // Flag this team's tank as respawned.
+					}
+
+					// If the tank was parented to the cart, we need to restore this for the new tank.
+					if(GetEntPropEnt(oldTank, Prop_Send, "moveparent") > MaxClients)
+					{
+						Tank_Parent(team);
+					}
+
+					Tank_KillFakeTank(team);
+					AcceptEntityInput(oldTank, "Kill"); // Kill the old tank.
+				}
+			}else{
+				int tank = Tank_CreateTank(team);
+				if(tank > MaxClients)
+				{
+					g_iRefTank[team] = EntIndexToEntRef(tank);
+					
+					// Find the tracks associated with this tank
+					Tank_FindParts(team);
+				}
 			}
+
+			// Continue round logic once both tanks are spawned and ready.
+			if(!g_bIsRoundStarted)
+			{
+				switch(g_nGameMode)
+				{
+					case GameMode_Race:
+					{
+						if(EntRefToEntIndex(g_iRefTank[TFTeam_Blue]) > MaxClients && EntRefToEntIndex(g_iRefTank[TFTeam_Red]) > MaxClients)
+						{
+							Tank_StartRound();
+						}
+					}
+					default:
+					{
+						if(EntRefToEntIndex(g_iRefTank[TFTeam_Blue]) > MaxClients)
+						{
+							Tank_StartRound();
+						}
+					}
+				}
+			}else if(g_nGameMode == GameMode_Race && g_bRaceIntermission)
+			{
+				if(EntRefToEntIndex(g_iRefTank[TFTeam_Blue]) > MaxClients && g_tankRespawned[TFTeam_Blue] && EntRefToEntIndex(g_iRefTank[TFTeam_Red]) > MaxClients && g_tankRespawned[TFTeam_Red])
+				{
+					Tank_EndIntermission();
+				}
+			}
+
+			g_nSpawner[client][g_hSpawnerTimer] = INVALID_HANDLE;
+			Spawner_Cleanup(client);
+			return Plugin_Stop;
 		}
 		case Spawn_GiantRobot:
 		{

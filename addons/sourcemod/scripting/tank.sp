@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-#define DEBUG
+//#define DEBUG
 
 #define PLUGIN_VERSION 				"1.5"
 
@@ -730,6 +730,7 @@ int g_iDamageStatsGiant[MAXPLAYERS+1][MAXPLAYERS+1];
 
 int g_iDamageAccul[MAXPLAYERS+1][MAX_TEAMS];
 float g_flTankHealEnd[MAX_TEAMS];
+bool g_tankRespawned[MAX_TEAMS];
 float g_flTankLastHealed[MAX_TEAMS];
 bool g_bTankTriggerDisabled[MAX_TEAMS];
 
@@ -899,7 +900,6 @@ Handle g_hellGateTimer = INVALID_HANDLE; // Opens up the gates of hell!
 Handle g_timerTip = INVALID_HANDLE; // Periodically shows game tips in chat to players.
 Handle g_timerCountdown = INVALID_HANDLE; // Plays the 5,4,3,2,1 announcer countdown before an action.
 int g_countdownTime;
-Handle g_timerPushaway = INVALID_HANDLE; // Spawns a pushaway in plr_ when the tanks resume after intermission.
 Handle g_timerAnnounce = INVALID_HANDLE; // Announces the entrance of the giant with a theme song.
 
 float g_spellTeleportPos[MAXPLAYERS+1][3];
@@ -928,12 +928,13 @@ bool g_bowAirBourne = false;
 enum eSpawnerType
 {
 	Spawn_Tank=0,
-	Spawn_GiantRobot
+	Spawn_GiantRobot,
 };
 
 #define SPAWNERFLAG_RAGEMETER 		(1 << 0)
 #define SPAWNERFLAG_NOPUSHAWAY 		(1 << 1)
 
+#define SPAWNER_SIZE 				MAXPLAYERS+MAX_TEAMS+1
 // Structure for the giant/tank spawner that supports spawning multiple giants at a time onto the playing field.
 enum eSpawnerStruct
 {
@@ -945,15 +946,15 @@ enum eSpawnerStruct
 	g_iSpawnerGiantIndex,				// Template giant index used
 	Float:g_flSpawnerTimeSpawned, 		// Engine time when the object has been spawned
 	g_iSpawnerFlags, 					// Flags to be used when invoking Spawner_Spawn
-	g_iSpawnerExtraEnt 					// A reference to any entity
+	g_iSpawnerExtraEnt, 				// A reference to any entity
 };
-int g_nSpawner[MAXPLAYERS+1][eSpawnerStruct];
+int g_nSpawner[SPAWNER_SIZE][eSpawnerStruct];
 
 enum
 {
 	TFStat_PlayerInvulnerable=15,
 	TFStat_PlayerStunBall=23,
-	TFStat_PlayerRevived=39
+	TFStat_PlayerRevived=39,
 };
 
 #define ANNOUNCER_MAX_MESSAGES 3
@@ -961,7 +962,7 @@ enum
 {
 	AnnouncerMessage_CloseGame=0,
 	AnnouncerMessage_LargeDifference,
-	AnnouncerMessage_CatchingUp
+	AnnouncerMessage_CatchingUp,
 };
 enum eAnnouncerStruct
 {
@@ -1122,7 +1123,7 @@ public void OnPluginStart()
 	g_hCvarGiantTimeAFK = CreateConVar("tank_giant_time_afk", "7.0", "Seconds after spawning when a giant will be considered AFK.");
 	g_hCvarGiantCooldown = CreateConVar("tank_giant_cooldown", "30.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again.");
 	g_hCvarGiantCooldownPlr = CreateConVar("tank_giant_cooldown_plr", "20.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again in payload race.");
-	g_hCvarGiantGibs = CreateConVar("tank_giant_gibs", "1", "0/1 - Enable or disable the spawning of gibs when a Giant Robot is destroyed.");
+	g_hCvarGiantGibs = CreateConVar("tank_giant_gibs", "5", "Number of gibs that spawn when a giant is destroyed. Set to 0 to spawn no gibs.");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -2572,36 +2573,11 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 	PrintToServer("(Event_RoundActive) Max CPs: %d, Sim. Tanks: %d!", g_iMaxControlPoints[TFTeam_Blue], g_iNumTankMaxSimulated);
 #endif
 
-	// Spawn the BLUE team's tank on the payload cart
-	int tank = Tank_CreateTank(TFTeam_Blue);
-	if(tank > MaxClients)
-	{
-		g_iRefTank[TFTeam_Blue] = EntIndexToEntRef(tank);
-		
-		Tank_SetNoTarget(TFTeam_Blue, true);
-		
-		// Find the tracks associated with this tank
-		Tank_FindParts(TFTeam_Blue);
-	}else{
-		LogMessage("(Event_RoundActive) Failed to spawn BLUE's \"tank_boss\"!");
-	}
-	
-	// Spawn the RED team's tank on the payload cart
-	if(g_nGameMode == GameMode_Race)
-	{
-		tank = Tank_CreateTank(TFTeam_Red);
-		if(tank > MaxClients)
-		{
-			g_iRefTank[TFTeam_Red] = EntIndexToEntRef(tank);
 
-			Tank_SetNoTarget(TFTeam_Red, true);
-
-			// Find the tracks associated with this tank
-			Tank_FindParts(TFTeam_Red);
-		}else{
-			LogMessage("(Event_RoundActive) Failed to spawn RED's \"tank_boss\"!");
-		}
-	}
+	// Spawn a 'fake' tank in place of the actual tank before the game begins.
+	// This will keep spawn exits open and make it more difficult to hide stickies around the tank.
+	Tank_CreateFakeTank(TFTeam_Blue, true);
+	if(g_nGameMode == GameMode_Race) Tank_CreateFakeTank(TFTeam_Red, true);
 
 	// Get rid of the mapobj_cart_dispenser and spawn our own with increased range
 	Train_RemoveAllDispensers();
@@ -2851,12 +2827,15 @@ public void Event_SetupFinished(Handle hEvent, char[] strEventName, bool bDontBr
 	Player_RemoveUberChargeBonus();
 
 	// Start the grace period timer
+	float graceTime = config.LookupFloat(g_hCvarTimeGrace);
+	if(graceTime < 6.0) graceTime = 6.0;
+
 	Timer_KillStart();
-	g_hTimerStart = CreateTimer(config.LookupFloat(g_hCvarTimeGrace), Timer_StartRound, _, TIMER_REPEAT);
+	g_hTimerStart = CreateTimer(graceTime-SPAWNER_TIME_TANK, Timer_StartRound, _, TIMER_REPEAT); // The spawning process takes 3s.
 	
 	g_countdownTime = 5;
 	Timer_KillCountdown();
-	g_timerCountdown = CreateTimer(config.LookupFloat(g_hCvarTimeGrace)-5.1, Timer_Countdown, _, TIMER_REPEAT);
+	g_timerCountdown = CreateTimer(graceTime-5.1, Timer_Countdown, _, TIMER_REPEAT);
 	
 	// Make the timer ago away after setup
 	int iTimer = MaxClients+1;
@@ -2871,7 +2850,7 @@ public void Event_SetupFinished(Handle hEvent, char[] strEventName, bool bDontBr
 	int iWatcher = EntRefToEntIndex(g_iRefTrainWatcher[TFTeam_Blue]);
 	if(iWatcher > MaxClients)
 	{
-		SetEntPropFloat(iWatcher, Prop_Send, "m_flRecedeTime", GetGameTime()+config.LookupFloat(g_hCvarTimeGrace));
+		SetEntPropFloat(iWatcher, Prop_Send, "m_flRecedeTime", GetGameTime()+graceTime);
 	}
 	Buster_Cleanup(TFTeam_Blue);
 	g_nBuster[TFTeam_Blue][g_bBusterActive] = true;
@@ -2882,7 +2861,7 @@ public void Event_SetupFinished(Handle hEvent, char[] strEventName, bool bDontBr
 		iWatcher = EntRefToEntIndex(g_iRefTrainWatcher[TFTeam_Red]);
 		if(iWatcher > MaxClients)
 		{
-			SetEntPropFloat(iWatcher, Prop_Send, "m_flRecedeTime", GetGameTime()+config.LookupFloat(g_hCvarTimeGrace));
+			SetEntPropFloat(iWatcher, Prop_Send, "m_flRecedeTime", GetGameTime()+graceTime);
 		}
 		Buster_Cleanup(TFTeam_Red);
 		g_nBuster[TFTeam_Red][g_bBusterActive] = true;
@@ -2955,8 +2934,23 @@ void Tank_SetDefaultHealth(int team)
 	}
 }
 
-public Action Timer_StartRound(Handle hTimer, any junk)
+public Action Timer_StartRound(Handle timer)
 {
+	// Start the spawning of the tank. When that's finished, the spawner should call Tank_StartRound() below.
+	Spawner_Spawn(MAXPLAYERS+TFTeam_Blue, Spawn_Tank);
+	if(g_nGameMode == GameMode_Race) Spawner_Spawn(MAXPLAYERS+TFTeam_Red, Spawn_Tank);
+
+	g_hTimerStart = INVALID_HANDLE;
+	return Plugin_Stop;
+}
+
+void Tank_StartRound()
+{
+#if defined DEBUG
+	PrintToServer("(Tank_StartRound)");
+#endif
+	if(g_bIsRoundStarted) return;
+
 	// Grace period is over, tank now moves and can be damaged
 	g_bIsRoundStarted = true;
 
@@ -3012,9 +3006,6 @@ public Action Timer_StartRound(Handle hTimer, any junk)
 	}
 
 	GameRules_SetProp("m_bInSetup", false); // Failsafe
-
-	g_hTimerStart = INVALID_HANDLE;
-	return Plugin_Stop;
 }
 
 void RaceTimer_Create()
@@ -3155,51 +3146,38 @@ public void RaceTimer_OnFinished(char[] output, int caller, int activator, float
 		g_bRaceIntermissionBottom[TFTeam_Blue] = false;
 
 		// Stop both team's tanks
-		for(int iTeam=2; iTeam<=3; iTeam++)
+		for(int team=2; team<=3; team++)
 		{
-			int iTank = EntRefToEntIndex(g_iRefTank[iTeam]);
+			// De-couple the tank from the track and hide it somewhere, doesn't matter where.
+			int iTank = EntRefToEntIndex(g_iRefTank[team]);
 			if(iTank > MaxClients)
 			{
-				// Another method, the below code lets players pass through the tank but has some downsides.
-				/*
-				// Make the tank non-solid so players can walk through it
-				SetEntProp(iTank, Prop_Send, "m_nSolidType", 0);
-				SetEntProp(iTank, Prop_Send, "m_usSolidFlags", FSOLID_NOT_SOLID);
-				SetEntProp(iTank, Prop_Send, "m_CollisionGroup", COLLISION_GROUP_DEBRIS);
-				SetEntityMoveType(iTank, MOVETYPE_OBSERVER);
+				Tank_CreateFakeTank(team, true);
 
-				// Make the tank transparent
-				Tank_Transparent(iTeam, true);
-
-				SetEntPropFloat(iTank, Prop_Data, "m_speed", 0.0);
-				*/
-
-				// De-couple the tank from the track and hide it somewhere, doesn't matter where.
-				Tank_CreateFake(iTeam);
 				// Hide the real tank somewhere. Why? It keeps tank logic going..
 				float pos[3] = {-10000.0, -10000.0, -10000.0};
 				TeleportEntity(iTank, pos, NULL_VECTOR, NULL_VECTOR);
 				
 				SetEntProp(iTank, Prop_Send, "m_bGlowEnabled", false);
-				Tank_SetNoTarget(iTeam, true);
+				Tank_SetNoTarget(team, true);
 			}
 
-			int iWatcher = EntRefToEntIndex(g_iRefTrainWatcher[iTeam]);
-			if(iWatcher > MaxClients)
+			int watcher = EntRefToEntIndex(g_iRefTrainWatcher[team]);
+			if(watcher > MaxClients)
 			{
-				SetEntPropFloat(iWatcher, Prop_Send, "m_flRecedeTime", g_flTimeIntermissionEnds);
+				SetEntPropFloat(watcher, Prop_Send, "m_flRecedeTime", g_flTimeIntermissionEnds);
 			}
 		}
 
+		float timeIntermissionEnds = config.LookupFloat(g_hCvarRaceTimeIntermission)*60.0;
+		if(timeIntermissionEnds < 6.0) timeIntermissionEnds = 6.0;
+
 		Timer_KillStart();
-		g_hTimerStart = CreateTimer(config.LookupFloat(g_hCvarRaceTimeIntermission)*60.0, Timer_EndIntermission, _, TIMER_REPEAT);
+		g_hTimerStart = CreateTimer(timeIntermissionEnds-SPAWNER_TIME_TANK, Timer_EndIntermission, _, TIMER_REPEAT); // The spawning process takes 3s.
 
 		g_countdownTime = 5;
 		Timer_KillCountdown();
-		g_timerCountdown = CreateTimer(config.LookupFloat(g_hCvarRaceTimeIntermission)*60.0-5.1, Timer_Countdown, _, TIMER_REPEAT);
-		
-		Timer_KillPushaway();
-		g_timerPushaway = CreateTimer(config.LookupFloat(g_hCvarRaceTimeIntermission)*60.0-4.1, Timer_TankPushAway, _, TIMER_REPEAT);
+		g_timerCountdown = CreateTimer(timeIntermissionEnds-5.1, Timer_Countdown, _, TIMER_REPEAT);
 
 		MapLogic_OnIntermission();
 	}
@@ -3214,68 +3192,27 @@ public void RaceTimer_OnFinished(char[] output, int caller, int activator, float
 	}
 }
 
-public Action Timer_TankPushAway(Handle hTimer)
+public Action Timer_EndIntermission(Handle timer)
 {
-	if(g_nGameMode == GameMode_Race && g_bRaceIntermission)
-	{
-		for(int team=2; team<=3; team++)
-		{
-			int fakeTank = EntRefToEntIndex(g_iRefFakeTank[team]);
-			if(fakeTank > MaxClients)
-			{
-				int cart = EntRefToEntIndex(g_iRefTrackTrain[team]);
-				if(cart > MaxClients)
-				{
-					float pos[3];
-					GetEntPropVector(cart, Prop_Send, "m_vecOrigin", pos);
-					PushAway_Create(pos, 4.0);
-				}
-			}
-		}
-	}
-
-	g_timerPushaway = INVALID_HANDLE;
-	return Plugin_Stop;
-}
-
-public Action Timer_EndIntermission(Handle hTimer)
-{
-	// Intermission is over and so the tanks can start moving again
-	g_bRaceIntermission = false;
-
-	// stop both team's tanks
-	for(int team=2; team<=3; team++)
-	{
-		int iTank = EntRefToEntIndex(g_iRefTank[team]);
-		if(iTank > MaxClients)
-		{
-			// The tank can get stuck if it is moved or changes speed abruptly.
-			// Spawn a new tank where the cart is to avoid this problem.
-			int newTank = Tank_CreateTankEntity(team); // Spawns a new tank where the cart is.
-			if(newTank > MaxClients)
-			{
-				g_iRefTank[team] = EntIndexToEntRef(newTank);
-				
-				Tank_FindParts(team); // Find the tracks associated with this tank.
-				Tank_SetDefaultHealth(team);
-				Tank_SetNoTarget(team, false);
-			}
-
-			// If the tank was parented to the cart, we need to restore this for the new tank.
-			if(GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients)
-			{
-				Tank_Parent(team);
-			}
-
-			Tank_KillFakeTank(team);
-			AcceptEntityInput(iTank, "Kill"); // Kill the old tank.
-		}
-	}
-
-	BroadcastSoundToTeam(TFTeam_Spectator, "harbor.red_whistle");
+	Spawner_Spawn(MAXPLAYERS+TFTeam_Red, Spawn_Tank);
+	Spawner_Spawn(MAXPLAYERS+TFTeam_Blue, Spawn_Tank);
 
 	g_hTimerStart = INVALID_HANDLE;
 	return Plugin_Stop;
+}
+
+public void Tank_EndIntermission()
+{
+#if defined DEBUG
+	PrintToServer("(Tank_EndIntermission)");
+#endif
+	if(!g_bRaceIntermission) return;
+
+	// Intermission is over and the tanks can start moving again.
+	g_bRaceIntermission = false;
+	for(int i=0; i<MAX_TEAMS; i++) g_tankRespawned[i] = false;
+
+	BroadcastSoundToTeam(TFTeam_Spectator, "harbor.red_whistle");
 }
 
 public void NextFrame_ParentTank(int team)
@@ -4014,11 +3951,10 @@ void Tank_KillFakeTank(int team)
 	g_iRefFakeTank[team] = 0;
 }
 
-int Tank_CreateFake(int team)
+void Tank_CreateFakeTank(int team, bool glow)
 {
 	Tank_KillFakeTank(team);
-
-	int transparency = 50;
+	
 	int tank = CreateEntityByName("prop_dynamic");
 	if(tank > MaxClients)
 	{
@@ -4032,34 +3968,7 @@ int Tank_CreateFake(int team)
 
 		DispatchSpawn(tank);
 
-		/*
-		char models[][] = {MODEL_TRACK_L, MODEL_TRACK_R};
-		for(int i=0; i<sizeof(models); i++)
-		{
-			int tracks = CreateEntityByName("prop_dynamic");
-			if(tracks > MaxClients)
-			{
-				DispatchKeyValue(tracks, "model", models[i]);
-				DispatchKeyValue(tracks, "solid", "0");
-
-				DispatchSpawn(tracks);
-				ActivateEntity(tracks);
-
-				int iFlags = GetEntProp(tracks, Prop_Send, "m_fEffects");
-				SetEntProp(tracks, Prop_Send, "m_fEffects", iFlags|EF_BONEMERGE|EF_NOSHADOW|EF_NORECEIVESHADOW|EF_PARENT_ANIMATES);
-
-				SetVariantString("!activator");
-				AcceptEntityInput(tracks, "SetParent", tank);
-
-				SetVariantString("smoke_attachment");
-				AcceptEntityInput(tracks, "SetParentAttachment");
-
-				SetEntityRenderMode(tracks, RENDER_TRANSCOLOR);
-				SetEntityRenderColor(tracks, 255, 255, 255, transparency);
-			}
-		}
-		*/
-
+		int transparency = 50;
 		SetEntityRenderMode(tank, RENDER_TRANSCOLOR);
 		if(team == TFTeam_Red)
 		{
@@ -4068,11 +3977,18 @@ int Tank_CreateFake(int team)
 			SetEntityRenderColor(tank, 255, 255, 255, transparency);
 		}
 
-		// Set a special skin on the final tank
+		// Set a special skin on the tank.
 		SetEntProp(tank, Prop_Send, "m_nSkin", 1);
+		SetEntProp(tank, Prop_Send, "m_fEffects", EF_NOSHADOW|EF_NORECEIVESHADOW|EF_ITEM_BLINK);
+		SetEntProp(tank, Prop_Send, "m_nSolidType", SOLID_NONE);
+		SetEntProp(tank, Prop_Send, "m_usSolidFlags", FSOLID_NOT_SOLID);
+
+		// To ensure the glow outline is visible in all parts of the map.
+		int flags = GetEdictFlags(tank);
+		flags |= FL_EDICT_ALWAYS;
+		SetEdictFlags(tank, flags);
 
 		int cart = EntRefToEntIndex(g_iRefTrackTrain[team]);
-
 		// Teleport the fake tank to the real tank ONLY IF the real tank isn't parented..
 		int realTank = EntRefToEntIndex(g_iRefTank[team]);
 		if(realTank > MaxClients && GetEntPropEnt(realTank, Prop_Send, "moveparent") <= MaxClients)
@@ -4090,7 +4006,7 @@ int Tank_CreateFake(int team)
 				float ang[3];
 				GetEntPropVector(cart, Prop_Send, "m_vecOrigin", pos);
 				GetEntPropVector(cart, Prop_Send, "m_angRotation", ang);
-				pos[2] -= 35.0;
+				pos[2] -= 55.0;
 				TeleportEntity(tank, pos, ang, NULL_VECTOR);				
 			}
 		}
@@ -4101,6 +4017,16 @@ int Tank_CreateFake(int team)
 			AcceptEntityInput(tank, "SetParent", cart);
 		}
 
+		if(glow)
+		{
+			// Produce a team colored glow outline on the fake tank entity.
+			int watcher = EntRefToEntIndex(g_iRefTrainWatcher[team]);
+			if(watcher > MaxClients) SetEntPropEnt(watcher, Prop_Send, "m_hGlowEnt", tank);
+		}
+
+#if defined DEBUG
+		PrintToServer("(Tank_CreateFakeTank) Created fake tank (team %d, glow %d): %d!", team, glow, tank);
+#endif
 		g_iRefFakeTank[team] = EntIndexToEntRef(tank);
 	}
 }
@@ -4114,9 +4040,11 @@ int Tank_CreateTankEntity(int team)
 	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
 	if(iTrackTrain <= MaxClients)
 	{
-		LogMessage("(Tank_CreateTank) Failed to create tank_boss: Missing func_tracktrain reference!");
+		LogMessage("(Tank_CreateTank) Failed to create tank_boss: Missing reference to \"func_tracktrain\"!");
 		return -1;
 	}
+
+	Tank_KillFakeTank(team);
 
 	int tank = CreateEntityByName("tank_boss");
 	if(tank > MaxClients)
@@ -4159,7 +4087,7 @@ int Tank_CreateTankEntity(int team)
 		flPosTrain[2] -= 35.0;
 		TeleportEntity(tank, flPosTrain, flAngTrain, NULL_VECTOR);
 #if defined DEBUG
-		PrintToServer("(Tank_CreateTankEntity) Spawned \"tank_boss\": %d!", tank);
+		PrintToServer("(Tank_CreateTankEntity) Spawned \"tank_boss\" (team %d): %d!", team, tank);
 #endif
 		return tank;
 	}else{
@@ -4180,6 +4108,7 @@ int Tank_CreateTank(int team)
 		g_bIsRoundStarted = false;
 		g_bEnableMapHack[team] = false;
 		g_flTankHealEnd[team] = 0.0;
+		g_tankRespawned[team] = false;
 		g_bTankTriggerDisabled[team] = false;
 		g_timeTankSeparation[team] = 0.0;
 
@@ -10621,10 +10550,6 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
-		Giant_SpawnGibs(client);
-
-		//float pos[3];
-		//GetClientAbsOrigin(client, pos);
 		//pos[2] += 25.0;
 		// void TE_PhysicsProp(int modelIndex, int skin, int flags, int effects, float pos[3])
 		//int model = PrecacheModel("models/bots/gibs/soldierbot_gib_boss_chest.mdl");
@@ -13842,15 +13767,6 @@ void Timer_KillCountdown()
 	}	
 }
 
-void Timer_KillPushaway()
-{
-	if(g_timerPushaway != INVALID_HANDLE)
-	{
-		KillTimer(g_timerPushaway);
-		g_timerPushaway = INVALID_HANDLE;
-	}	
-}
-
 void Timer_KillAnnounce()
 {
 	if(g_timerAnnounce != INVALID_HANDLE)
@@ -13865,7 +13781,6 @@ void Timers_KillAll()
 	Timer_KillFailsafe();
 	Timer_KillCountdown();
 	Timer_KillStart();
-	Timer_KillPushaway();
 	Timer_KillAnnounce();
 
 	Hell_KillGateTimer();

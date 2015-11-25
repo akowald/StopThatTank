@@ -2088,7 +2088,8 @@ public Action SendProxy_ToggleGiantHealthMeter(int entity, char[] propName, int 
 
 void Giant_SpawnGibs(int client)
 {
-	if(!config.LookupBool(g_hCvarGiantGibs)) return;
+	int maxGibs = config.LookupInt(g_hCvarGiantGibs);
+	if(maxGibs <= 0) return;
 
 	if(!g_nSpawner[client][g_bSpawnerEnabled] || g_nSpawner[client][g_nSpawnerType] != Spawn_GiantRobot) return;
 
@@ -2151,7 +2152,7 @@ void Giant_SpawnGibs(int client)
 	}
 
 	// Spawn arm/leg/torso gibs.
-	for(int numGibs=0; numGibs<5; numGibs++)
+	for(int numGibs=0; numGibs<maxGibs; numGibs++)
 	{
 		for(int i=0; i<2; i++) pos[i] += GetRandomFloat(-42.0, 42.0);
 
