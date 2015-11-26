@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-//#define DEBUG
+#define DEBUG
 
 #define PLUGIN_VERSION 				"1.5"
 
@@ -3226,27 +3226,34 @@ public void NextFrame_ParentTank(int team)
 	}
 }
 
-public void NextFrame_TankRestorePath(int team)
+public void NextFrame_TankRestorePath(int ref)
 {
-	Tank_RestorePath(team);
+	int tank = EntRefToEntIndex(ref);
+	if(tank > MaxClients)
+	{
+		Tank_RestorePath(tank);
+	}
 }
 
-void Tank_RestorePath(int team)
+void Tank_RestorePath(int tank)
 {
-	int iTank = EntRefToEntIndex(g_iRefTank[team]);
-	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
-	if(iTank > MaxClients && iTrackTrain > MaxClients)
+	int team = GetEntProp(tank, Prop_Send, "m_iTeamNum");
+	if(team != TFTeam_Red && team != TFTeam_Blue) return;
+
+	int cart = EntRefToEntIndex(g_iRefTrackTrain[team]);
+	if(cart > MaxClients)
 	{
 		// Set the next path of the tank to that of the cart's
-		int iPath = Train_GetCurrentPath(team);
-		if(iPath > MaxClients)
+		int path = Train_GetCurrentPath(team);
+		if(path > MaxClients)
 		{
-			int iPathNext = GetEntDataEnt2(iPath, Offset_GetNextOffset(iPath));
-			if(iPathNext > MaxClients)
+			int nextPath = GetEntDataEnt2(path, Offset_GetNextOffset(path));
+			if(nextPath > MaxClients)
 			{
-				char strPathName[100];
-				GetEntPropString(iPathNext, Prop_Data, "m_iName", strPathName, sizeof(strPathName));
-				Tank_SetStartingPathTrack(team, strPathName);
+				char pathName[128];
+				GetEntPropString(nextPath, Prop_Data, "m_iName", pathName, sizeof(pathName));
+
+				Tank_SetStartingPathTrack(tank, pathName);
 			}
 		}
 	}	
@@ -4049,6 +4056,9 @@ int Tank_CreateTankEntity(int team)
 	int tank = CreateEntityByName("tank_boss");
 	if(tank > MaxClients)
 	{
+		// Set the tank's team
+		SetEntProp(tank, Prop_Send, "m_iTeamNum", team);
+
 		// Hook the tank output OnKilled
 		HookSingleEntityOutput(tank, "OnKilled", Tank_OnKilled, true);
 		
@@ -4059,16 +4069,20 @@ int Tank_CreateTankEntity(int team)
 			DHookEntity(g_hSDKSolidMask, false, tank);
 		}
 
+		// There's a bug in CTFTankBoss::Spawn which will cause an infinite loop if any path_tracks form a connected cycle.
+		// The game's code finds one path_track and visits the previous path_track until it reaches a dead end. (I guess pl_angkor is unlucky enough to provide one of the few path_tracks that form a cycle.)
+		// This is not a problem in MVM if you set the starting path track of the tank in the population files.
+		// If you spawn a tank outside of MVM population files, you run the risk of hitting this buggy code.
+		// You need to call CTFTankBoss::SetStartingPathTrackNode before calling CTFTankBoss::Spawn.
+		Tank_RestorePath(tank);
+
 		DispatchSpawn(tank);
-		
+
 		// Set the tank's start path, it's on a timer because setting the track immediately after spawn is hit or miss
-		RequestFrame(NextFrame_TankRestorePath, team);
+		//RequestFrame(NextFrame_TankRestorePath, EntIndexToEntRef(tank));
 
 		// Set the tank's initial speed
 		SetEntPropFloat(tank, Prop_Data, "m_speed", 0.0);
-		// Set the tank's team
-		SetEntProp(tank, Prop_Send, "m_iTeamNum", team);
-		
 		// Set a special skin on the final tank
 		SetEntProp(tank, Prop_Send, "m_nSkin", 1);
 		
@@ -4085,6 +4099,7 @@ int Tank_CreateTankEntity(int team)
 		GetEntPropVector(iTrackTrain, Prop_Send, "m_vecOrigin", flPosTrain);
 		GetEntPropVector(iTrackTrain, Prop_Send, "m_angRotation", flAngTrain);
 		flPosTrain[2] -= 35.0;
+
 		TeleportEntity(tank, flPosTrain, flAngTrain, NULL_VECTOR);
 #if defined DEBUG
 		PrintToServer("(Tank_CreateTankEntity) Spawned \"tank_boss\" (team %d): %d!", team, tank);
@@ -6356,21 +6371,20 @@ public bool TraceFilter_Tank(int entity, int contentsMask, int iTank)
 	return false;
 }
 
-void Tank_SetStartingPathTrack(int team, const char[] strName)
+void Tank_SetStartingPathTrack(int tank, const char[] pathName)
 {
-	if(strlen(strName) <= 0)
+	if(strlen(pathName) <= 0)
 	{
 		LogMessage("(Tank_SetStartingPathTrack) path_track with no name was passed!");
 		return;
 	}
 	
-	int iTank = EntRefToEntIndex(g_iRefTank[team]);
-	if(iTank > MaxClients)
+	if(tank > MaxClients)
 	{
 #if defined DEBUG
-		PrintToServer("(Tank_SetStartingPathTrack) Setting next path on tank to: \"%s\"..", strName);
+		PrintToServer("(Tank_SetStartingPathTrack) Setting next path on tank to: \"%s\"..", pathName);
 #endif
-		SDKCall(g_hSDKSetStartingPath, iTank, strName);
+		SDKCall(g_hSDKSetStartingPath, tank, pathName);
 	}
 }
 
@@ -7194,20 +7208,20 @@ void Tank_UnParent(int team)
 //public void NextFrame_TankTeleport(int team)
 public Action Timer_TankTeleport(Handle timer, int team)
 {
-	int iTank = EntRefToEntIndex(g_iRefTank[team]);
+	int tank = EntRefToEntIndex(g_iRefTank[team]);
 	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
-	if(iTank > MaxClients && iTrackTrain > MaxClients)
+	if(tank > MaxClients && iTrackTrain > MaxClients)
 	{
 		// Set the next path of the tank to that of the cart's
-		Tank_RestorePath(team);
+		Tank_RestorePath(tank);
 
 		float flPosCart[3];
 		float flAngCart[3];
 		GetEntPropVector(iTrackTrain, Prop_Send, "m_vecOrigin", flPosCart);
 		GetEntPropVector(iTrackTrain, Prop_Send, "m_angRotation", flAngCart);
-		TeleportEntity(iTank, flPosCart, flAngCart, NULL_VECTOR);
+		TeleportEntity(tank, flPosCart, flAngCart, NULL_VECTOR);
 		
-		SetEntityMoveType(iTank, MOVETYPE_CUSTOM);
+		SetEntityMoveType(tank, MOVETYPE_CUSTOM);
 	}
 
 	return Plugin_Handled;
@@ -14308,13 +14322,14 @@ void Tank_CheckForSeparation(int team, int tank, int cart)
 		{
 			// Enough time has passed. Move the tank back to the cart.
 
+			Tank_RestorePath(tank);
+
 			// Try teleporting the tank back to the cart even though most likely it won't work.
 			cartPos[2] -= 50.0;
 			float cartAngles[3];
 			GetEntPropVector(cart, Prop_Send, "m_angRotation", cartAngles);
 
 			TeleportEntity(tank, cartPos, cartAngles, NULL_VECTOR);
-			Tank_RestorePath(team);
 
 			g_timeTankSeparation[team] = 0.0;
 #if defined DEBUG
