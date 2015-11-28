@@ -394,6 +394,7 @@ int g_iRefCaptureZones[MAX_TEAMS];
 
 int g_iRefBombTimer;
 int g_iRefBombFlag;
+int g_iRefRoundControlPoint;
 
 int g_iMaxControlPoints[MAX_TEAMS];
 int g_iCurrentControlPoint[MAX_TEAMS];
@@ -909,6 +910,9 @@ float g_timeLastHealedGiant[MAXPLAYERS+1];
 float g_timeTankSeparation[MAX_TEAMS]; // Keeps track of how long the tank has been separated from the cart.
 float g_lastClientTick[MAXPLAYERS+1];
 
+bool g_cartIsOnARoll; // The bomb has been deployed and the cart should be moving on its own.
+float g_cartIsOnARollTime;
+
 float g_timeSentryBusterDied;
 
 enum
@@ -1274,6 +1278,8 @@ public void OnPluginStart()
 	
 	HookEntityOutput("team_round_timer", "On10SecRemain", Output_On10SecRemaining);
 	HookEntityOutput("team_control_point", "OnCapTeam2", Output_OnBlueCapture);
+	HookEntityOutput("team_control_point_round", "OnStart", Output_TeamControlPointRound_OnStart);
+	HookEntityOutput("team_control_point_round", "OnEnd", Output_TeamControlPointRound_OnEnd);
 
 	CreateTimer(0.3, Timer_CheckTeams, _, TIMER_REPEAT);
 
@@ -1653,6 +1659,7 @@ public void OnMapStart()
 	g_overrideSound = false;
 	g_timeLastRobotDamage = 0.0;
 	g_hitWithScorchShot = 0;
+	g_iRefRoundControlPoint = 0;
 
 	Reanimator_Cleanup();
 	Spawner_Cleanup();
@@ -2111,6 +2118,7 @@ public void Event_RoundStart(Handle hEvent, char[] strEventName, bool bDontBroad
 	g_flTimeIntermissionEnds = 0.0;
 	g_bCactusTrainOnce = false;
 	g_hellTeamWinner = 0;
+	g_cartIsOnARoll = false;
 	for(int i=0; i<MAXPLAYERS+1; i++)
 	{
 		g_iReanimatorNumRevives[i] = 0;
@@ -3329,10 +3337,15 @@ void Tank_BombDeployHud(bool bEnable)
 public void Event_RoundWin(Handle hEvent, char[] strEventName, bool bDontBroadcast)
 {
 	if(!g_bEnabled) return;
-	
+
+#if defined DEBUG
+	PrintToServer("(Event_RoundWin)");
+#endif
+
 	int winningTeam = GetEventInt(hEvent, "team");
 	g_bIsRoundStarted = false;
 	g_bIsInNaturalRound = false;
+	g_cartIsOnARoll = false;
 	Buster_Cleanup(TFTeam_Blue);
 	Buster_Cleanup(TFTeam_Red);
 	Giant_Cleanup(TFTeam_Blue);
@@ -3810,7 +3823,9 @@ void Train_FindPropsByPhysConstraint(int team)
 				Address pointer = view_as<Address>(LoadFromAddress(GetEntityAddress(constraint)+view_as<Address>(offset), NumberType_Int32));
 				if(!IsValidAddress(pointer)) continue;
 				char name1[64];
-				LoadStringFromAddress(name1, sizeof(name1), pointer);				
+				LoadStringFromAddress(name1, sizeof(name1), pointer);
+				//PrintToServer("GetEntPropString: m_nameAttach1 = \"%s\"", GetEntPropString(constraint, Prop_Data, "m_nameAttach1", temp, sizeof(temp)));
+				//PrintToServer("LoadStringFromAddress: m_nameAttach1 = \"%s\"", name1);			
 
 				offset = FindDataMapInfo(constraint, "m_nameAttach2");
 				if(offset <= 0) continue;
@@ -4333,6 +4348,15 @@ public void Tank_OnKilled(char[] output, int caller, int activator, float delay)
 	// The tank should never be killed in plr_ maps
 	if(g_nGameMode == GameMode_Race) return;
 
+	// Cancel out the tank deploy sound.
+	for(int client=1; client<=MaxClients; client++)
+	{
+		if(IsClientInGame(client) && !IsFakeClient(client))
+		{
+			StopSound(client, SNDCHAN_AUTO, SOUND_TANK_DEPLOY);
+		}
+	}
+
 	// Voice lines that should be played by HUMANS whenever a tank is destroyed
 	int iMax = GetRandomInt(6, 7);
 	int iCount;
@@ -4530,6 +4554,7 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 				g_bBombSentDropNotice = false;
 				g_bBombGone = false;
 				g_flBombLastMessage = 0.0;
+				g_cartIsOnARoll = false;
 				
 				DispatchKeyValue(iBomb, "GameType", "2");
 				char strTemp[50];
@@ -5355,6 +5380,25 @@ public void OnGameFrame()
 	if(g_nGameMode == GameMode_Race) Announcer_Think();
 
 	g_timeSentryBusterDied = 0.0;
+
+	// Ensure the cart moves on its own after the bomb is deployed in payload.
+	if(g_bIsRoundStarted && g_nGameMode == GameMode_BombDeploy && g_cartIsOnARoll)
+	{
+		if(g_cartIsOnARollTime == 0.0 || GetEngineTime() - g_cartIsOnARollTime > 0.3)
+		{
+			int team = TFTeam_Blue;
+			int cart = EntRefToEntIndex(g_iRefTrackTrain[team]);
+			if(cart > MaxClients)
+			{
+				Train_Move(team, 1.0);
+				SetEntPropFloat(cart, Prop_Data, "m_maxSpeed", 500.0);
+				SetVariantFloat(1.0);
+				AcceptEntityInput(cart, "StartForward");
+			}
+
+			g_cartIsOnARollTime = GetEngineTime();
+		}
+	}
 }
 
 void Tank_CheckForStuckPlayers(int iTank, int team)
@@ -9254,9 +9298,11 @@ public Action Arrow_OnTouch(int iProjectileArrow, int client)
 			}
 		}
 
-		char strClass[16];
+		char strClass[24];
 		GetEdictClassname(client, strClass, sizeof(strClass));
+		//PrintToServer("Arrow touched: %s", strClass);
 		if(strncmp(strClass, "prop_dynamic", 12) == 0) return Plugin_Handled;
+		//if(strcmp(strClass, "func_door_rotating") == 0) return Plugin_Handled; // Causes crashes
 		//if(strncmp(strClass, "func_brush", 10) == 0) return Plugin_Handled; // Causes crashes
 	}
 
@@ -9704,26 +9750,61 @@ void Bomb_Think(int iBomb)
 						int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
 						if(iTrackTrain > MaxClients)
 						{
-							// Capture all the control points in normal progression so we can trigger a win
-							// This code is probably not needed anymore, all preceding points should be capped before the final point is capped
+							// Capture all the control points in normal progression so we can trigger a win.
+							// This code is probably not needed anymore, all preceding points should be capped before the final point is capped.
+							int controlPointGoal = EntRefToEntIndex(g_iRefControlPointGoal[team]);
 							for(int i=0; i<MAX_LINKS; i++)
 							{
-								if(g_iRefLinkedCPs[team][i] == 0 || g_iRefLinkedPaths[team][i] == 0) continue;
-								if(g_iRefLinkedCPs[team][i] == g_iRefControlPointGoal[team]) continue; // Bypass the final control point
+								if(g_iRefLinkedCPs[team][i] == 0) continue;
 
-								int iCP = EntRefToEntIndex(g_iRefLinkedCPs[team][i]);
-								int iPath = EntRefToEntIndex(g_iRefLinkedPaths[team][i]);
+								int cp = EntRefToEntIndex(g_iRefLinkedCPs[team][i]);
+								if(cp <= MaxClients) continue;
+								if(cp == controlPointGoal) continue; // Let the cart capture the final control point.
 
-								if(iCP <= MaxClients || iPath <= MaxClients) continue;
-								
-								bool bCaptured = (GetEntProp(iCP, Prop_Send, "m_nSkin") != 0);
-								if(!bCaptured)
+								if(GetEntProp(cp, Prop_Send, "m_iTeamNum") != team)
 								{
+									// This control point has not been captured yet.
 #if defined DEBUG
-									PrintToServer("(Bomb_Think) Capping team_control_point #%d: %d!", iIndexCP, iCP);
+									PrintToServer("(Bomb_Think) Capping payload team_control_point #%d: %d..", i, cp);
 #endif
-									// This point hasn't been capped, so we need to do that before capturing the final control point
-									AcceptEntityInput(iPath, "InPass", iTrackTrain);
+									SetVariantInt(team);
+									AcceptEntityInput(cp, "SetOwner", -1, cp);
+								}
+							}
+
+							// Make sure all the control points indicated by the active team_control_point_round has been captured.
+							// There may be control points that are required to be captured that are not a part of the payload hud.
+							if(g_iRefRoundControlPoint != 0)
+							{
+								int roundControlPoint = EntRefToEntIndex(g_iRefRoundControlPoint);
+								if(roundControlPoint > MaxClients)
+								{
+									char cpNames[MAX_LINKS*64];
+									GetEntPropString(roundControlPoint, Prop_Data, "m_iszCPNames", cpNames, sizeof(cpNames));
+									if(strlen(cpNames) > 0)
+									{
+										char cpName[MAX_LINKS][64];
+										int numCps = ExplodeString(cpNames, " ", cpName, sizeof(cpName), sizeof(cpName[]));
+										for(int i=0; i<numCps; i++)
+										{
+											if(strlen(cpName[i]) > 0)
+											{
+												int cp = Entity_FindEntityByName(cpName[i], "team_control_point");
+												if(cp <= MaxClients) continue;
+												if(cp == controlPointGoal) continue; // Let the cart capture the final control point.
+
+												if(GetEntProp(cp, Prop_Send, "m_iTeamNum") != team)
+												{
+													// This control point has not been captured yet.
+#if defined DEBUG
+													PrintToServer("(Bomb_Think) Capping round team_control_point #%d \"%s\": %d..", i, cpName[i], cp);
+#endif
+													SetVariantInt(team);
+													AcceptEntityInput(cp, "SetOwner", -1, cp);
+												}
+											}
+										}
+									}
 								}
 							}
 							
@@ -9797,10 +9878,8 @@ void Bomb_Think(int iBomb)
 								}
 							}
 							
-							Train_Move(team, 1.0);
-							SetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed", 500.0);
-							SetVariantFloat(1.0);
-							AcceptEntityInput(iTrackTrain, "StartForward");
+							g_cartIsOnARoll = true; // Setting this flag will make the cart move on its own.
+							g_cartIsOnARollTime = 0.0;
 						}
 						
 						// Kill the bomb carrier and trigger the log events
@@ -9850,7 +9929,7 @@ void Bomb_Think(int iBomb)
 					//TF2_StunPlayer(client, config.LookupFloat(g_hCvarBombTimeDeploy)+0.5, 1.0, TF_STUNFLAG_NOSOUNDOREFFECT|TF_STUNFLAG_SLOWDOWN|TF_STUNFLAG_THIRDPERSON);
 					
 					BroadcastSoundToTeam(TFTeam_Spectator, "Announcer.MVM_Bomb_Alert_Deploying");
-					
+
 					if(bIsGiantCarrying)
 					{
 						EmitSoundToAll(SOUND_DEPLOY_GIANT);
@@ -9868,7 +9947,7 @@ void Bomb_Think(int iBomb)
 			}
 		}
 	}else{
-		// Reset the player animation if the planter goes outside of bounds after planting so they down end up invisible
+		// Reset the player animation if the planter goes outside of bounds after planting so they don't end up invisible.
 		if(bIsGoal && g_iBombPlayerPlanting != 0)
 		{
 			int iPlanter = GetClientOfUserId(g_iBombPlayerPlanting);
@@ -10564,6 +10643,8 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
+		//EmitSoundToAll(const String:sample[], entity = SOUND_FROM_PLAYER, channel = SNDCHAN_AUTO, level = SNDLEVEL_NORMAL, flags = SND_NOFLAGS, Float:volume = SNDVOL_NORMAL, pitch = SNDPITCH_NORMAL, speakerentity = -1, const Float:origin[3] = NULL_VECTOR, const Float:dir[3] = NULL_VECTOR, bool:updatePos = true, Float:soundtime = 0.0)
+
 		//pos[2] += 25.0;
 		// void TE_PhysicsProp(int modelIndex, int skin, int flags, int effects, float pos[3])
 		//int model = PrecacheModel("models/bots/gibs/soldierbot_gib_boss_chest.mdl");
@@ -10805,14 +10886,18 @@ public Event_PlayerStunned(Handle:hEvent, const String:strEventName[], bool:bDon
 
 public void Output_OnBlueCapture(const char[] output, int iControlPoint, int activator, float delay)
 {
+	if(!g_bEnabled) return;
+
 #if defined DEBUG
 	PrintToServer("(Output_OnBlueCapture) caller: %d activator: %d delay: %0.1f!", iControlPoint, activator, delay);
 #endif
-	if(!g_bEnabled || !g_bIsInNaturalRound || g_nGameMode == GameMode_Race) return;
+	if(!g_bIsInNaturalRound || g_nGameMode == GameMode_Race) return;
 	if(iControlPoint <= MaxClients) return;
 
 	int team = GetEntProp(iControlPoint, Prop_Send, "m_iTeamNum");
 	if(team != TFTeam_Blue) return;
+
+	g_cartIsOnARoll = false; // Stop moving the cart as soon as a control point is captured.
 
 	// Find the control point's index
 	int iIndexCP = -1;
@@ -12751,9 +12836,28 @@ int CaptureTriggers_Create(int team, int index)
 		float pos[3];
 		GetEntPropVector(iControlPoint, Prop_Send, "m_vecOrigin", pos);
 
+		// Find the absolute origin should the team_control_point be parented.
+		int parent = iControlPoint;
+		for(int i=0; i<12; i++)
+		{
+			parent = GetEntPropEnt(parent, Prop_Send, "moveparent");
+			if(parent <= 0) break;
+
+			float parentPos[3];
+			GetEntPropVector(parent, Prop_Send, "m_vecOrigin", parentPos);
+			for(int j=0; j<3; j++) pos[j] += parentPos[j];
+		}
+
 		// Teleport the trigger_capture_area onto the control point and set its size
 		TeleportEntity(iTrigger, pos, NULL_VECTOR, NULL_VECTOR);
 		SetEntityModel(iTrigger, MODEL_ROBOT_HOLOGRAM);
+
+		// If the control point is parented, parent the trigger_capture_area to it.
+		if(GetEntPropEnt(iControlPoint, Prop_Send, "moveparent") > MaxClients)
+		{
+			SetVariantString("!activator");
+			AcceptEntityInput(iTrigger, "SetParent", iControlPoint);
+		}
 
 		float mins[3];
 		float maxs[3];
@@ -12847,9 +12951,27 @@ int CaptureZones_Create(int team, int index)
 		float pos[3];
 		GetEntPropVector(iControlPoint, Prop_Send, "m_vecOrigin", pos);
 
+		// Find the absolute origin should the team_control_point be parented.
+		int parent = iControlPoint;
+		for(int i=0; i<12; i++)
+		{
+			parent = GetEntPropEnt(parent, Prop_Send, "moveparent");
+			if(parent <= 0) break;
+
+			float parentPos[3];
+			GetEntPropVector(parent, Prop_Send, "m_vecOrigin", parentPos);
+			for(int j=0; j<3; j++) pos[j] += parentPos[j];
+		}
+
 		TeleportEntity(capture, pos, NULL_VECTOR, NULL_VECTOR);
 		SetEntityModel(capture, MODEL_ROBOT_HOLOGRAM);
 
+		// If the control point is parented, parent the func_capturezone to it.
+		if(GetEntPropEnt(iControlPoint, Prop_Send, "moveparent") > MaxClients)
+		{
+			SetVariantString("!activator");
+			AcceptEntityInput(capture, "SetParent", iControlPoint);
+		}
 
 		float mins[3];
 		float maxs[3];
@@ -12870,12 +12992,11 @@ int CaptureZones_Create(int team, int index)
 			// Use the same size as the trigger_capture_area's.
 			CaptureArea_GetSize(mins, maxs);
 		}
-		
 
 		SetEntPropVector(capture, Prop_Send, "m_vecMinsPreScaled", mins);
 		SetEntPropVector(capture, Prop_Send, "m_vecMaxsPreScaled", maxs);
 		SetEntPropVector(capture, Prop_Send, "m_vecMins", mins);
-		SetEntPropVector(capture, Prop_Send, "m_vecMaxs", maxs);			
+		SetEntPropVector(capture, Prop_Send, "m_vecMaxs", maxs);
 
 		return capture;
 	}else{
@@ -12908,7 +13029,7 @@ public void Event_PointCaptured(Handle hEvent, const char[] strEventName, bool b
 #if defined DEBUG
 	PrintToServer("(Event_PointCaptured) cp: %d team: %d!", GetEventInt(hEvent, "cp"), GetEventInt(hEvent, "team"));
 #endif
-	// The robots have capture a control point so move the cart up
+	// The robots have capture a control point so move the cart up.
 	if(!g_bEnabled) return;
 
 	if(!g_bIsRoundStarted || g_nGameMode != GameMode_BombDeploy) return;
@@ -12916,8 +13037,8 @@ public void Event_PointCaptured(Handle hEvent, const char[] strEventName, bool b
 	int team = GetEventInt(hEvent, "team");
 	if(team != TFTeam_Blue) return;
 
-	// Find the index of the control point which was just capped (the event key "cp" will report the cp's index keyvalue)
-	// Go backwards to find the first captured control point
+	// Find the index of the control point which was just capped (the event key "cp" will report the cp's index keyvalue).
+	// Go backwards to find the first captured control point.
 	int iIndexCP = -1;
 	int iCaptureTrigger, iControlPoint, iPathTrack;
 	for(int i=MAX_LINKS-1; i>=0; i--)
@@ -12930,11 +13051,10 @@ public void Event_PointCaptured(Handle hEvent, const char[] strEventName, bool b
 
 		if(iControlPoint <= MaxClients || iCaptureTrigger <= MaxClients || iPathTrack <= MaxClients) continue;
 		if(g_iRefLinkedCPs[team][i] == g_iRefControlPointGoal[team]) continue;
-		bool bCaptured = (GetEntProp(iControlPoint, Prop_Send, "m_nSkin") != 0);
 
-		if(!bCaptured) continue;
+		if(GetEntProp(iControlPoint, Prop_Send, "m_iTeamNum") != team) continue; // Control point has not yet been captured.
 
-		// We've found the control point and custom trigger_capture_area for the next control point
+		// We've found the control point and custom trigger_capture_area for the next control point.
 		iIndexCP = i;
 		break;
 	}
@@ -12943,12 +13063,12 @@ public void Event_PointCaptured(Handle hEvent, const char[] strEventName, bool b
 	PrintToServer("(Event_PointCaptured) Control point index #%d was captured: cp(%d)!", iIndexCP, iControlPoint);
 #endif
 
-	if(iIndexCP == -1) // Failed to find a valid control point
+	if(iIndexCP == -1) // Failed to find a valid control point.
 	{
 		return;
 	}
 
-	// Determine the cappers - this should only be one person - the BLU bomb carrier
+	// Determine the cappers - this should only be one person - the BLU bomb carrier.
 	char strCappers[32];
 	GetEventString(hEvent, "cappers", strCappers, sizeof(strCappers));
 	int iLength = strlen(strCappers);
@@ -12978,12 +13098,13 @@ public void Event_PointCaptured(Handle hEvent, const char[] strEventName, bool b
 		}
 	}
 
-	// Capture the control point
+	// Capture the control point.
 	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
 	if(iTrackTrain > MaxClients)
 	{
 		AcceptEntityInput(iPathTrack, "InPass", iTrackTrain);
 	}
+
 	// The control point should now be capped and the code will move on to the next control point
 	g_flBombPlantStart = 0.0; // Reset the bomb plant time to ensure this capping code is only ran once
 
@@ -13186,6 +13307,7 @@ int PushAway_Create(float pos[3], float timeCleanup=4.0)
 
 /* 
  * Adjusts the output speed of the tank based on the inputs of how close the tank and cart are to the current path_track node.
+ * 	
  */
 void Tank_Controller(int team, int tank, int cart)
 {
@@ -13194,6 +13316,14 @@ void Tank_Controller(int team, int tank, int cart)
 	static float Kp = 0.1;
 
 	float trainSpeed = GetEntPropFloat(cart, Prop_Data, "m_flSpeed");
+
+	// If the cart isn't moving, don't try and correct the tank's position.
+	if(trainSpeed <= 0.0)
+	{
+		SetEntPropFloat(tank, Prop_Data, "m_speed", 0.0);
+		//PrintCenterTextAll("Cart not moving!\nNew speed: 0.0");
+		return;
+	}
 	
 	int currentPath = Train_GetCurrentPath(team);
 	if(currentPath > MaxClients)
@@ -13866,7 +13996,7 @@ public Action Timer_FailsafeBombDeploy(Handle timer, any unused)
 	return Plugin_Stop;
 }
 
-void Game_CaptureControlPoints(int team, int owner)
+void Game_CaptureControlPoints(int team, int ownerTeam)
 {
 	for(int i=0; i<MAX_LINKS; i++)
 	{
@@ -13874,9 +14004,9 @@ void Game_CaptureControlPoints(int team, int owner)
 		if(controlPoint > MaxClients)
 		{
 #if defined DEBUG
-			PrintToServer("(Game_CaptureControlPoints) SetOwner(team %d) on #%d %d..", owner, i, controlPoint);
+			PrintToServer("(Game_CaptureControlPoints) SetOwner(team %d) on #%d %d..", ownerTeam, i, controlPoint);
 #endif
-			SetVariantInt(owner);
+			SetVariantInt(ownerTeam);
 			AcceptEntityInput(controlPoint, "SetOwner", -1, controlPoint);
 		}
 	}
@@ -14718,4 +14848,27 @@ int Tank_PrecacheModel(const char[] model)
 	}
 
 	return 0;
+}
+
+public void Output_TeamControlPointRound_OnStart(const char[] output, int round, int activator, float delay)
+{
+	if(!g_bEnabled) return;
+
+#if defined DEBUG
+	PrintToServer("(Output_TeamControlPointRound_OnStart) caller: %d activator: %d delay: %0.1f!", round, activator, delay);
+#endif
+
+	// Save a reference of the active team_control_point_round entity.
+	g_iRefRoundControlPoint = EntIndexToEntRef(round);
+}
+
+public void Output_TeamControlPointRound_OnEnd(const char[] output, int round, int activator, float delay)
+{
+	if(!g_bEnabled) return;
+
+#if defined DEBUG
+	PrintToServer("(Output_TeamControlPointRound_OnEnd) caller: %d activator: %d delay: %0.1f!", round, activator, delay);
+#endif
+
+	g_iRefRoundControlPoint = 0;
 }
