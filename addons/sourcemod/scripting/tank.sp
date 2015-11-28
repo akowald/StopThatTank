@@ -518,6 +518,7 @@ Handle g_hCvarGiantHHHCap;
 Handle g_hCvarGiantCooldownPlr;
 Handle g_hCvarRespawnScaleMin;
 Handle g_hCvarGiantGibs;
+Handle g_hCvarPointsForDeploy;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -1093,7 +1094,8 @@ public void OnPluginStart()
 	g_hCvarPointsForGiant = CreateConVar("tank_points_for_giant", "2", "Scoreboard points awarded when enough damage is done to the giant.");
 	g_hCvarPointsForGiantPlr = CreateConVar("tank_points_for_giant_plr", "1", "Scoreboard points awarded when enough damage is done to the giant.");
 	g_hCvarPointsDamageTank = CreateConVar("tank_points_damage_tank", "1000", "Tank damage required to be rewarded with scoreboard points.");
-	g_hCvarPointsDamageGiant = CreateConVar("tank_bomb_points_giant", "1000", "Giant damage required to be rewarded with scoreboard points.");
+	g_hCvarPointsDamageGiant = CreateConVar("tank_points_damage_giant", "1000", "Giant damage required to be rewarded with scoreboard points.");
+	g_hCvarPointsForDeploy = CreateConVar("tank_points_for_deploy", "5", "Scoreboard points awarded when a bomb carrier deploys the bomb in pl.");
 
 	g_hCvarAttribHaulSpeed = CreateConVar("tank_haul_speed", "1.1111", "Haul speed modifier for RED engineers on pl_ or ALL engineers on plr_.");
 	g_hCvarAttribMetalMult = CreateConVar("tank_metal_mult", "1.7", "Metal multiplier for RED engineers on pl_ or ALL engineers on plr_.");
@@ -9973,6 +9975,13 @@ void Bomb_Terminate(int iBomb, int client)
 	GetClientAuthId(client, AuthId_Steam3, strAuth, sizeof(strAuth));
 
 	LogToGame("\"%N<%d><%s><%s>\" triggered \"bomb_deploy\"", client, GetClientUserId(client), strAuth, g_strTeamClass[GetClientTeam(client)]);			
+
+	// Throw the deployer some scoreboard points.
+	int points = config.LookupInt(g_hCvarPointsForDeploy);
+	if(points > 0)
+	{
+		Score_IncrementBonusPoints(client, points);
+	}
 
 	int iHealth = GetClientHealth(client);
 	int iMaxHealth = SDK_GetMaxHealth(client);
