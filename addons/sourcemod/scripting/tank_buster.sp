@@ -129,7 +129,15 @@ int Buster_PickPlayer(int team, int dontConsider=-1)
 void Buster_QueuePlayer(int team, int client)
 {
 	PrintCenterText(client, "%t", "Tank_Center_Buster_YouAreNext");
-	PrintToChatAll("%t", "Tank_Chat_Buster_Queued", 0x01, g_strTeamColors[team], 0x01, g_strTeamColors[team], client, 0x01);
+
+	// Show who will become the next buster to one team.
+	for(int i=1; i<=MaxClients; i++)
+	{
+		if(IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) == team)
+		{
+			PrintToChat(i, "%t", "Tank_Chat_Buster_Queued", 0x01, g_strTeamColors[team], 0x01, g_strTeamColors[team], client, 0x01);
+		}
+	}
 
 	g_nBuster[team][g_iBusterQueuedUserId] = GetClientUserId(client);
 	// Whenever a new player is selected, reset the warn period

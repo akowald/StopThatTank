@@ -119,6 +119,7 @@
 #define SETUP_UBER_CHARG_RATE 	6.0
 #define COLOR_TANK_STRANGE		"\x07CF6A32"
 #define MAX_EDICTS				2048
+#define ENTITY_LIMIT_BUFFER 	20
 
 #define ITEM_PHLOG 594
 #define ITEM_TRIAD_TRINKET 814
@@ -241,10 +242,13 @@
 #define ATTRIB_HEALTH_DRAIN 129
 #define ATTRIB_WEAPON_ALLOW_INSPECT 731
 #define ATTRIB_PARTICLE_INDEX 134
+#define ATTRIB_REDUCED_HEALING_FROM_MEDIC 740
 
 #define QUALITY_NORMAL 		0
 #define QUALITY_UNIQUE 		6
 #define QUALITY_SELFMADE 	9
+#define QUALITY_COLLECTORS 	14
+#define QUALITY_VINTAGE 	3
 
 #define WeaponSlot_PDABuild 3
 
@@ -519,6 +523,7 @@ Handle g_hCvarGiantCooldownPlr;
 Handle g_hCvarRespawnScaleMin;
 Handle g_hCvarGiantGibs;
 Handle g_hCvarPointsForDeploy;
+Handle g_hCvarGiantScaleHealing;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -568,6 +573,7 @@ enum eMapHack
 	MapHack_CactusCanyon,
 	MapHack_Borneo,
 	MapHack_MillstoneEvent,
+	MapHack_Barnblitz,
 };
 eMapHack g_nMapHack = MapHack_None;
 bool g_bEnableMapHack[MAX_TEAMS];
@@ -1130,6 +1136,7 @@ public void OnPluginStart()
 	g_hCvarGiantCooldown = CreateConVar("tank_giant_cooldown", "30.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again.");
 	g_hCvarGiantCooldownPlr = CreateConVar("tank_giant_cooldown_plr", "20.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again in payload race.");
 	g_hCvarGiantGibs = CreateConVar("tank_giant_gibs", "5", "Number of gibs that spawn when a giant is destroyed. Set to 0 to spawn no gibs.");
+	g_hCvarGiantScaleHealing = CreateConVar("tank_giant_scale_healing", "1", "0/1 - Enable or disable giant healing scaling for low player counts in pl.");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -1445,6 +1452,9 @@ public void OnMapStart()
 	}else if(strcmp(strMap, "pl_millstone_event", false) == 0)
 	{
 		g_nMapHack = MapHack_MillstoneEvent;
+	}else if(strcmp(strMap, "pl_barnblitz", false) == 0)
+	{
+		g_nMapHack = MapHack_Barnblitz;
 	}
 
 	g_nGameMode = GameMode_Unknown;
@@ -8995,7 +9005,7 @@ public Action Timer_CheckTeams(Handle hTimer)
 			}
 		}
 		
-		// Keep track of whether we've seen players or not
+		// Keep track of whether we've seen players or not.
 		if(!g_bHasPlayers)
 		{
 			int iCount;
@@ -9004,7 +9014,7 @@ public Action Timer_CheckTeams(Handle hTimer)
 		}
 	}
 	
-	// Scale respawn times with player count
+	// Scale respawn times with player count.
 	int iPlayerCount = 0;
 	for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) >= 2) iPlayerCount++;
 	if(iPlayerCount < 1) iPlayerCount = 1;
@@ -9036,11 +9046,11 @@ public Action Timer_CheckTeams(Handle hTimer)
 	if(flRespawnBombRed < flRespawnBase) flRespawnBombRed = flRespawnBase;
 	if(flRespawnRace < flRespawnBase) flRespawnRace = flRespawnBase;
 
-	// Periodically update the respawn times in case the map tries to change the values (such as when a point is capped)
+	// Periodically update the respawn times in case the map tries to change the values (such as when a point is capped).
 	TF2_SetRespawnTime(TFTeam_Blue, flRespawnBase);
 	TF2_SetRespawnTime(TFTeam_Red, flRespawnBase);
 
-	// Only check for a giant robot in pl_ maps where they actually spawn
+	// Only check for a giant robot in pl_ maps where they actually spawn.
 	if(g_nGameMode != GameMode_Race)
 	{
 		for(int i=1; i<=MaxClients; i++)
@@ -9116,60 +9126,38 @@ public Action Timer_CheckTeams(Handle hTimer)
 			}			
 		}
 	}
-
-	/*
-	if(g_nMapHack == MapHack_CactusCanyon && g_bIsRoundStarted && g_iRefTrackTrain[TFTeam_Blue] != 0)
+	
+	// Scale the amount that Giant Robots can be healed based on the player count on the opposite team in payload.
+	if(g_nGameMode != GameMode_Race && config.LookupBool(g_hCvarGiantScaleHealing))
 	{
-		// volvo fixed the map not triggering SetOwner on the control point but it still crashes thanks to a bug in their code
-		// i'll emailed them about it but until then, i'll need to manually call SetOwner myself to bypass the crash
-		int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]);
-		if(iTrackTrain > MaxClients)
+		float healingScale[MAX_TEAMS];
+		healingScale[TFTeam_Red] = Giant_GetScaleForHealing(TFTeam_Blue); // Healing scale for Giant Robots on the RED team.
+		healingScale[TFTeam_Blue] = Giant_GetScaleForHealing(TFTeam_Red); // Healing scale for Giant Robots on the BLU team.
+		for(int client=1; client<=MaxClients; client++)
 		{
-			float flPosCart[3];
-			GetEntPropVector(iTrackTrain, Prop_Send, "m_vecOrigin", flPosCart);
-
-			for(int i=0; i<MAX_LINKS; i++)
+			if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 			{
-				if(g_iRefLinkedCPs[TFTeam_Blue][i] == 0) break;
-
-				int iCP = EntRefToEntIndex(g_iRefLinkedCPs[TFTeam_Blue][i]);
-				if(iCP <= MaxClients) continue;
-
-				bool bCaptured = (GetEntProp(iCP, Prop_Send, "m_nSkin") != 0);
-				if(bCaptured) continue; // Don't do anything for control points that were already captured
-
-				if(g_nMapHack == MapHack_CactusCanyon && g_bIsFinale)
+				int team = GetClientTeam(client);
+				if(team == TFTeam_Red || team == TFTeam_Blue)
 				{
-					char strName[20];
-					GetEntPropString(iCP, Prop_Data, "m_iName", strName, sizeof(strName));
-					// Do not attempt to cap the final control point in cactus canyon stage 3
-					// Allow the train to hit the cart and trigger the round end automatically
-					if(strcmp(strName, "cap_2s3") == 0) continue;
+					float scale = healingScale[team];
+					if(scale >= 1.0)
+					{
+						// Remove the reduced_healing_from_medics attribute from the Giant Robot.
+						float attribValue;
+						if(Tank_GetAttributeValue(client, ATTRIB_REDUCED_HEALING_FROM_MEDIC, attribValue))
+						{
+							Tank_RemoveAttribute(client, ATTRIB_REDUCED_HEALING_FROM_MEDIC);
+						}
+					}else{
+						// Set the reduced_healing_from_medics attribute on the Giant Robot.
+						Tank_SetAttributeValue(client, ATTRIB_REDUCED_HEALING_FROM_MEDIC, scale);
+					}
 				}
-
-				float flPosCP[3];
-				GetEntPropVector(iCP, Prop_Send, "m_vecOrigin", flPosCP);
-
-				//PrintCenterTextAll("%d - %d (%0.2f)", i, iCP, GetVectorDistance(flPosCart, flPosCP));
-				// If the cart is close enough to the control point, manually cap it myself
-				if(GetVectorDistance(flPosCart, flPosCP) < 50.0)
-				{
-#if defined DEBUG
-					PrintToServer("(Timer_CheckTeams) Attempting to capture control point #%d %d (%0.2f)!", i, iCP, GetVectorDistance(flPosCart, flPosCP));
-#endif
-#if defined DEBUG
-					PrintToServer("(Timer_CheckTeams) Using SetOwner input on team_control_point %d..", iCP);
-#endif
-					SetVariantInt(3);
-					AcceptEntityInput(iCP, "SetOwner", -1, iCP);
-				}
-
-				break;
 			}
 		}
 	}
-	*/
-	
+
 	return Plugin_Continue;
 }
 
@@ -10652,15 +10640,6 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
-		//EmitSoundToAll(const String:sample[], entity = SOUND_FROM_PLAYER, channel = SNDCHAN_AUTO, level = SNDLEVEL_NORMAL, flags = SND_NOFLAGS, Float:volume = SNDVOL_NORMAL, pitch = SNDPITCH_NORMAL, speakerentity = -1, const Float:origin[3] = NULL_VECTOR, const Float:dir[3] = NULL_VECTOR, bool:updatePos = true, Float:soundtime = 0.0)
-
-		//pos[2] += 25.0;
-		// void TE_PhysicsProp(int modelIndex, int skin, int flags, int effects, float pos[3])
-		//int model = PrecacheModel("models/bots/gibs/soldierbot_gib_boss_chest.mdl");
-		//TE_PhysicsProp(model, GetClientTeam(client)-2, 4, EF_NOSHADOW|EF_NORECEIVESHADOW, pos);
-		//TE_BreakModel(model, pos);
-		//TE_SendToAll();
-
 		//SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
 
 		//float pos[3];
@@ -10830,7 +10809,8 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "Nov-1: Added Hellstone support!");
+	DrawPanelText(hPanel, "Nov-28: Added transparent Tanks on Setup.");
+	//DrawPanelText(hPanel, "Nov-1: Added Hellstone support!");
 	if(GetConVarBool(g_hCvarOfficialServer))
 	{
 		DrawPanelText(hPanel, "Type !invite to join our Steam Group!");
@@ -10950,6 +10930,27 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 				}
 			}
 		}
+	}else if(g_nMapHack == MapHack_Barnblitz)
+	{
+		switch(iIndexCP)
+		{
+			// Make sure the doors are opened if the tank is destroyed before reaching the turn table.
+			case 1:
+			{
+#if defined DEBUG
+				PrintToServer("(Output_OnBlueCapture) Second point captured on Barnblitz, opening doors..");
+#endif
+				static char doors[3][32] = {"gate_redbarn_1_door", "gate_cap2_tunnel2", "gate_cap2_tunnel1"};
+				for(int i=0; i<sizeof(doors); i++)
+				{
+					int door = Entity_FindEntityByName(doors[i], "func_door");
+					if(door != -1)
+					{
+						AcceptEntityInput(door, "Open");
+					}
+				}
+			}
+		}
 	}
 
 	// Swap the boring old RED hologram with the robot carrier hologram.
@@ -11065,7 +11066,6 @@ void Reanimator_Cleanup(int client=0)
 	}
 }
 
-#define ENTITY_LIMIT_BUFFER 20
 void Reanimator_Create(int client, bool bFeignMarker=false, int disguisedClass=0)
 {
 	// There are several problems with the reanimator in non-mvm:

@@ -748,11 +748,16 @@ void Giant_GiveWeapons(int client)
 		TF2Items_SetClassname(hItem, className);
 		TF2Items_SetItemIndex(hItem, g_nGiants[iIndex][g_iGiantWeaponDefs][i]);
 		TF2Items_SetLevel(hItem, GetRandomInt(1, 100));
-		TF2Items_SetQuality(hItem, QUALITY_UNIQUE);
+		if(team == TFTeam_Red)
+		{
+			TF2Items_SetQuality(hItem, QUALITY_COLLECTORS);
+		}else{
+			TF2Items_SetQuality(hItem, QUALITY_VINTAGE);
+		}
 
 		int numAttribs = 0;
 		TF2Items_SetAttribute(hItem, numAttribs++, ATTRIB_KILLSTREAK_TIER, 1.0); // the standard killstreak tier
-		if(i >= 0 && i <= 1 && config.LookupInt(g_hCvarWeaponInspect) >= 1) TF2Items_SetAttribute(hItem, numAttribs++, ATTRIB_WEAPON_ALLOW_INSPECT, 1.0); // Allows the weapon to be inspected by pressing 'f'.
+		if(i >= 0 && i <= 2 && config.LookupInt(g_hCvarWeaponInspect) >= 1) TF2Items_SetAttribute(hItem, numAttribs++, ATTRIB_WEAPON_ALLOW_INSPECT, 1.0); // Allows the weapon to be inspected by pressing 'f'.
 
 		// Gives the mod creators Banshee and linux_lover weapons with self-made quality to make them feel special.
 		if(isSpecial && i >= 0 && i <= 3)
@@ -1115,6 +1120,7 @@ void Giant_Clear(int client, int reason=0)
 	Tank_RemoveAttribute(client, ATTRIB_MAXAMMO_SECONDARY_INCREASED);
 	Tank_RemoveAttribute(client, ATTRIB_MAJOR_MOVE_SPEED_BONUS);
 	Tank_RemoveAttribute(client, ATTRIB_MAJOR_INCREASED_JUMP_HEIGHT);
+	Tank_RemoveAttribute(client, ATTRIB_REDUCED_HEALING_FROM_MEDIC);
 
 	// This is an attempt to fix overheal and ammo carrying over when a giant dies and respawns.
 	SetEntityHealth(client, 25);
@@ -2096,6 +2102,12 @@ void Giant_SpawnGibs(int client)
 	int index = g_nSpawner[client][g_iSpawnerGiantIndex];
 	if(g_nGiants[index][g_iGiantTags] & GIANTTAG_SENTRYBUSTER || g_nGiants[index][g_iGiantTags] & GIANTTAG_NO_GIB) return;
 
+	if(GetEntityCount() > GetMaxEntities()-ENTITY_LIMIT_BUFFER-maxGibs)
+	{
+		LogMessage("Not spawning gibs. Reaching entity limit: %d/%d!", GetEntityCount(), GetMaxEntities());
+		return;
+	}
+
 	TFClassType class = g_nGiants[index][g_nGiantClass];
 	int skin = GetClientTeam(client)-2;
 
@@ -2207,4 +2219,32 @@ void Giant_InitGib(const char[] model, float pos[3], float ang[3]=NULL_VECTOR, f
 
 		CreateTimer(20.0, Timer_EntityCleanup, EntIndexToEntRef(gib), TIMER_FLAG_NO_MAPCHANGE);
 	}
+}
+
+float Giant_GetScaleForHealing(int team)
+{
+	int numPlayers = CountPlayersOnTeam(team);
+	float result = 1.0; // 8+ players.
+
+	if(numPlayers <= 2)
+	{
+		result = 0.3;
+	}else if(numPlayers <= 3)
+	{
+		result = 0.4;
+	}else if(numPlayers <= 4)
+	{
+		result = 0.5;
+	}else if(numPlayers <= 5)
+	{
+		result = 0.6;
+	}else if(numPlayers <= 6)
+	{
+		result = 0.7;
+	}else if(numPlayers <= 7)
+	{
+		result = 0.85;
+	}
+
+	return result;
 }
