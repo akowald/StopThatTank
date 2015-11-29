@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-#define DEBUG
+//#define DEBUG
 
 #define PLUGIN_VERSION 				"1.5"
 
@@ -919,6 +919,7 @@ float g_lastClientTick[MAXPLAYERS+1];
 
 bool g_cartIsOnARoll; // The bomb has been deployed and the cart should be moving on its own.
 float g_cartIsOnARollTime;
+int g_finalBombDeployer; // The userid of the player that deployed the bomb and won the round.
 
 float g_timeSentryBusterDied;
 
@@ -1250,6 +1251,7 @@ public void OnPluginStart()
 	HookEvent("post_inventory_application", Event_Inventory);
 	HookEvent("object_destroyed", Event_ObjectDestroyed);
 	HookEvent("server_spawn", Event_ServerSpawn);
+	HookEvent("teamplay_win_panel", Event_WinPanel, EventHookMode_Pre);
 
 	HookEvent("revive_player_notify", Event_ReviveNotify);
 	HookEvent("revive_player_complete", Event_ReviveComplete);
@@ -2131,6 +2133,7 @@ public void Event_RoundStart(Handle hEvent, char[] strEventName, bool bDontBroad
 	g_bCactusTrainOnce = false;
 	g_hellTeamWinner = 0;
 	g_cartIsOnARoll = false;
+	g_finalBombDeployer = 0;
 	for(int i=0; i<MAXPLAYERS+1; i++)
 	{
 		g_iReanimatorNumRevives[i] = 0;
@@ -4567,6 +4570,7 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 				g_bBombGone = false;
 				g_flBombLastMessage = 0.0;
 				g_cartIsOnARoll = false;
+				g_finalBombDeployer = 0;
 				
 				DispatchKeyValue(iBomb, "GameType", "2");
 				char strTemp[50];
@@ -9956,6 +9960,7 @@ void Bomb_Think(int iBomb)
 
 void Bomb_Terminate(int iBomb, int client)
 {
+	g_finalBombDeployer = GetClientUserId(client);
 	StopSound(iBomb, SNDCHAN_AUTO, SOUND_RING);
 
 	// Log the deployment so hlstats can pick it up
@@ -14880,4 +14885,31 @@ public void Output_TeamControlPointRound_OnEnd(const char[] output, int round, i
 #endif
 
 	g_iRefRoundControlPoint = 0;
+}
+
+public Action Event_WinPanel(Event event, const char[] name, bool dontBroadcast)
+{
+	if(!g_bEnabled) return Plugin_Continue;
+
+#if defined DEBUG
+	PrintToServer("(Event_WinPanel)");
+#endif
+
+	if(g_nGameMode != GameMode_BombDeploy) return Plugin_Continue;
+
+	// The win panel will show the last player that captured a control point in the 'Winning capture' space.
+	// Fix it so it credits the player that deployed the bomb, winning the round.
+	if(g_finalBombDeployer != 0)
+	{
+		int client = GetClientOfUserId(g_finalBombDeployer);
+		if(client >= 1 && client <= MaxClients && IsClientInGame(client))
+		{
+			char cappers[6];
+			cappers[0] = client;
+			event.SetString("cappers", cappers);
+		}
+	}
+
+	g_finalBombDeployer = 0;
+	return Plugin_Continue;
 }
