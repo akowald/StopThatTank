@@ -917,8 +917,6 @@ float g_timeLastHealedGiant[MAXPLAYERS+1];
 float g_timeTankSeparation[MAX_TEAMS]; // Keeps track of how long the tank has been separated from the cart.
 float g_lastClientTick[MAXPLAYERS+1];
 
-bool g_cartIsOnARoll; // The bomb has been deployed and the cart should be moving on its own.
-float g_cartIsOnARollTime;
 int g_finalBombDeployer; // The userid of the player that deployed the bomb and won the round.
 
 float g_timeSentryBusterDied;
@@ -2132,7 +2130,6 @@ public void Event_RoundStart(Handle hEvent, char[] strEventName, bool bDontBroad
 	g_flTimeIntermissionEnds = 0.0;
 	g_bCactusTrainOnce = false;
 	g_hellTeamWinner = 0;
-	g_cartIsOnARoll = false;
 	g_finalBombDeployer = 0;
 	for(int i=0; i<MAXPLAYERS+1; i++)
 	{
@@ -3360,7 +3357,6 @@ public void Event_RoundWin(Handle hEvent, char[] strEventName, bool bDontBroadca
 	int winningTeam = GetEventInt(hEvent, "team");
 	g_bIsRoundStarted = false;
 	g_bIsInNaturalRound = false;
-	g_cartIsOnARoll = false;
 	Buster_Cleanup(TFTeam_Blue);
 	Buster_Cleanup(TFTeam_Red);
 	Giant_Cleanup(TFTeam_Blue);
@@ -4086,9 +4082,6 @@ int Tank_CreateTankEntity(int team)
 	int tank = CreateEntityByName("tank_boss");
 	if(tank > MaxClients)
 	{
-		// Set the tank's team
-		SetEntProp(tank, Prop_Send, "m_iTeamNum", team);
-
 		// Hook the tank output OnKilled
 		HookSingleEntityOutput(tank, "OnKilled", Tank_OnKilled, true);
 		
@@ -4099,6 +4092,9 @@ int Tank_CreateTankEntity(int team)
 			DHookEntity(g_hSDKSolidMask, false, tank);
 		}
 
+		// Set the tank's team.
+		SetEntProp(tank, Prop_Send, "m_iTeamNum", team);
+
 		// There's a bug in CTFTankBoss::Spawn which will cause an infinite loop if any path_tracks form a connected cycle.
 		// The game's code finds one path_track and visits the previous path_track until it reaches a dead end. (I guess pl_angkor is unlucky enough to provide one of the few path_tracks that form a cycle.)
 		// This is not a problem in MVM if you set the starting path track of the tank in the population files.
@@ -4108,8 +4104,8 @@ int Tank_CreateTankEntity(int team)
 
 		DispatchSpawn(tank);
 
-		// Set the tank's start path, it's on a timer because setting the track immediately after spawn is hit or miss
-		//RequestFrame(NextFrame_TankRestorePath, EntIndexToEntRef(tank));
+		// Set the tank's team (again).
+		SetEntProp(tank, Prop_Send, "m_iTeamNum", team);
 
 		// Set the tank's initial speed
 		SetEntPropFloat(tank, Prop_Data, "m_speed", 0.0);
@@ -4569,7 +4565,6 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 				g_bBombSentDropNotice = false;
 				g_bBombGone = false;
 				g_flBombLastMessage = 0.0;
-				g_cartIsOnARoll = false;
 				g_finalBombDeployer = 0;
 				
 				DispatchKeyValue(iBomb, "GameType", "2");
@@ -5396,25 +5391,6 @@ public void OnGameFrame()
 	if(g_nGameMode == GameMode_Race) Announcer_Think();
 
 	g_timeSentryBusterDied = 0.0;
-
-	// Ensure the cart moves on its own after the bomb is deployed in payload.
-	if(g_bIsRoundStarted && g_nGameMode == GameMode_BombDeploy && g_cartIsOnARoll)
-	{
-		if(g_cartIsOnARollTime == 0.0 || GetEngineTime() - g_cartIsOnARollTime > 0.3)
-		{
-			int team = TFTeam_Blue;
-			int cart = EntRefToEntIndex(g_iRefTrackTrain[team]);
-			if(cart > MaxClients)
-			{
-				Train_Move(team, 1.0);
-				SetEntPropFloat(cart, Prop_Data, "m_maxSpeed", 500.0);
-				SetVariantFloat(1.0);
-				AcceptEntityInput(cart, "StartForward");
-			}
-
-			g_cartIsOnARollTime = GetEngineTime();
-		}
-	}
 }
 
 void Tank_CheckForStuckPlayers(int iTank, int team)
@@ -9872,8 +9848,11 @@ void Bomb_Think(int iBomb)
 								}
 							}
 							
-							g_cartIsOnARoll = true; // Setting this flag will make the cart move on its own.
-							g_cartIsOnARollTime = 0.0;
+							// Cart the start moving on its own.
+							Train_Move(team, 1.0);
+							SetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed", 500.0);
+							SetVariantFloat(1.0);
+							AcceptEntityInput(iTrackTrain, "StartForward");
 						}
 						
 						// Kill the bomb carrier and trigger the log events
@@ -10890,8 +10869,6 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 
 	int team = GetEntProp(iControlPoint, Prop_Send, "m_iTeamNum");
 	if(team != TFTeam_Blue) return;
-
-	g_cartIsOnARoll = false; // Stop moving the cart as soon as a control point is captured.
 
 	// Find the control point's index
 	int iIndexCP = -1;
