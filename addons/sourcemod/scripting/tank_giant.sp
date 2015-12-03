@@ -62,10 +62,11 @@
 #define GIANTTAG_AIRBLAST_KILLS_STICKIES	(1 << 14)
 #define GIANTTAG_HUNTSMAN_IN_AIR 			(1 << 15)
 #define GIANTTAG_NO_GIB 					(1 << 16)
+#define GIANTTAG_BLOCK_HEALTHONHIT 			(1 << 17)
 
 char g_strGiantTags[][] =
 {
-	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "huntsman_in_air", "no_gib",
+	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "huntsman_in_air", "no_gib", "block_healonhit",
 };
 
 enum
@@ -92,6 +93,7 @@ enum eGiantStruct
 	TFClassType:g_nGiantClass,
 	g_iGiantHealth,
 	g_iGiantOverheal,
+	Float:g_flGiantCapHealth,
 	Float:g_flGiantScale,
 	String:g_strGiantDesc[MAXLEN_GIANT_DESC],
 	String:g_strGiantHint[MAXLEN_GIANT_DESC],
@@ -260,6 +262,7 @@ void Giant_LoadTemplates()
 
 				g_nGiants[iIndex][g_iGiantHealth] = KvGetNum(hKv, "health");
 				g_nGiants[iIndex][g_iGiantOverheal] = KvGetNum(hKv, "overheal");
+				g_nGiants[iIndex][g_flGiantCapHealth] = KvGetFloat(hKv, "cap-health", -1.0);
 				g_nGiants[iIndex][g_flGiantScale] = KvGetFloat(hKv, "scale", -1.0);
 
 				KvGetString(hKv, "info", g_nGiants[iIndex][g_strGiantDesc], MAXLEN_GIANT_DESC);

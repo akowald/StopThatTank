@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5"
+#define PLUGIN_VERSION 				"1.5.1"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -1250,6 +1250,7 @@ public void OnPluginStart()
 	HookEvent("object_destroyed", Event_ObjectDestroyed);
 	HookEvent("server_spawn", Event_ServerSpawn);
 	HookEvent("teamplay_win_panel", Event_WinPanel, EventHookMode_Pre);
+	HookEvent("player_healonhit", Event_PlayerHealed, EventHookMode_Pre);
 
 	HookEvent("revive_player_notify", Event_ReviveNotify);
 	HookEvent("revive_player_complete", Event_ReviveComplete);
@@ -1851,6 +1852,20 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 							SetEntProp(client, Prop_Send, "m_bGlowEnabled", false);
 						}else{
 							SetEntProp(client, Prop_Send, "m_bGlowEnabled", true);
+						}
+					}
+				}
+
+				// Apply "cap-health" rule set in the giant template.
+				if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot)
+				{
+					float mult = g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_flGiantCapHealth];
+					if(mult > 0.0)
+					{
+						int cap = RoundToNearest(float(SDK_GetMaxHealth(client)) * mult);
+						if(GetClientHealth(client) > cap)
+						{
+							SetEntityHealth(client, cap);
 						}
 					}
 				}
@@ -14889,4 +14904,14 @@ public Action Event_WinPanel(Event event, const char[] name, bool dontBroadcast)
 
 	g_finalBombDeployer = 0;
 	return Plugin_Continue;
+}
+
+public void Event_PlayerHealed(Event event, const char[] name, bool dontBroadcast)
+{
+	// Block the + particle from appearing over giants when they are healed.
+	int client = event.GetInt("entindex");
+	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALTHONHIT) && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+	{
+		event.BroadcastDisabled = true;
+	}
 }
