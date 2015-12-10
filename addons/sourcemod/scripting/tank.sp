@@ -120,6 +120,7 @@
 #define COLOR_TANK_STRANGE		"\x07CF6A32"
 #define MAX_EDICTS				2048
 #define ENTITY_LIMIT_BUFFER 	20
+#define MAD_MILK_HEALTH 		8
 
 #define ITEM_PHLOG 594
 #define ITEM_TRIAD_TRINKET 814
@@ -1250,7 +1251,7 @@ public void OnPluginStart()
 	HookEvent("object_destroyed", Event_ObjectDestroyed);
 	HookEvent("server_spawn", Event_ServerSpawn);
 	HookEvent("teamplay_win_panel", Event_WinPanel, EventHookMode_Pre);
-	HookEvent("player_healonhit", Event_PlayerHealed, EventHookMode_Pre);
+	HookEvent("player_healonhit", Event_PlayerHealOnHit, EventHookMode_Pre);
 
 	HookEvent("revive_player_notify", Event_ReviveNotify);
 	HookEvent("revive_player_complete", Event_ReviveComplete);
@@ -14906,8 +14907,10 @@ public Action Event_WinPanel(Event event, const char[] name, bool dontBroadcast)
 	return Plugin_Continue;
 }
 
-public void Event_PlayerHealed(Event event, const char[] name, bool dontBroadcast)
+public void Event_PlayerHealOnHit(Event event, const char[] name, bool dontBroadcast)
 {
+	if(!g_bEnabled) return;
+
 	// Block the + particle from appearing over giants when they are healed.
 	int client = event.GetInt("entindex");
 	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALTHONHIT) && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))

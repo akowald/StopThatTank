@@ -541,7 +541,7 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 		GetArrayString(g_nGiants[iIndex][g_hGiantCharAttrib], i, strAttributeName, sizeof(strAttributeName));
 		flAttribValue = GetArrayCell(g_nGiants[iIndex][g_hGiantCharAttribValue], i);
 #if defined DEBUG
-		PrintToServer("(TF2_MakeGiantRobot) Setting character attribute: %s - %0.3f", strAttributeName, flAttribValue);
+		PrintToServer("(TF2_MakeGiantRobot) Setting character attribute: %s -> %0.3f", strAttributeName, flAttribValue);
 #endif
 		Tank_SetAttributeValueByName(client, strAttributeName, flAttribValue);
 	}
@@ -787,7 +787,7 @@ void Giant_GiveWeapons(int client)
 				GetArrayString(g_nGiants[iIndex][g_hGiantWeaponAttrib][i], a, strAttributeName, sizeof(strAttributeName));
 				flAttribValue = GetArrayCell(g_nGiants[iIndex][g_hGiantWeaponAttribValue][i], a);
 #if defined DEBUG
-				PrintToServer("(Giant_GiveWeapons) Setting attribute on weapon %d slot %d: %s - %0.3f", iWeapon, i, strAttributeName, flAttribValue);
+				PrintToServer("(Giant_GiveWeapons) Setting weapon attribute on %d (slot %d): %s -> %0.3f", iWeapon, i, strAttributeName, flAttribValue);
 #endif
 				Tank_SetAttributeValueByName(iWeapon, strAttributeName, flAttribValue);
 			}
