@@ -1405,7 +1405,7 @@ void Giant_Think(int team)
 			bIsValid = true;
 
 			// Check to see if the player wants to pass the giant (don't bother checking for this after they spawn)
-			if(g_bBusterPassed[client] && g_nTeamGiant[team][g_flTeamGiantTimeSpawned] == 0.0 && !GetEntProp(client, Prop_Send, "m_bIsMiniBoss") && !IsFakeClient(client))
+			if(g_bBusterPassed[client] && g_nTeamGiant[team][g_flTeamGiantTimeSpawned] == 0.0 && !IsFakeClient(client))
 			{
 				// If they've already spawned, it's too late
 				bIsValid = false;
