@@ -525,6 +525,7 @@ Handle g_hCvarRespawnScaleMin;
 Handle g_hCvarGiantGibs;
 Handle g_hCvarPointsForDeploy;
 Handle g_hCvarGiantScaleHealing;
+Handle g_hCvarJarateOnHitTime;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -1187,6 +1188,7 @@ public void OnPluginStart()
 
 	g_hCvarHellTowerTimeGate = CreateConVar("tank_helltower_time_gates_open", "30.0", "Seconds after hell starts that the gates open in hell. This triggers the relay which will then delay an additional 29 seconds.");
 	g_hCvarGiantHHHCap = CreateConVar("tank_giant_hhh_cap", "250.0", "Damage cap for the HHH Halloween boss against the giant.");
+	g_hCvarJarateOnHitTime = CreateConVar("tank_jarate_on_hit_time", "3.0", "Seconds that jarate is applied for the jarate_on_hit giant tag.");
 
 	g_hCvarClassLimits[TFTeam_Red][1] = CreateConVar("tank_classlimit_red_scout", "2", "Class limit for scout. Set to -1 for no limit.");
 	g_hCvarClassLimits[TFTeam_Red][2] = CreateConVar("tank_classlimit_red_sniper", "2", "Class limit for sniper. Set to -1 for no limit.");
@@ -7647,8 +7649,13 @@ public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLAT
 				// Detonate deflected stickies
 				if(Spawner_HasGiantTag(deflector, GIANTTAG_AIRBLAST_KILLS_STICKIES) && GetEntProp(deflector, Prop_Send, "m_bIsMiniBoss"))
 				{
-					SetEntProp(entity, Prop_Send, "m_bTouched", true); // This bypass the check that the stickies have come to a rest.
-					SDKHooks_TakeDamage(entity, 0, 0, 100.0, DMG_SLOWBURN|DMG_BUCKSHOT);
+					// Do not destroy the stickies if they belong to a giant.
+					int owner = GetEntPropEnt(entity, Prop_Send, "m_hThrower");
+					if(owner >= 1 && owner <= MaxClients && !GetEntProp(owner, Prop_Send, "m_bIsMiniBoss"))
+					{
+						SetEntProp(entity, Prop_Send, "m_bTouched", true); // This bypass the check that the stickies have come to a rest in order to allow them to take damage.
+						SDKHooks_TakeDamage(entity, 0, 0, 100.0, DMG_SLOWBURN|DMG_BUCKSHOT);
+					}
 				}
 			}
 		}else{
@@ -8705,14 +8712,14 @@ public void Event_PlayerHurt(Handle hEvent, const char[] strEventName, bool bDon
 
 		if(iAttacker >= 1 && iAttacker <= MaxClients && IsClientInGame(iAttacker))
 		{
-			int iTeamVictim = GetClientTeam(iVictim);
+			int teamVictim = GetClientTeam(iVictim);
 
 			// Record the last time when the giant robot has done damage for the purposes of the rage meter
 			RageMeter_OnDamageDealt(iAttacker);
 			RageMeter_OnTookDamage(iVictim);
 
 			// Keep track of damage dealt to the giant robot
-			if(GetEntProp(iVictim, Prop_Send, "m_bIsMiniBoss") && g_nSpawner[iVictim][g_bSpawnerEnabled] && g_nSpawner[iVictim][g_nSpawnerType] == Spawn_GiantRobot)
+			if(g_nSpawner[iVictim][g_bSpawnerEnabled] && g_nSpawner[iVictim][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(iVictim, Prop_Send, "m_bIsMiniBoss"))
 			{
 				// Don't count damage done to the sentry buster for the Giant MVP
 				if(!(g_nGiants[g_nSpawner[iVictim][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
@@ -8723,13 +8730,13 @@ public void Event_PlayerHurt(Handle hEvent, const char[] strEventName, bool bDon
 					if(g_bTakingSentryDamage)
 					{
 						g_bTakingSentryDamage = false;
-						Buster_IncrementStat(BusterStat_Giant, iTeamVictim, iDamage);
+						Buster_IncrementStat(BusterStat_Giant, teamVictim, iDamage);
 					}
 				}
 
 				// Check accumulated points to see if the player has earned some scoreboard points
-				g_iDamageAccul[iAttacker][iTeamVictim] += iDamage;
-				while(g_iDamageAccul[iAttacker][iTeamVictim] >= config.LookupInt(g_hCvarPointsDamageGiant))
+				g_iDamageAccul[iAttacker][teamVictim] += iDamage;
+				while(g_iDamageAccul[iAttacker][teamVictim] >= config.LookupInt(g_hCvarPointsDamageGiant))
 				{
 					int numPoints = config.LookupInt(g_hCvarPointsForGiant);
 					if(g_nGameMode == GameMode_Race) numPoints = config.LookupInt(g_hCvarPointsForGiantPlr);
@@ -8744,7 +8751,16 @@ public void Event_PlayerHurt(Handle hEvent, const char[] strEventName, bool bDon
 					GetClientAuthId(iAttacker, AuthId_Steam3, auth, sizeof(auth));
 					LogToGame("\"%N<%d><%s><%s>\" triggered \"%s\"", iAttacker, GetClientUserId(iAttacker), auth, g_strTeamClass[GetClientTeam(iAttacker)], logEvent);
 
-					g_iDamageAccul[iAttacker][iTeamVictim] -= config.LookupInt(g_hCvarPointsDamageGiant);
+					g_iDamageAccul[iAttacker][teamVictim] -= config.LookupInt(g_hCvarPointsDamageGiant);
+				}
+			}
+
+			// Apply the effects of the giant tag: jarate_on_hit.
+			if(Spawner_HasGiantTag(iAttacker, GIANTTAG_JARATE_ON_HIT) && GetEntProp(iAttacker, Prop_Send, "m_bIsMiniBoss") && GetClientTeam(iAttacker) != teamVictim)
+			{
+				if(IsPlayerAlive(iVictim))
+				{
+					TF2_AddCondition(iVictim, TFCond_Jarated, config.LookupFloat(g_hCvarJarateOnHitTime), iAttacker);
 				}
 			}
 		}

@@ -63,10 +63,11 @@
 #define GIANTTAG_HUNTSMAN_IN_AIR 			(1 << 15)
 #define GIANTTAG_NO_GIB 					(1 << 16)
 #define GIANTTAG_BLOCK_HEALTHONHIT 			(1 << 17)
+#define GIANTTAG_JARATE_ON_HIT				(1 << 18)
 
 char g_strGiantTags[][] =
 {
-	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "huntsman_in_air", "no_gib", "block_healonhit",
+	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "huntsman_in_air", "no_gib", "block_healonhit", "jarate_on_hit",
 };
 
 enum
