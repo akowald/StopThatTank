@@ -41,6 +41,7 @@
 #define MAXLEN_GIANT_TAG 	50
 #define MAXLEN_GIANT_TAGS 	((MAX_GIANT_TAGS * MAXLEN_GIANT_TAG) + MAX_GIANT_TAGS + 1)
 #define MAX_CONFIG_WEAPONS	6
+#define TF_COND_TEAM_GLOWS 	114
 
 #define FLAG_DONT_DROP_WEAPON 				0x23E173A2
 #define OFFSET_DONT_DROP					36
@@ -60,9 +61,9 @@
 #define GIANTTAG_NO_LOOP_SOUND				(1 << 12)
 #define GIANTTAG_CAN_DROP_BOMB				(1 << 13)
 #define GIANTTAG_AIRBLAST_KILLS_STICKIES	(1 << 14)
-#define GIANTTAG_NO_GIB 					(1 << 16)
-#define GIANTTAG_BLOCK_HEALTHONHIT 			(1 << 17)
-#define GIANTTAG_JARATE_ON_HIT				(1 << 18)
+#define GIANTTAG_NO_GIB 					(1 << 15)
+#define GIANTTAG_BLOCK_HEALTHONHIT 			(1 << 16)
+#define GIANTTAG_JARATE_ON_HIT				(1 << 17)
 
 char g_strGiantTags[][] =
 {
@@ -799,7 +800,7 @@ void Giant_GiveWeapons(int client)
 
 				if(TF2_GetPlayerClass(client) == TFClass_Medic)
 				{
-					Tank_SetAttributeValue(iWeapon, ATTRIB_HEALTH_DRAIN, -3.0);
+					Tank_SetAttributeValue(iWeapon, ATTRIB_HEALTH_DRAIN, -10.0);
 				}
 			}
 

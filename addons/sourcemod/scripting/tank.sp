@@ -734,6 +734,8 @@ int g_iOffset_m_buildingPercentage;
 int g_iOffset_m_uberChunk;
 int g_iOffset_m_tauntProp;
 int g_iOffset_m_bCapBlocked;
+int g_offset_m_bPlayingHybrid_CTF_CP;
+int g_offset_m_medicRegenMult;
 
 int g_iNumTankMaxSimulated;
 
@@ -1314,6 +1316,7 @@ public void OnPluginStart()
 
 	LookupOffset(g_iOffsetReviveMarker, "CTFPlayer", "m_nForcedSkin");
 	LookupOffset(g_iOffset_m_Shared, "CTFPlayer", "m_Shared");
+	LookupOffset(g_offset_m_bPlayingHybrid_CTF_CP, "CTFGameRulesProxy", "m_bPlayingHybrid_CTF_CP");
 	if(LookupOffset(g_iOffset_m_numGibs, "CBaseObject", "m_bServerOverridePlacement"))
 	{
 		g_iOffset_m_numGibs -= 8; // This offset stores how many gibs are spawned when an object is detonated. Don't set this to a crazy number or you will crash. Valve references this number directly when creating the gib model name.
@@ -1333,6 +1336,10 @@ public void OnPluginStart()
 	if(LookupOffset(g_iOffset_m_bCapBlocked, "CTeamTrainWatcher", "m_nNumCappers"))
 	{
 		g_iOffset_m_bCapBlocked += 44; // This offset allows me to force the timer into overtime on plr maps.
+	}
+	if(LookupOffset(g_offset_m_medicRegenMult, "CTFPlayer", "m_iSpawnCounter"))
+	{
+		g_offset_m_medicRegenMult += 52; // This offset keeps medic health regen at a constant rate.
 	}
 
 	LoadTranslations("common.phrases");
@@ -1855,7 +1862,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
 				{
 					// m_bGlowEnabled should only be set on non-spy giants in plr mode.
-					if(g_nGameMode == GameMode_Race && TF2_GetPlayerClass(client) != TFClass_Spy)
+					if(g_nGameMode == GameMode_Race && class != TFClass_Spy)
 					{
 						if(TF2_IsPlayerInCondition(client, TFCond_Stealthed))
 						{
@@ -1960,8 +1967,12 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 						SetEntPropFloat(iMelee, Prop_Send, "m_flNextPrimaryAttack", 99999999.0);
 					}
 
-					// Keeps the medic regen at 3 at all times.
-					SetEntPropFloat(client, Prop_Send, "m_flLastDamageTime", GetEngineTime());
+					// Cancels out medic health regeneration on medic sentry busters.
+					if(class == TFClass_Medic)
+					{
+						SetEntPropFloat(client, Prop_Send, "m_flLastDamageTime", GetEngineTime());
+						if(g_offset_m_medicRegenMult > 0) SetEntDataFloat(client, g_offset_m_medicRegenMult, 0.0);
+					}
 
 					// Make attack cause the player to taunt and self-destruct
 					// Prevent the bomb becoming armed as soon as they spawn
@@ -1985,7 +1996,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 					//buttons &= ~IN_ATTACK2; // Prevents engie sentry busters from picking up their buildings and becoming civilian. Alternative to using the "cannot pick up buildings" attribute.
 				}
 				
-				if(Spawner_HasGiantTag(client, GIANTTAG_CAN_DROP_BOMB) && g_nGameMode == GameMode_BombDeploy && TF2_GetPlayerClass(client) == TFClass_Spy)
+				if(Spawner_HasGiantTag(client, GIANTTAG_CAN_DROP_BOMB) && g_nGameMode == GameMode_BombDeploy && class == TFClass_Spy)
 				{
 					// Drop the bomb automatically so the player can cloak easily.
 					if(buttons & IN_ATTACK2 && !TF2_IsPlayerInCondition(client, TFCond_Cloaked))
@@ -3366,9 +3377,19 @@ public void Event_BroadcastAudio(Handle hEvent, char[] strEventName, bool bDontB
 	}
 }
 
-void Tank_BombDeployHud(bool bEnable)
+void Tank_BombDeployHud(bool enable)
 {
-	GameRules_SetProp("m_bPlayingHybrid_CTF_CP", bEnable, 1, 0, true);
+	// This will crash if changeState is true (more so on linux). I think SourceMod makes the incorrect assumption that the SendTables are identical in the real and proxy gamerules entity. I could be wrong.
+	GameRules_SetProp("m_bPlayingHybrid_CTF_CP", enable);
+
+	if(g_offset_m_bPlayingHybrid_CTF_CP > 0)
+	{
+		int gamerules = FindEntityByClassname(MaxClients+1, "tf_gamerules");
+		if(gamerules > MaxClients)
+		{
+			ChangeEdictState(gamerules, g_offset_m_bPlayingHybrid_CTF_CP);
+		}
+	}
 }
 
 public void Event_RoundWin(Handle hEvent, char[] strEventName, bool bDontBroadcast)
@@ -3731,12 +3752,16 @@ void Train_FindProps()
 	char model[MAXLEN_CART_PATH];
 	char name[64];
 	char cartModel[MAXLEN_CART_PATH];
+	char classname[32];
 	int size = g_cartModels.Length;
 
 	for(int entity=MaxClients+1,maxEntities=GetMaxEntities(); entity<maxEntities; entity++)
 	{
 		if(IsValidEntity(entity))
 		{
+			GetEdictClassname(entity, classname, sizeof(classname));
+			if(strncmp(classname, "prop_physics", 12) != 0 && strncmp(classname, "prop_dynamic", 12) != 0) continue;
+
 			GetEntPropString(entity, Prop_Data, "m_ModelName", model, sizeof(model));
 			GetEntPropString(entity, Prop_Data, "m_iName", name, sizeof(name));
 
