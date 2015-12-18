@@ -60,14 +60,13 @@
 #define GIANTTAG_NO_LOOP_SOUND				(1 << 12)
 #define GIANTTAG_CAN_DROP_BOMB				(1 << 13)
 #define GIANTTAG_AIRBLAST_KILLS_STICKIES	(1 << 14)
-#define GIANTTAG_HUNTSMAN_IN_AIR 			(1 << 15)
 #define GIANTTAG_NO_GIB 					(1 << 16)
 #define GIANTTAG_BLOCK_HEALTHONHIT 			(1 << 17)
 #define GIANTTAG_JARATE_ON_HIT				(1 << 18)
 
 char g_strGiantTags[][] =
 {
-	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "huntsman_in_air", "no_gib", "block_healonhit", "jarate_on_hit",
+	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit",
 };
 
 enum
@@ -791,19 +790,6 @@ void Giant_GiveWeapons(int client)
 				PrintToServer("(Giant_GiveWeapons) Setting weapon attribute on %d (slot %d): %s -> %0.3f", iWeapon, i, strAttributeName, flAttribValue);
 #endif
 				Tank_SetAttributeValueByName(iWeapon, strAttributeName, flAttribValue);
-			}
-
-			// Let's the giant rapid fire huntsman shoot the bow while airbourne.
-			if(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_HUNTSMAN_IN_AIR && strcmp(className, "tf_weapon_compound_bow") == 0)
-			{
-				if(g_hSDKLaunchGrenadePre != INVALID_HANDLE && g_hSDKLaunchGrenadePost != INVALID_HANDLE)
-				{
-#if defined DEBUG
-					PrintToServer("(Giant_GiveWeapons) Hooking LaunchGrenade on bow: %d!", iWeapon);
-#endif
-					DHookEntity(g_hSDKLaunchGrenadePre, false, iWeapon);
-					DHookEntity(g_hSDKLaunchGrenadePost, true, iWeapon);
-				}
 			}
 
 			// Some class-related fixes that come from allowing any class to be the sentry buster.
@@ -2028,57 +2014,6 @@ void Giant_FlagWeaponDontDrop(int weapon)
 
 	StoreToAddress(addr, FLAG_DONT_DROP_WEAPON, NumberType_Int32);
 	SetEntProp(weapon, Prop_Send, "m_bValidatedAttachedEntity", 1);
-}
-
-// int *CTFCompoundBow::LaunchGrenade(void)
-public MRESReturn CTFCompoundBow_LaunchGrenade_Pre(int compoundBow)
-{
-	//PrintToServer("(CTFCompoundBow_LaunchGrenade_Pre) entity = %d", compoundBow);
-	g_bowAirBourne = false;
-
-	// Get the owner of the compound bow and trick the game into thinking they are on the ground.
-	if(compoundBow > MaxClients)
-	{
-		int owner = GetEntPropEnt(compoundBow, Prop_Send, "m_hOwnerEntity");
-		if(owner >= 1 && owner <= MaxClients && IsClientInGame(owner))
-		{
-			int groundEntity = GetEntPropEnt(owner, Prop_Send, "m_hGroundEntity");
-			if(groundEntity == -1)
-			{
-#if defined DEBUG
-				PrintToServer("(CTFCompoundBow_LaunchGrenade_Pre) %N fired the bow while airbourne..", owner);
-#endif
-				g_bowAirBourne = true;
-
-				SetEntPropEnt(owner, Prop_Send, "m_hGroundEntity", 0);
-			}
-		}
-	}
-
-	return MRES_Ignored;
-}
-
-// int *CTFCompoundBow::LaunchGrenade(void)
-public MRESReturn CTFCompoundBow_LaunchGrenade_Post(int compoundBow)
-{
-	//PrintToServer("(CTFCompoundBow_LaunchGrenade_Post) entity = %d", compoundBow);
-
-	// Get the owner of the compound bow and trick the game into thinking they are on the ground.
-	if(g_bowAirBourne && compoundBow > MaxClients)
-	{
-		int owner = GetEntPropEnt(compoundBow, Prop_Send, "m_hOwnerEntity");
-		if(owner >= 1 && owner <= MaxClients && IsClientInGame(owner))
-		{
-#if defined DEBUG
-			PrintToServer("(CTFCompoundBow_LaunchGrenade_Post) Func has ran, resetting ground entity on %N..", owner);
-#endif
-			// Return the ground entity back to the way it was.
-			SetEntPropEnt(owner, Prop_Send, "m_hGroundEntity", -1);
-		}
-	}
-
-	g_bowAirBourne = false;
-	return MRES_Ignored;
 }
 
 #if defined _SENDPROXYMANAGER_INC_

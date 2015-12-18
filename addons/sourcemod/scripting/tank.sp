@@ -550,8 +550,6 @@ Handle g_hSDKChargeEffects;
 Handle g_hSDKHeal;
 Handle g_hSDKFindHealerIndex;
 Handle g_hSDKWeaponSwitch;
-Handle g_hSDKLaunchGrenadePre;
-Handle g_hSDKLaunchGrenadePost;
 Handle g_hSDKSolidMask;
 Handle g_hSDKSetBossHealth;
 
@@ -939,7 +937,6 @@ Handle g_timerFailsafe;
 bool g_overrideSound = false;
 float g_timeLastRobotDamage = 0.0;
 int g_hitWithScorchShot = 0;
-bool g_bowAirBourne = false;
 
 enum eSpawnerType
 {
@@ -6765,20 +6762,6 @@ void SDK_Init()
 		return;
 	}
 
-	// This hook lets the giant shoot the huntsman while airbourne.
-	int offset = GameConfGetOffset(hGamedata, "CTFCompoundBow::LaunchGrenade");
-	if(offset > 0)
-	{
-		g_hSDKLaunchGrenadePre = DHookCreate(offset, HookType_Entity, ReturnType_Int, ThisPointer_CBaseEntity, CTFCompoundBow_LaunchGrenade_Pre);
-		g_hSDKLaunchGrenadePost = DHookCreate(offset, HookType_Entity, ReturnType_Int, ThisPointer_CBaseEntity, CTFCompoundBow_LaunchGrenade_Post);
-		if(g_hSDKLaunchGrenadePre == INVALID_HANDLE || g_hSDKLaunchGrenadePost == INVALID_HANDLE)
-		{
-			LogMessage("Failed to create DHook handle: CTFCompoundBow::LaunchGrenade!");
-		}
-	}else{
-		LogMessage("Failed to get offset: CTFCompoundBow::LaunchGrenade!");
-	}
-
 	// This offset stores the number of players being healed in the medic's radius heal
 	g_iOffset_m_HealingRadius = GameConfGetOffset(hGamedata, "CTFPlayerShared::m_HealingRadius");
 	if(g_iOffset_m_HealingRadius == -1)
@@ -6786,7 +6769,7 @@ void SDK_Init()
 		LogMessage("Failed to get offset: CTFPlayerShared::m_HealingRadius!");
 	}
 	
-	offset = GameConfGetOffset(hGamedata, "CBaseEntity::PhysicsSolidMaskForEntity");
+	int offset = GameConfGetOffset(hGamedata, "CBaseEntity::PhysicsSolidMaskForEntity");
 	if(offset > 0)
 	{
 		g_hSDKSolidMask = DHookCreate(offset, HookType_Entity, ReturnType_Int, ThisPointer_CBaseEntity, CBaseEntity_PhysicsSolidMaskForEntity);

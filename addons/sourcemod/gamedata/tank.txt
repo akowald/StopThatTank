@@ -290,11 +290,6 @@
 				"linux"		"14"
 				"windows"		"13"
 			}
-			"CTFCompoundBow::LaunchGrenade"
-			{
-				"linux"		"482"
-				"windows"		"472"
-			}
 			"CMonsterResource::SetBossHealthPercentage"
 			{
 				"linux"		"191"
