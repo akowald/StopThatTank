@@ -262,28 +262,28 @@
 			}
 			"CCaptureFlag::PickUp"
 			{
-				"linux"		"259"
-				"windows"		"221"
+				"linux"		"260"
+				"windows"		"222"
 			}
 			"CBasePlayer::EquipWearable"
-			{
-				"linux"		"427"
-				"windows"		"426"
-			}
-			"CBasePlayer::RemoveWearable"
 			{
 				"linux"		"428"
 				"windows"		"427"
 			}
+			"CBasePlayer::RemoveWearable"
+			{
+				"linux"		"429"
+				"windows"		"428"
+			}
 			"CObjectTeleporter::TeleporterReceive"
 			{
-				"linux"		"407"
-				"windows"		"393"
+				"linux"		"408"
+				"windows"		"394"
 			}
 			"CTFWeaponBase::GetMaxClip1"
 			{
-				"linux"		"320"
-				"windows"		"314"
+				"linux"		"321"
+				"windows"		"315"
 			}
 			"CAttributeManager::OnAttributeValuesChanged"
 			{
@@ -292,13 +292,13 @@
 			}
 			"CTFCompoundBow::LaunchGrenade"
 			{
-				"linux"		"481"
-				"windows"		"471"
+				"linux"		"482"
+				"windows"		"472"
 			}
 			"CMonsterResource::SetBossHealthPercentage"
 			{
-				"linux"		"190"
-				"windows"		"189"
+				"linux"		"191"
+				"windows"		"190"
 			}
 		}
 	}

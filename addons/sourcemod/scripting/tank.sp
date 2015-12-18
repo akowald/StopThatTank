@@ -526,6 +526,7 @@ Handle g_hCvarGiantGibs;
 Handle g_hCvarPointsForDeploy;
 Handle g_hCvarGiantScaleHealing;
 Handle g_hCvarJarateOnHitTime;
+Handle g_hCvarBombWinSpeed;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -576,6 +577,7 @@ enum eMapHack
 	MapHack_Borneo,
 	MapHack_MillstoneEvent,
 	MapHack_Barnblitz,
+	MapHack_SnowyCoast,
 };
 eMapHack g_nMapHack = MapHack_None;
 bool g_bEnableMapHack[MAX_TEAMS];
@@ -697,6 +699,8 @@ char g_spyBossGibs[][] = {"models/bots/gibs/spybot_gib_head.mdl"};
 char g_sniperBossGibs[][] = {"models/bots/gibs/sniperbot_gib_head.mdl"};
 char g_medicBossGibs[][] = {"models/bots/gibs/medicbot_gib_head.mdl"};
 char g_engyBossGibs[][] = {"models/bots/gibs/pyrobot_gib_boss_pelvis.mdl"}; // No engy bot head gib.
+
+char g_soundBombFinalWarning[][] = {"vo/announcer_cart_attacker_finalwarning1.mp3", "vo/announcer_cart_attacker_finalwarning2.mp3", "vo/announcer_cart_attacker_finalwarning5.mp3", "vo/mvm_bomb_alerts03.mp3", "vo/mvm_bomb_alerts05.mp3"};
 
 enum
 {
@@ -1126,6 +1130,7 @@ public void OnPluginStart()
 	g_hCvarBombMiniCritsDuration = CreateConVar("tank_bomb_minicrits_duration", "-1.0", "Time (seconds) duration of minicrits when a normal robot picks up the bomb.");
 	g_hCvarBombHealCooldown = CreateConVar("tank_bomb_heal_cooldown", "10.0", "Time (seconds) between dropping the bomb and picking it up that heal effects are granted.");
 	g_hCvarBombBuffsCuttoff = CreateConVar("tank_bomb_buffs_cutoff", "10", "Minimum player count required bomb carrier buffs to be activated.");
+	g_hCvarBombWinSpeed = CreateConVar("tank_bomb_win_speed", "500.0", "Speed of the payload cart when the robots deploy the bomb, winning the round.");
 
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
 	g_hCvarGiantForce = CreateConVar("tank_giant_force", "-1", "Index of giant template to pick. (-1 = random)");
@@ -1135,7 +1140,7 @@ public void OnPluginStart()
 	g_hCvarGiantWarnCutoff = CreateConVar("tank_giant_cutoff_time", "17.0", "Seconds after a bomb deploy round begins that a giant can no longer replace an afk/disconnected giant. (May need to add 5.0s, round start is when the countdown begins)");
 	g_hCvarGiantTimeAFK = CreateConVar("tank_giant_time_afk", "7.0", "Seconds after spawning when a giant will be considered AFK.");
 	g_hCvarGiantCooldown = CreateConVar("tank_giant_cooldown", "30.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again.");
-	g_hCvarGiantCooldownPlr = CreateConVar("tank_giant_cooldown_plr", "20.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again in payload race.");
+	g_hCvarGiantCooldownPlr = CreateConVar("tank_giant_cooldown_plr", "15.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again in payload race.");
 	g_hCvarGiantGibs = CreateConVar("tank_giant_gibs", "5", "Number of gibs that spawn when a giant is destroyed. Set to 0 to spawn no gibs.");
 	g_hCvarGiantScaleHealing = CreateConVar("tank_giant_scale_healing", "1", "0/1 - Enable or disable giant healing scaling for low player counts in pl.");
 
@@ -1143,17 +1148,17 @@ public void OnPluginStart()
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
 	g_hCvarRageLow = CreateConVar("tank_rage_low", "20.0", "The rage meter will show when the player's rage meter has this much time (seconds) left.");
 
-	g_hCvarRaceLvls[0] = CreateConVar("tank_race_level_0", "-0.5", "-1.0-0.0 - The speed the tank moves backwards < on hills as a percentage of maxspeed.", _, true, -1.0, true, 0.0);
+	g_hCvarRaceLvls[0] = CreateConVar("tank_race_level_0", "-0.24", "-1.0-0.0 - The speed the tank moves backwards < on hills as a percentage of maxspeed.", _, true, -1.0, true, 0.0);
 	g_hCvarRaceLvls[1] = CreateConVar("tank_race_level_1", "0.15", "0.0-1.0 - The speed the tank moves at x1 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
 	g_hCvarRaceLvls[2] = CreateConVar("tank_race_level_2", "0.4", "0.0-1.0 - The speed the tank moves at x2 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
 	g_hCvarRaceLvls[3] = CreateConVar("tank_race_level_3", "0.7", "0.0-1.0 - The speed the tank moves at x3 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
 	g_hCvarRaceLvls[4] = CreateConVar("tank_race_level_4", "1.0", "0.0-1.0 - The speed the tank moves at x4 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
 	g_hCvarRaceInterval = CreateConVar("tank_race_interval", "3.0", "Time (seconds) in between tank level/speed changes.");
 	g_hCvarRaceDamageBase = CreateConVar("tank_race_damage_base", "50", "base + EPC * average | The base damage in the formula for each level interval.");
-	g_hCvarRaceDamageAverage = CreateConVar("tank_race_damage_average", "15", "base + EPC * average | The average damage in the formula for each level interval.");
+	g_hCvarRaceDamageAverage = CreateConVar("tank_race_damage_average", "9", "base + EPC * average | The average damage in the formula for each level interval.");
 	g_hCvarRaceTimeGiantStart = CreateConVar("tank_race_time_giant_start", "0.75", "Time (minutes) after tanks start moving when giant robots will spawn.");
 	g_hCvarRaceTimeIntermission = CreateConVar("tank_race_time_intermission", "0.9", "Time (minutes) after giants spawn that the tanks will move again. Set to -1.0 to disable intermission. Can't be less than 0.2.");
-	g_hCvarRaceTimeWave = CreateConVar("tank_race_time_wave", "1.333", "Time (minutes) between giant waves in payload race. The first giant spawn time is set with tank_race_time_giant_start.");
+	g_hCvarRaceTimeWave = CreateConVar("tank_race_time_wave", "1.0", "Time (minutes) between giant waves in payload race. The first giant spawn time is set with tank_race_time_giant_start.");
 	g_hCvarRaceNumWaves = CreateConVar("tank_race_num_waves", "2", "Number of giants that spawn in each payload race round.");
 	g_hCvarRaceGiantHealthMin = CreateConVar("tank_race_giant_health_min", "0.5", "Minimum percentage that giant health and overheal will be scaled to based on opposite team player count in plr_.");
 	g_hCvarRaceTimeOvertime = CreateConVar("tank_race_time_overtime", "4.0", "Time (minutes) after the final wave that overtime will begin and the cart will no longer move backwards.");
@@ -1164,7 +1169,7 @@ public void OnPluginStart()
 	g_hCvarBusterExplodeMagnitude = CreateConVar("tank_buster_explode_damage", "2500", "Damage dealt inside explosion radius.");
 	g_hCvarBusterExplodeRadius = CreateConVar("tank_buster_explode_radius", "300", "Explosion radius.");
 	g_hCvarBusterTriggerTank = CreateConVar("tank_buster_trigger_tank", "2500", "A sentry buster can spawn when this damage is dealt to the tank by a sentry.");
-	g_hCvarBusterTriggerGiant = CreateConVar("tank_buster_trigger_giant", "2000", "A sentry buster can spawn when this damage is dealt to the giant by a sentry.");
+	g_hCvarBusterTriggerGiant = CreateConVar("tank_buster_trigger_giant", "1800", "A sentry buster can spawn when this damage is dealt to the giant by a sentry.");
 	g_hCvarBusterTriggerRobots = CreateConVar("tank_buster_trigger_robot", "6", "A sentry buster can spawn after the specified robot kills.");
 	g_hCvarBusterTimeWarn = CreateConVar("tank_buster_time_warn", "3.0", "Time (seconds) duration where a player will be warned that he will become a sentry buster and have a chance to pass.");
 	g_hCvarBusterTriggerTankPlr = CreateConVar("tank_buster_trigger_tank_plr", "3250", "A sentry buster can spawn when this damage is dealt to the tank by a sentry in plr_ maps.");
@@ -1459,6 +1464,9 @@ public void OnMapStart()
 	}else if(strcmp(strMap, "pl_barnblitz", false) == 0)
 	{
 		g_nMapHack = MapHack_Barnblitz;
+	}else if(strcmp(strMap, "pl_snowycoast", false) == 0)
+	{
+		g_nMapHack = MapHack_SnowyCoast;
 	}
 
 	g_nGameMode = GameMode_Unknown;
@@ -1499,6 +1507,8 @@ public void OnMapStart()
 	PrecacheSound(SOUND_GIANT_RAGE_DEATH);
 	PrecacheSound(SOUND_TELEPORT);
 	PrecacheSound(SOUND_TANK_RANKUP);
+
+	for(int i=0; i<sizeof(g_soundBombFinalWarning); i++) PrecacheSound(g_soundBombFinalWarning[i]);
 
 	for(int i=0; i<sizeof(g_strSoundRobotFootsteps); i++)
 	{
@@ -3056,10 +3066,10 @@ void RaceTimer_Create()
 	Bomb_KillTimer();
 	g_numGiantWave++;
 
-	int iTimerLength = RoundToNearest(config.LookupFloat(g_hCvarRaceTimeGiantStart) * 60.0);			
+	int iTimerLength = RoundToNearest(config.LookupFloat(g_hCvarRaceTimeGiantStart)*60.0);			
 	if(g_numGiantWave >= 2)
 	{
-		iTimerLength = RoundToNearest(config.LookupInt(g_hCvarRaceTimeWave)*60.0);
+		iTimerLength = RoundToNearest(config.LookupFloat(g_hCvarRaceTimeWave)*60.0);
 	}
 
 	if(iTimerLength > 0)
@@ -3692,7 +3702,7 @@ int Tank_FindTrackTrain(int team)
 			DispatchKeyValue(iTrackTrain, "solid", "0");
 			SetEntityRenderMode(iTrackTrain, RENDER_NONE); // Gets rid of outline
 			SetEntityRenderColor(iTrackTrain, _, _, _, 0); // Makes the model invisible
-			
+
 			// Set the max cart/tank speed
 			SetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed", config.LookupFloat(g_hCvarMaxSpeed));
 			
@@ -9582,7 +9592,17 @@ void Bomb_Think(int iBomb)
 
 		if(bIsGoal && !g_bBombPlayedNearHatch)
 		{
-			BroadcastSoundToTeam(TFTeam_Spectator, "Announcer.MVM_Bomb_Alert_Near_Hatch");
+			BroadcastSoundToTeam(TFTeam_Red, "Announcer.MVM_Bomb_Alert_Near_Hatch");
+
+			int random = GetRandomInt(0, sizeof(g_soundBombFinalWarning)-1);
+			for(int i=1; i<=MaxClients; i++)
+			{
+				if(IsClientInGame(i) && GetClientTeam(i) != TFTeam_Red)
+				{
+					g_overrideSound = true; // This sound is blocked in BombDeploy.
+					EmitSoundToClient(i, g_soundBombFinalWarning[random]);
+				}
+			}
 
 			g_bBombPlayedNearHatch = true;
 		}else{
@@ -9882,7 +9902,7 @@ void Bomb_Think(int iBomb)
 							
 							// Cart the start moving on its own.
 							Train_Move(team, 1.0);
-							SetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed", 500.0);
+							SetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed", config.LookupFloat(g_hCvarBombWinSpeed));
 							SetVariantFloat(1.0);
 							AcceptEntityInput(iTrackTrain, "StartForward");
 						}
@@ -10965,6 +10985,25 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 				}
 			}
 		}
+	}else if(g_nMapHack == MapHack_SnowyCoast)
+	{
+		switch(iIndexCP)
+		{
+			case 2:
+			{
+#if defined DEBUG
+				PrintToServer("(Output_OnBlueCapture) Third point captured on Snowycoast, opening big doors..");
+#endif
+				int relay = Entity_FindEntityByName("final_gate_open", "logic_relay");
+				if(relay != -1)
+				{
+					AcceptEntityInput(relay, "Trigger");
+					AcceptEntityInput(relay, "Disable");
+
+					CreateTimer(0.1, Timer_SnowyCoastDoors, g_iRefTrainWatcher[TFTeam_Blue], TIMER_FLAG_NO_MAPCHANGE);
+				}
+			}
+		}
 	}
 
 	// Swap the boring old RED hologram with the robot carrier hologram.
@@ -10972,6 +11011,21 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 	Path_GetOrientation(iPathTrack, flAng);
 	SetEntityModel(iControlPoint, MODEL_ROBOT_HOLOGRAM);
 	TeleportEntity(iControlPoint, NULL_VECTOR, flAng, NULL_VECTOR);
+}
+
+public Action Timer_SnowyCoastDoors(Handle timer, int ref)
+{
+	if(!g_bIsRoundStarted) return Plugin_Handled;
+
+	// Cancel out the final_gate_open relay setting SetSpeedForwardModifier to 0.01 so the tank does not stop.
+	int watcher = EntRefToEntIndex(ref);
+	if(watcher > MaxClients)
+	{
+		SetVariantFloat(1.0);
+		AcceptEntityInput(watcher, "SetSpeedForwardModifier");
+	}
+
+	return Plugin_Handled;
 }
 
 public void Event_BuildObject(Handle hEvent, const char[] strEventName, bool bDontBroadcast)
@@ -14873,24 +14927,34 @@ int Tank_PrecacheModel(const char[] model)
 	return 0;
 }
 
-public void Output_TeamControlPointRound_OnStart(const char[] output, int round, int activator, float delay)
+public void Output_TeamControlPointRound_OnStart(const char[] output, int caller, int activator, float delay)
 {
 	if(!g_bEnabled) return;
 
 #if defined DEBUG
-	PrintToServer("(Output_TeamControlPointRound_OnStart) caller: %d activator: %d delay: %0.1f!", round, activator, delay);
+	char callerClass[32];
+	GetEdictClassname(caller, callerClass, sizeof(callerClass));
+	PrintToServer("(Output_TeamControlPointRound_OnStart) caller: %d(%s) activator: %d delay: %0.1f!", caller, callerClass, activator, delay);
 #endif
 
 	// Save a reference of the active team_control_point_round entity.
-	g_iRefRoundControlPoint = EntIndexToEntRef(round);
+	if(caller > MaxClients)
+	{
+		char className[32];
+		GetEdictClassname(caller, className, sizeof(className));	
+		if(strcmp(className, "team_control_point_round") == 0)
+		{
+			g_iRefRoundControlPoint = EntIndexToEntRef(caller);
+		}
+	}
 }
 
-public void Output_TeamControlPointRound_OnEnd(const char[] output, int round, int activator, float delay)
+public void Output_TeamControlPointRound_OnEnd(const char[] output, int caller, int activator, float delay)
 {
 	if(!g_bEnabled) return;
 
 #if defined DEBUG
-	PrintToServer("(Output_TeamControlPointRound_OnEnd) caller: %d activator: %d delay: %0.1f!", round, activator, delay);
+	PrintToServer("(Output_TeamControlPointRound_OnEnd) caller: %d activator: %d delay: %0.1f!", caller, activator, delay);
 #endif
 
 	g_iRefRoundControlPoint = 0;

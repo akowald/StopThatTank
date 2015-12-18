@@ -746,11 +746,12 @@ public void Config_LoadPropSection(KeyValues kv, const char[] sectionName)
 							kv.GetString("skin", skin, sizeof(skin), "-1");
 
 							// Spawn the prop
-							int prop = CreateEntityByName("prop_dynamic");
+							int prop = CreateEntityByName("prop_dynamic_override");
 							if(prop > MaxClients)
 							{
-								DispatchKeyValue(prop, "model", bufferName);
 								DispatchKeyValue(prop, "solid", "6");
+								SetEntProp(prop, Prop_Send, "m_fEffects", EF_NOSHADOW|EF_NORECEIVESHADOW);
+								DispatchKeyValue(prop, "model", bufferName);
 								if(strcmp(skin, "-1") != 0) DispatchKeyValue(prop, "skin", skin);
 
 								DispatchSpawn(prop);
