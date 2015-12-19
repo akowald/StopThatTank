@@ -225,6 +225,7 @@
 #define ITEM_KAZOTSKY_KICK 1157
 #define ITEM_BOX_TROT 30615
 #define ITEM_ZOOMIN_BROOM 30672
+#define ITEM_MANNROBICS 1162
 
 #define ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED 140
 #define ATTRIB_MAXAMMO_PRIMARY_INCREASED 76
@@ -5134,7 +5135,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 					}
 				}
 
-				// Prevent the crash knockback that occurs to the giant from the Loose Cannon.
+				
 				if(inflictor > MaxClients && strcmp(inflictorClass, "tf_projectile_pipe") == 0)
 				{
 					int iOrigLauncher = GetEntPropEnt(inflictor, Prop_Send, "m_hOriginalLauncher");
@@ -5143,24 +5144,30 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 #if defined DEBUG
 						PrintToServer("(Player_OnTakeDamage) Giant %N was hit by the loose cannon..", victim);
 #endif
+						// If the projectile is reflected, cap the damage that can be done to the giant.
 						int owner = GetEntPropEnt(iOrigLauncher, Prop_Send, "m_hOwner");
 						if(owner >= 1 && owner <= MaxClients && victim == owner)
 						{
-							// If the projectile is reflected, cap the damage that can be done to the giant.
 							float flDamageCap = config.LookupFloat(g_hCvarSirNukesCap);
 							if(damagetype & DMG_CRIT) flDamageCap = config.LookupFloat(g_hCvarSirNukesCap) / 3.0;
 
 							if(damage > flDamageCap) damage = flDamageCap;
 						}
 
-						damagetype |= DMG_PREVENT_PHYSICS_FORCE;
-						float vel[3];
-						vel[0] = GetRandomFloat(-100.0, 100.0);
-						vel[1] = GetRandomFloat(-100.0, 100.0);
-						vel[2] = 300.0;
-						TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, vel);
+						// See notes above on how knockback is canceled out.
+						if(damagecustom == TF_CUSTOM_CANNONBALL_PUSH && !TF2_IsPlayerInCondition(victim, TFCond_MegaHeal))
+						{
+							// Giant was hit directly with a cannon ball. Substitute knockback with our own.
+							g_hitWithScorchShot = GetClientUserId(victim);
 
-						return Plugin_Changed;
+							float vel[3];
+							vel[0] = GetRandomFloat(-100.0, 100.0);
+							vel[1] = GetRandomFloat(-100.0, 100.0);
+							vel[2] = 300.0;
+							TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, vel);
+
+							TF2_AddCondition(victim, TFCond_MegaHeal, 0.01);
+						}
 					}
 				}
 			}
@@ -7700,7 +7707,7 @@ public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLAT
 		}
 	}
 
-	if(hitWithScorch > 0 && strncmp(sample, "physics/rubber/rubber_tire_impact_bullet", 40) == 0)
+	if(hitWithScorch > 0 && (strncmp(sample, "physics/rubber/rubber_tire_impact_bullet", 40) == 0 || strncmp(sample, "weapons/loose_cannon_ball_impact.wav", 36) == 0))
 	{
 		int giant = GetClientOfUserId(hitWithScorch);
 		if(giant >= 1 && giant <= MaxClients && IsClientInGame(giant) && IsPlayerAlive(giant) && GetEntProp(giant, Prop_Send, "m_bIsMiniBoss"))
@@ -7851,31 +7858,31 @@ public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLAT
 					return Plugin_Changed;
 				}
 			}
+		}
+	}
+
+	// Hook weapon sounds for giants.
+	if(entity >= 1 && entity <= MaxClients && GetEntProp(entity, Prop_Send, "m_bIsMiniBoss"))
+	{
+		if(strcmp(sample, ")weapons/rocket_shoot.wav") == 0)
+		{
+			EmitSoundToAll(SOUND_GIANT_ROCKET, entity, 1, _, _, 1.0);
 			
-			// Hook weapon sounds for giants
-			if(GetEntProp(entity, Prop_Send, "m_bIsMiniBoss"))
-			{
-				if(strcmp(sample, ")weapons/rocket_shoot.wav") == 0)
-				{
-					EmitSoundToAll(SOUND_GIANT_ROCKET, entity, 1, _, _, 1.0);
-					
-					return Plugin_Stop;
-				}else if(strcmp(sample, ")weapons/rocket_shoot_crit.wav") == 0)
-				{
-					EmitSoundToAll(SOUND_GIANT_ROCKET_CRIT, entity, 1, _, _, 1.0);
-					
-					return Plugin_Stop;				
-				}else if(strcmp(sample, ")weapons/grenade_launcher_shoot.wav") == 0 || strcmp(sample, ")weapons/grenade_launcher_shoot_crit.wav") == 0)
-				{
-					EmitSoundToAll(SOUND_GIANT_GRENADE, entity, 1, _, _, 1.0);
-					
-					return Plugin_Stop;
-				}else if(strcmp(sample, ")weapons/bow_shoot_pull.wav") == 0)
-				{
-					pitch = 100;
-					return Plugin_Changed;
-				}
-			}
+			return Plugin_Stop;
+		}else if(strcmp(sample, ")weapons/rocket_shoot_crit.wav") == 0)
+		{
+			EmitSoundToAll(SOUND_GIANT_ROCKET_CRIT, entity, 1, _, _, 1.0);
+			
+			return Plugin_Stop;				
+		}else if(strcmp(sample, ")weapons/grenade_launcher_shoot.wav") == 0 || strcmp(sample, ")weapons/grenade_launcher_shoot_crit.wav") == 0)
+		{
+			EmitSoundToAll(SOUND_GIANT_GRENADE, entity, 1, _, _, 1.0);
+			
+			return Plugin_Stop;
+		}else if(strcmp(sample, ")weapons/bow_shoot_pull.wav") == 0)
+		{
+			pitch = 100;
+			return Plugin_Changed;
 		}
 	}
 
@@ -10853,7 +10860,8 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "Nov-28: Added transparent Tanks on Setup.");
+	DrawPanelText(hPanel, "Dec-18: Added support for pl_snowycoast.");
+	//DrawPanelText(hPanel, "Nov-28: Added transparent Tanks on Setup.");
 	//DrawPanelText(hPanel, "Nov-1: Added Hellstone support!");
 	if(GetConVarBool(g_hCvarOfficialServer))
 	{
@@ -11934,7 +11942,7 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 				{
 					switch(GetEntProp(client, Prop_Send, "m_iTauntItemDefIndex"))
 					{
-						case ITEM_CONGA,ITEM_KAZOTSKY_KICK:
+						case ITEM_CONGA,ITEM_KAZOTSKY_KICK,ITEM_MANNROBICS:
 						{
 							SetEntPropFloat(client, Prop_Send, "m_flCurrentTauntMoveSpeed", 50.0);
 							SetEntProp(client, Prop_Send, "m_bAllowMoveDuringTaunt", true);
