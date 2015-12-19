@@ -2115,8 +2115,15 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 					int secondary = GetPlayerWeaponSlot(client, WeaponSlot_Secondary);
 					if(secondary > MaxClients && GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon") == secondary)
 					{
-						// We choose this sequence because it is longer than Stand_PRIMARY
-						SDK_PlaySpecificSequence(client, "Stand_SECONDARY");
+						// Do not override the bomb deploy animation.
+						bool planting = false;
+						if(g_nGameMode == GameMode_BombDeploy && g_iBombPlayerPlanting > 0 && client == GetClientOfUserId(g_iBombPlayerPlanting))
+						{
+							planting = true;
+						}
+
+						// We chose this sequence because it is longer than Stand_PRIMARY.
+						if(!planting) SDK_PlaySpecificSequence(client, "Stand_SECONDARY");
 					}
 				}
 
@@ -2371,6 +2378,18 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		}
 	}
 
+	// Find BLUE's last path_track
+	if(Tank_FindPathGoal(TFTeam_Blue) <= MaxClients)
+	{
+		LogMessage("(Event_RoundActive) Failed to find BLUE's path_track goal!");
+	}
+
+	// Find RED's last path_track
+	if(g_nGameMode == GameMode_Race && Tank_FindPathGoal(TFTeam_Red) <= MaxClients)
+	{
+		LogMessage("(Event_RoundActive) Failed to find RED's path_track goal!");
+	}
+
 	switch(g_nMapHack)
 	{
 		case MapHack_Frontier:
@@ -2434,26 +2453,6 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 				}
 			}
 
-			/*
-			// Teleport the blu and red func_tracktrain entities into their starting position
-			int iTrain = EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]);
-			if(iTrain > MaxClients)
-			{
-				SetVariantFloat(0.0);
-				AcceptEntityInput(iTrain, "SetSpeed");
-				SetVariantString("plr_blu_pathC_start3");
-				AcceptEntityInput(iTrain, "TeleportToPathTrack");
-			}
-			iTrain = EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Red]);
-			if(iTrain > MaxClients)
-			{
-				SetVariantFloat(0.0);
-				AcceptEntityInput(iTrain, "SetSpeed");
-				SetVariantString("plr_red_pathC_start3");
-				AcceptEntityInput(iTrain, "TeleportToPathTrack");
-			}
-			*/
-
 			// Disable the hell gates relay so we can trigger it whenever we want.
 			int relay = Entity_FindEntityByName(HELL_GATES_TARGETNAME, "logic_relay");
 			if(relay != -1)
@@ -2484,6 +2483,22 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 #endif
 				// This triggers hurts players that get hit by the front of the train
 				SDKHook(trigger, SDKHook_StartTouch, CactusCanyon_TrainTouch);
+			}
+		}
+		case MapHack_Pipeline:
+		{
+			// Remove the first set of uphill paths near the start on stage 3 for game balance.
+			static char paths[][] = {"red_path_c_3", "red_path_c_4", "red_path_c_5", "red_path_c_6",
+										"blue_path_c_3", "blue_path_c_4", "blue_path_c_5", "blue_path_c_6",};
+			for(int i=0; i<sizeof(paths); i++)
+			{
+				int path = Entity_FindEntityByName(paths[i], "path_track");
+				if(path > MaxClients)
+				{
+					int flags = GetEntProp(path, Prop_Data, "m_spawnflags");
+					flags &= ~PATH_UPHILL;
+					SetEntProp(path, Prop_Data, "m_spawnflags", flags);
+				}
 			}
 		}
 	}
@@ -2519,18 +2534,6 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 	if(g_nGameMode == GameMode_Race && Tank_HookCaptureTrigger(TFTeam_Red) <= MaxClients)
 	{
 		LogMessage("(Event_RoundActive) Failed to find RED's capture trigger!");
-	}
-
-	// Find BLUE's last path_track
-	if(Tank_FindPathGoal(TFTeam_Blue) <= MaxClients)
-	{
-		LogMessage("(Event_RoundActive) Failed to find BLUE's path_track goal!");
-	}
-
-	// Find RED's last path_track
-	if(g_nGameMode == GameMode_Race && Tank_FindPathGoal(TFTeam_Red) <= MaxClients)
-	{
-		LogMessage("(Event_RoundActive) Failed to find RED's path_track goal!");
 	}
 	
 	// Check for any map-related config settings.
@@ -9757,7 +9760,7 @@ void Bomb_Think(int iBomb)
 	{
 		// When a player stops transmitting UserCmds they become stuck and cannot be moved by other players.
 		// This means that a player can deploy, pull their network cord, and get an easy win.
-		// If the player stops transmitting updates during while deploy, cancel it.
+		// If the player stops transmitting updates during deploy, cancel it.
 		bool lostConnection = false;
 		if(!IsFakeClient(client) && g_lastClientTick[client] != 0.0 && GetEngineTime() - g_lastClientTick[client] > 0.5)
 		{
