@@ -13591,7 +13591,10 @@ void Settings_Load(int client)
 	char cookie[12];
 
 	GetClientCookie(client, g_cookieInfoPanel, cookie, sizeof(cookie));
-	g_settings[client][g_settingsShowInfoPanel] = StringToInt(cookie);
+	if(strlen(cookie) > 0)
+	{
+		g_settings[client][g_settingsShowInfoPanel] = StringToInt(cookie);
+	}
 }
 
 bool Settings_ShouldShowGiantInfoPanel(int client)
@@ -13609,7 +13612,7 @@ bool Settings_ShouldShowGiantInfoPanel(int client)
 void Settings_Clear(int client)
 {
 	// Set the default value for each setting here..
-	g_settings[client][g_settingsShowInfoPanel] = ShowInfoPanel_Always;
+	g_settings[client][g_settingsShowInfoPanel] = ShowInfoPanel_PayloadOnly;
 }
 
 public void Settings_ItemSelected(int client, CookieMenuAction action, any info, char[] buffer, int maxlen)
