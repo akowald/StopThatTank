@@ -60,6 +60,15 @@ enum
 };
 #define ARRAY_GIANTSPAWN_SIZE 8
 
+ArrayList g_captureSize;
+enum
+{
+	CaptureSizeArray_PointIndex=0,
+	CaptureSizeArray_Mins,
+	CaptureSizeArray_Maxs=4
+};
+#define ARRAY_CAPTURESIZE_SIZE 7
+
 methodmap BlockedCosmetics < StringMap
 {
 	public BlockedCosmetics()
@@ -250,6 +259,7 @@ methodmap Config < StringMap
 		g_cartModels.Clear(); // Clear the list of cart models.
 		g_giantSpawns.Clear(); // Clear the list of giant spawn overrides.
 		g_customProps.Clear(); // Clear the custom props spawned into the map.
+		g_captureSize.Clear(); // Clear the list of bomb capture area size overrides.
 
 		char configPath[PLATFORM_MAX_PATH];
 		char map[PLATFORM_MAX_PATH];
@@ -613,6 +623,35 @@ public void Config_LoadSection(KeyValues kv, const char[] sectionName, const cha
 							g_giantSpawns.PushArray(giantSpawn, sizeof(giantSpawn));
 #if defined DEBUG
 							PrintToServer("(Config_LoadSection) Added giant spawn, team = %d, index = %d. Length so far = %d!", team, index, g_giantSpawns.Length);
+#endif
+							continue;
+						}
+
+						if(strncmp(bufferName, "capture_size", 12, false) == 0) // User wants to override the size of the bomb capture area.
+						{
+							int index = kv.GetNum("index", -2);
+							if(index < -1 || index == 0 || index > MAX_LINKS)
+							{
+								LogMessage("Config error. Section \"%s\": Malformed capture_size index. Use a non-zero value between -1 and %d (inclusive).", sectionName, MAX_LINKS);
+								continue;
+							}
+
+							float mins[3];
+							float maxs[3];
+							kv.GetVector("mins", mins);
+							kv.GetVector("maxs", maxs);
+
+							int captureSize[ARRAY_CAPTURESIZE_SIZE];
+							captureSize[CaptureSizeArray_PointIndex] = index;
+							for(int i=0; i<3; i++)
+							{
+								captureSize[CaptureSizeArray_Mins+i] = view_as<int>(mins[i]);
+								captureSize[CaptureSizeArray_Maxs+i] = view_as<int>(maxs[i]);
+							}
+
+							g_captureSize.PushArray(captureSize, sizeof(captureSize));
+#if defined DEBUG
+							PrintToServer("(Config_LoadSection) Added capture size, index = %d. Length so far = %d!", index, g_captureSize.Length);
 #endif
 							continue;
 						}

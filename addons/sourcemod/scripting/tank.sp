@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5.1"
+#define PLUGIN_VERSION 				"1.5.2"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -430,8 +430,6 @@ Handle g_hCvarRespawnGiant;
 Handle g_hCvarRespawnRace;
 Handle g_hCvarGiantForce;
 Handle g_hCvarBombMoveSpeed;
-Handle g_hCvarBombCaptureDistance;
-Handle g_hCvarBombCaptureDistanceHeight;
 Handle g_hCvarBombCaptureRate;
 Handle g_hCvarBombTimeAdd;
 Handle g_hCvarBombTimePenalty;
@@ -528,6 +526,7 @@ Handle g_hCvarPointsForDeploy;
 Handle g_hCvarGiantScaleHealing;
 Handle g_hCvarJarateOnHitTime;
 Handle g_hCvarBombWinSpeed;
+Handle g_hCvarBombCapAreaSize;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -1121,8 +1120,7 @@ public void OnPluginStart()
 	g_hCvarBombDistanceWarn = CreateConVar("tank_bomb_distance_warn", "650.0", "Distance the bomb must be from the goal for warnings to sound.");
 	g_hCvarBombTimeDeploy = CreateConVar("tank_bomb_time_deploy", "1.9", "Seconds that it takes for a robot to deploy a bomb.");
 	g_hCvarBombMoveSpeed = CreateConVar("tank_bomb_move_speed", "0.8", "Move speed bonus for normal bomb carriers. (percentage)");
-	g_hCvarBombCaptureDistance = CreateConVar("tank_bomb_capture_distance", "175.0", "Capture area length & width for the bomb carrier.");
-	g_hCvarBombCaptureDistanceHeight = CreateConVar("tank_bomb_capture_distance_height", "125.0", "Capture area height for the bomb carrier.");
+	g_hCvarBombCapAreaSize = CreateConVar("tank_bomb_capture_size", "-175.0 -175.0 -50.0 175.0 175.0 125.0", "Define the bomb capture area size. First 3 numbers are the x,y,z mins. Last 3 numbers are the x,y,z maxs. Delimited by space.");
 	g_hCvarBombCaptureRate = CreateConVar("tank_bomb_capture_rate", "2.9", "Capture rate for robots to capture a control point with the bomb.");
 	g_hCvarBombTimeAdd = CreateConVar("tank_bomb_time_add", "60", "Time (seconds) added when a robot captures a control point with the bomb.");
 	g_hCvarBombTimePenalty = CreateConVar("tank_bomb_time_penalty", "8.0", "Time (seconds) after a bomb turns up out of bounds that it is respawned back in the game.");
@@ -1374,6 +1372,7 @@ public void OnPluginStart()
 	g_cartModels = new ArrayList(ByteCountToCells(MAXLEN_CART_PATH));
 	g_giantSpawns = new ArrayList(ARRAY_GIANTSPAWN_SIZE);
 	g_trainProps = new ArrayList(ARRAY_TRAINPROP_SIZE);
+	g_captureSize = new ArrayList(ARRAY_CAPTURESIZE_SIZE);
 }
 
 public void OnAllPluginsLoaded()
@@ -7865,7 +7864,7 @@ public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLAT
 	}
 
 	// Hook weapon sounds for giants.
-	if(entity >= 1 && entity <= MaxClients && GetEntProp(entity, Prop_Send, "m_bIsMiniBoss"))
+	if(entity >= 1 && entity <= MaxClients && IsClientInGame(entity) && GetEntProp(entity, Prop_Send, "m_bIsMiniBoss"))
 	{
 		if(strcmp(sample, ")weapons/rocket_shoot.wav") == 0)
 		{
@@ -12957,7 +12956,7 @@ int CaptureTriggers_Create(int team, int index)
 
 		float mins[3];
 		float maxs[3];
-		CaptureArea_GetSize(mins, maxs);
+		CaptureArea_GetSize(mins, maxs, index);
 
 		SetEntPropVector(iTrigger, Prop_Send, "m_vecMinsPreScaled", mins);
 		SetEntPropVector(iTrigger, Prop_Send, "m_vecMaxsPreScaled", maxs);
@@ -12994,17 +12993,53 @@ int CaptureTriggers_Create(int team, int index)
 	return -1;
 }
 
-void CaptureArea_GetSize(float mins[3], float maxs[3])
+void CaptureArea_GetSize(float mins[3], float maxs[3], int pointIndex)
 {
-	float flBoxSize = config.LookupFloat(g_hCvarBombCaptureDistance);
+	// Search for a capture_size override in stt.cfg.
+	for(int i=0,size=g_captureSize.Length; i<size; i++)
+	{
+		int captureSize[ARRAY_CAPTURESIZE_SIZE];
+		g_captureSize.GetArray(i, captureSize, sizeof(captureSize));
 
-	mins[0] = flBoxSize*-1.0;
-	mins[1] = flBoxSize*-1.0;
-	mins[2] = -50.0;
+		if(captureSize[CaptureSizeArray_PointIndex] == -1 || captureSize[CaptureSizeArray_PointIndex] == pointIndex+1)
+		{
+#if defined DEBUG
+			PrintToServer("(CaptureArea_GetSize) Overrided with index = %d!", captureSize[CaptureSizeArray_PointIndex]);
+#endif
+			for(int a=0; a<3; a++)
+			{
+				mins[a] = view_as<float>(captureSize[CaptureSizeArray_Mins+a]);
+				maxs[a] = view_as<float>(captureSize[CaptureSizeArray_Maxs+a]);
+			}
 
-	maxs[0] = flBoxSize;
-	maxs[1] = flBoxSize;
-	maxs[2] = config.LookupFloat(g_hCvarBombCaptureDistanceHeight);
+			return;
+		}
+	}
+
+	char dim[64];
+	config.LookupString(g_hCvarBombCapAreaSize, dim, sizeof(dim));
+
+	char explode[6][24];
+	if(ExplodeString(dim, " ", explode, sizeof(explode), sizeof(explode[])) == 6)
+	{
+		// Use the contents of tank_bomb_capture_size.
+		for(int i=0; i<3; i++)
+		{
+			mins[i] = StringToFloat(explode[i]);
+			maxs[i] = StringToFloat(explode[i+3]);
+		}
+	}else{
+		// Fall back on a static value.
+		LogMessage("Value of \"tank_bomb_capture_size\" cvar is formatted incorectly. Check your .cfg files!");
+
+		mins[0] = -175.0;
+		mins[1] = -175.0;
+		mins[2] = -50.0;
+
+		maxs[0] = 175.0;
+		maxs[1] = 175.0;
+		maxs[2] = 125.0;
+	}
 }
 
 int CaptureZones_Get(int team, int index)
@@ -13083,10 +13118,10 @@ int CaptureZones_Create(int team, int index)
 
 			maxs[0] = boxSize;
 			maxs[1] = boxSize;
-			maxs[2] = config.LookupFloat(g_hCvarBombCaptureDistanceHeight);
+			maxs[2] = 125.0;
 		}else{
 			// Use the same size as the trigger_capture_area's.
-			CaptureArea_GetSize(mins, maxs);
+			CaptureArea_GetSize(mins, maxs, index);
 		}
 
 		SetEntPropVector(capture, Prop_Send, "m_vecMinsPreScaled", mins);
