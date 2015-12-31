@@ -245,6 +245,7 @@
 #define ATTRIB_WEAPON_ALLOW_INSPECT 731
 #define ATTRIB_PARTICLE_INDEX 134
 #define ATTRIB_REDUCED_HEALING_FROM_MEDIC 740
+#define ATTRIB_DAMAGE_BONUS 2
 
 #define QUALITY_NORMAL 		0
 #define QUALITY_UNIQUE 		6
@@ -4902,9 +4903,11 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 	char inflictorClass[32];
 	if(inflictor >= 0) GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
 
-	// Increase knockback on victim for melee damage
+	bool overrideReturn = false;
+
 	if(attacker >= 1 && attacker <= MaxClients && g_nSpawner[attacker][g_bSpawnerEnabled] && g_nSpawner[attacker][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(attacker, Prop_Send, "m_bIsMiniBoss"))
 	{
+		// Increase knockback on victim for melee damage
 		if((Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK) || Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK_CRITS)) && weapon > MaxClients && victim >= 1 && victim <= MaxClients)
 		{
 			TFClassType classAttacker = TF2_GetPlayerClass(attacker);
@@ -4949,6 +4952,23 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 				PrintToServer("(Player_OnTakeDamage) %N was hurt by the sentry buster..", victim);
 #endif
 				g_hitBySentryBuster[victim] = true;
+			}
+		}
+
+		// Valve introduced a bug in Touch Break. The "damage bonus" attribute isn't being applied on cannon ball impacts.
+		if(Spawner_HasGiantTag(attacker, GIANTTAG_PIPE_EXPLODE_SOUND) && victim != attacker && victim >= 1 && victim <= MaxClients && IsClientInGame(victim))
+		{
+			if(weapon > MaxClients && damagecustom == TF_CUSTOM_CANNONBALL_PUSH && strcmp(inflictorClass, "tf_projectile_pipe") == 0)
+			{
+				float value;
+				if(GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex") == ITEM_LOOSE_CANNON && Tank_GetAttributeValue(weapon, ATTRIB_DAMAGE_BONUS, value))
+				{
+#if defined DEBUG
+					PrintToServer("(Player_OnTakeDamage) Giant %N had cannonball impact on another player, multiplying damage by %1.2f..", attacker, value);
+#endif
+					damage *= value;
+					overrideReturn = true;
+				}
 			}
 		}
 	}
@@ -5136,29 +5156,49 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 						}
 					}
 				}
-
 				
 				if(inflictor > MaxClients && strcmp(inflictorClass, "tf_projectile_pipe") == 0)
 				{
-					int iOrigLauncher = GetEntPropEnt(inflictor, Prop_Send, "m_hOriginalLauncher");
-					if(iOrigLauncher > MaxClients && GetEntProp(iOrigLauncher, Prop_Send, "m_iItemDefinitionIndex") == ITEM_LOOSE_CANNON)
+					int origLauncher = GetEntPropEnt(inflictor, Prop_Send, "m_hOriginalLauncher");
+					if(origLauncher > MaxClients && GetEntProp(origLauncher, Prop_Send, "m_iItemDefinitionIndex") == ITEM_LOOSE_CANNON)
 					{
 #if defined DEBUG
 						PrintToServer("(Player_OnTakeDamage) Giant %N was hit by the loose cannon..", victim);
 #endif
 						// If the projectile is reflected, cap the damage that can be done to the giant.
-						int owner = GetEntPropEnt(iOrigLauncher, Prop_Send, "m_hOwner");
+						int owner = GetEntPropEnt(origLauncher, Prop_Send, "m_hOwner");
 						if(owner >= 1 && owner <= MaxClients && victim == owner)
 						{
-							float flDamageCap = config.LookupFloat(g_hCvarSirNukesCap);
-							if(damagetype & DMG_CRIT) flDamageCap = config.LookupFloat(g_hCvarSirNukesCap) / 3.0;
+							// Valve introduced a bug in Touch Break. The "damage bonus" attribute isn't being applied on cannon ball impacts.
+							float value;
+							if(Spawner_HasGiantTag(victim, GIANTTAG_PIPE_EXPLODE_SOUND) && Tank_GetAttributeValue(origLauncher, ATTRIB_DAMAGE_BONUS, value))
+							{
+#if defined DEBUG
+								PrintToServer("(Player_OnTakeDamage) Giant %N was hit by his own cannonball, multiplying damage by %1.2f..", victim, value);
+#endif
+								damage *= value;
+								overrideReturn = true;
+							}
 
-							if(damage > flDamageCap) damage = flDamageCap;
+							float damageCap = config.LookupFloat(g_hCvarSirNukesCap);
+							if(damagetype & DMG_CRIT) damageCap = config.LookupFloat(g_hCvarSirNukesCap) / 3.0;
+
+							if(damage > damageCap)
+							{
+#if defined DEBUG
+								PrintToServer("(Player_OnTakeDamage) Capping cannonball damage done to Giant %N to: %1.2f..", victim, damageCap);
+#endif
+								damage = damageCap;
+								overrideReturn = true;
+							}
 						}
 
 						// See notes above on how knockback is canceled out.
-						if(damagecustom == TF_CUSTOM_CANNONBALL_PUSH && !TF2_IsPlayerInCondition(victim, TFCond_MegaHeal))
+						if(!TF2_IsPlayerInCondition(victim, TFCond_MegaHeal))
 						{
+#if defined DEBUG
+							PrintToServer("(Player_OnTakeDamage) Nulling out loose cannon knockback on Giant %N..", victim);
+#endif
 							// Giant was hit directly with a cannon ball. Substitute knockback with our own.
 							g_hitWithScorchShot = GetClientUserId(victim);
 
@@ -5198,6 +5238,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		}
 	}
 
+	if(overrideReturn) return Plugin_Changed;
 	return Plugin_Continue;
 }
 
