@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-//#define DEBUG
+#define DEBUG
 
 #define PLUGIN_VERSION 				"1.5.2"
 
@@ -99,6 +99,9 @@
 #define SOUND_TANK_RANKUP 		"ui/itemcrate_smash_ultrarare_short.wav"
 #define SOUND_ANNOUNCER_FINAL_STRETCH_ALLY "vo/announcer_plr_racegeneral12.mp3"
 #define SOUND_ANNOUNCER_FINAL_STRETCH_ENEMY "vo/announcer_plr_racegeneral11.mp3"
+#define SOUND_DEATHPIT_BOOST 	"misc/halloween/spell_blast_jump.wav"
+#define SOUND_SUPERSPY_HINT 	"misc/ks_tier_02_kill_02.wav"
+#define SOUND_LOOK_HERE 		"coach/coach_attack_here.wav"
 
 #define EPSILON 				0.0005
 #define TIME_SHIELD_EXPIRE		2.5
@@ -333,6 +336,12 @@ enum // Collision_Group_t in const.h
 	LAST_SHARED_COLLISION_GROUP
 };
 
+// settings for m_takedamage - from shareddefs.h
+#define	DAMAGE_NO				0
+#define DAMAGE_EVENTS_ONLY		1		// Call damage functions, but don't modify health
+#define	DAMAGE_YES				2
+#define	DAMAGE_AIM				3
+
 enum // For use with UTIL_ScreenShake.
 {
 	Shake_Start=0,
@@ -511,7 +520,6 @@ Handle g_hCvarDefaultGiantScale;
 Handle g_hCvarGoalDistance;
 Handle g_hCvarGiantHealthMultiplier;
 Handle g_hCvarDistanceSeparation;
-Handle g_hCvarLavaPush;
 Handle g_hCvarUpdatesPanel;
 Handle g_hCvarOfficialServer;
 Handle g_hCvarNavMesh;
@@ -528,6 +536,14 @@ Handle g_hCvarGiantScaleHealing;
 Handle g_hCvarJarateOnHitTime;
 Handle g_hCvarBombWinSpeed;
 Handle g_hCvarBombCapAreaSize;
+Handle g_hCvarGiantDeathpitDamage;
+Handle g_hCvarGiantDeathpitCooldown;
+Handle g_hCvarGiantDeathpitMinZ;
+Handle g_hCvarRespawnCartBehind;
+Handle g_hCvarRespawnAdvMult;
+Handle g_hCvarRespawnAdvCap;
+Handle g_hCvarRespawnAdvRunaway;
+Handle g_hCvarBombSkipDistance;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -837,6 +853,7 @@ enum
 	Annotation_BusterHintBlue,
 	Annotation_GiantSpawnedRed,
 	Annotation_GiantSpawnedBlue,
+	Annotation_BombCaptureSkipped,
 };
 
 enum eTeleporterState
@@ -880,6 +897,8 @@ int g_iParticleFetti = -1;
 int g_iSpriteBeam = -1;
 int g_iSpriteHalo = -1;
 int g_iParticleBotDeath = -1;
+int g_iParticleJumpRed = -1;
+int g_iParticleJumpBlue = -1;
 
 int g_modelRomevisionTank = -1;
 int g_modelRomevisionTrackL = -1;
@@ -928,6 +947,10 @@ int g_finalBombDeployer; // The userid of the player that deployed the bomb and 
 
 float g_timeSentryBusterDied;
 
+float g_timeGiantEnteredDeathpit[MAXPLAYERS+1];
+
+float g_timeControlPointSkipped; // Timestamp when the bomb carrier skips a control point.
+
 enum
 {
 	Interest_None=0,
@@ -963,6 +986,7 @@ enum eSpawnerStruct
 	Float:g_flSpawnerTimeSpawned, 		// Engine time when the object has been spawned
 	g_iSpawnerFlags, 					// Flags to be used when invoking Spawner_Spawn
 	g_iSpawnerExtraEnt, 				// A reference to any entity
+	bool:g_bSpawnerShownReminder, 		// Flag that a reminder has been shown.
 };
 int g_nSpawner[SPAWNER_SIZE][eSpawnerStruct];
 
@@ -1073,11 +1097,17 @@ public void OnPluginStart()
 	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "26.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.2", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
+	
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams.");
 	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU when a giant is out. Note: This will be scaled to playercount: x/24*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: x/24*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: x/24*this = final respawn time.");
 	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.5", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
+	g_hCvarRespawnCartBehind = CreateConVar("tank_respawn_cart_behind", "0.25", "A team's tank is considered behind if the difference is greater than this percentage of total track length. Set to over 1.0 to disable.");
+	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "3.0", "Respawn time multiplier per each Giant Robot advantage.");
+	g_hCvarRespawnAdvCap = CreateConVar("tank_respawn_advantage_cap", "3", "Maximum Giant Robot advantage amount that can be factored into respawn time. Set to 0 to disable.");
+	g_hCvarRespawnAdvRunaway = CreateConVar("tank_respawn_advantage_runaway", "2", "When the Giant Robot advantage is equal to or greater than this, the opposite team's respawn is reduced. Set to a really high number like 100 to disable.");
+
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
 	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.1", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
 	g_hCvarScrambleEnabled = CreateConVar("tank_scramble_enabled", "1", "0/1 - Enable or disable triggering team scrambles.");
@@ -1092,14 +1122,13 @@ public void OnPluginStart()
 	g_hCvarGoalDistance = CreateConVar("tank_goal_distance", "325.0", "When the tank reaches this distance to the goal, it will be parented to the cart.");
 	g_hCvarGiantHealthMultiplier = CreateConVar("tank_giant_health_multiplier", "1.0", "Set a giant max health multiplier that is applied to the total health of the tank. (includes overheal) 2.0 = double giant health.");
 	g_hCvarDistanceSeparation = CreateConVar("tank_distance_separation", "200.0", "The tank can be teleported to the cart if it gets this far away from the cart.");
-	g_hCvarLavaPush = CreateConVar("tank_lava_pushup", "600.0", "How much the giant should be boosted if he falls into the lava in helltower.");
 	g_hCvarUpdatesPanel = CreateConVar("tank_updates_panel", "1", "0 - never show updates panel | 1 - only show when requested by !stt in chat | 2 - show when the player first spawns");
 	g_hCvarOfficialServer = CreateConVar("tank_official_server", "0", "This turns on specific messages only for our server.");
 	g_hCvarTags = CreateConVar("tank_sv_tags", "1", "0/1 - Whether or not to attempt to set an 'stt' tag inside of sv_tags.");
 	g_hCvarTeleportStartRed = CreateConVar("tank_teleport_start_red", "", "The targetname of the path_track to teleport the cart to when the round begins. Leaving this blank will use start_node from the team_train_watcher. Set this to \"disabled\" to disable teleporting.");
 	g_hCvarTeleportStartBlue = CreateConVar("tank_teleport_start_blue", "", "The targetname of the path_track to teleport the cart to when the round begins. Leaving this blank will use start_node from the team_train_watcher. Set this to \"disabled\" to disable teleporting.");
 	g_hCvarTeleportGoal = CreateConVar("tank_teleport_goal", "", "The targetname of the path_track to teleport the cart to when the bomb is deployed. The cart will start moving forward from this position and trigger a win.");
-	
+
 	g_hCvarPointsForTank = CreateConVar("tank_points_for_tank", "2", "Scoreboard points awarded when enough damage is done to the tank.");
 	g_hCvarPointsForTankPlr = CreateConVar("tank_points_for_tank_plr", "1", "Scoreboard points awarded when enough damage is done to the tank.");
 	g_hCvarPointsForGiant = CreateConVar("tank_points_for_giant", "2", "Scoreboard points awarded when enough damage is done to the giant.");
@@ -1130,6 +1159,7 @@ public void OnPluginStart()
 	g_hCvarBombHealCooldown = CreateConVar("tank_bomb_heal_cooldown", "10.0", "Time (seconds) between dropping the bomb and picking it up that heal effects are granted.");
 	g_hCvarBombBuffsCuttoff = CreateConVar("tank_bomb_buffs_cutoff", "10", "Minimum player count required bomb carrier buffs to be activated.");
 	g_hCvarBombWinSpeed = CreateConVar("tank_bomb_win_speed", "500.0", "Speed of the payload cart when the robots deploy the bomb, winning the round.");
+	g_hCvarBombSkipDistance = CreateConVar("tank_bomb_skip_distance", "500.0", "Distance you must be to a locked control point to trigger the skipped annotation.");
 
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
 	g_hCvarGiantForce = CreateConVar("tank_giant_force", "-1", "Index of giant template to pick. (-1 = random)");
@@ -1142,6 +1172,9 @@ public void OnPluginStart()
 	g_hCvarGiantCooldownPlr = CreateConVar("tank_giant_cooldown_plr", "15.0", "Time (minutes) that must pass in order for a player to be chosen as a giant again in payload race.");
 	g_hCvarGiantGibs = CreateConVar("tank_giant_gibs", "5", "Number of gibs that spawn when a giant is destroyed. Set to 0 to spawn no gibs.");
 	g_hCvarGiantScaleHealing = CreateConVar("tank_giant_scale_healing", "1", "0/1 - Enable or disable giant healing scaling for low player counts in pl.");
+	g_hCvarGiantDeathpitDamage = CreateConVar("tank_giant_deathpit_damage", "500.0", "The amount of damage the giant should take when they fall into a death pit.");
+	g_hCvarGiantDeathpitCooldown = CreateConVar("tank_giant_deathpit_cooldown", "0.4", "The time (seconds) that must pass before the giant can be hurt/teleported again.");
+	g_hCvarGiantDeathpitMinZ = CreateConVar("tank_giant_deathpit_min_z", "500.0", "Minimum boost scaling in the Z(up) direction.");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -1157,7 +1190,7 @@ public void OnPluginStart()
 	g_hCvarRaceDamageAverage = CreateConVar("tank_race_damage_average", "9", "base + EPC * average | The average damage in the formula for each level interval.");
 	g_hCvarRaceTimeGiantStart = CreateConVar("tank_race_time_giant_start", "0.75", "Time (minutes) after tanks start moving when giant robots will spawn.");
 	g_hCvarRaceTimeIntermission = CreateConVar("tank_race_time_intermission", "0.9", "Time (minutes) after giants spawn that the tanks will move again. Set to -1.0 to disable intermission. Can't be less than 0.2.");
-	g_hCvarRaceTimeWave = CreateConVar("tank_race_time_wave", "1.0", "Time (minutes) between giant waves in payload race. The first giant spawn time is set with tank_race_time_giant_start.");
+	g_hCvarRaceTimeWave = CreateConVar("tank_race_time_wave", "0.75", "Time (minutes) between giant waves in payload race. The first giant spawn time is set with tank_race_time_giant_start.");
 	g_hCvarRaceNumWaves = CreateConVar("tank_race_num_waves", "2", "Number of giants that spawn in each payload race round.");
 	g_hCvarRaceGiantHealthMin = CreateConVar("tank_race_giant_health_min", "0.5", "Minimum percentage that giant health and overheal will be scaled to based on opposite team player count in plr_.");
 	g_hCvarRaceTimeOvertime = CreateConVar("tank_race_time_overtime", "4.0", "Time (minutes) after the final wave that overtime will begin and the cart will no longer move backwards.");
@@ -1512,6 +1545,9 @@ public void OnMapStart()
 	PrecacheSound(SOUND_GIANT_RAGE_DEATH);
 	PrecacheSound(SOUND_TELEPORT);
 	PrecacheSound(SOUND_TANK_RANKUP);
+	PrecacheSound(SOUND_DEATHPIT_BOOST);
+	PrecacheSound(SOUND_SUPERSPY_HINT);
+	PrecacheSound(SOUND_LOOK_HERE);
 
 	for(int i=0; i<sizeof(g_soundBombFinalWarning); i++) PrecacheSound(g_soundBombFinalWarning[i]);
 
@@ -1703,6 +1739,8 @@ public void OnMapStart()
 	g_iParticleFireworks[TFTeam_Blue] = Particle_GetTableIndex("utaunt_firework_teamcolor_blue");
 	g_iParticleFetti = Particle_GetTableIndex("bday_confetti");
 	g_iParticleBotDeath = Particle_GetTableIndex("bot_death");
+	g_iParticleJumpRed = Particle_GetTableIndex("spell_cast_wheel_red");
+	g_iParticleJumpBlue = Particle_GetTableIndex("spell_cast_wheel_blue");
 
 	g_iSpriteBeam = Tank_PrecacheModel("materials/sprites/laser.vmt");
 	g_iSpriteHalo = Tank_PrecacheModel("materials/sprites/halo01.vmt");
@@ -1795,6 +1833,7 @@ public void OnClientDisconnect(int client)
 	g_flTimeCashPickup[client] = 0.0;
 	g_flHasShield[client] = 0.0;
 	g_lastClientTick[client] = 0.0;
+	g_timeGiantEnteredDeathpit[client] = 0.0;
 
 	g_bBusterPassed[client] = false;
 	g_bBusterUsed[client] = false;
@@ -2050,7 +2089,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				}
 
 				// The Super Spy receives a speed and jump height bonus while cloaked.
-				if(Spawner_HasGiantTag(client, GIANTTAG_CAN_DROP_BOMB))
+				if(Spawner_HasGiantTag(client, GIANTTAG_CAN_DROP_BOMB) && class == TFClass_Spy)
 				{
 					float value;
 					if(TF2_IsPlayerInCondition(client, TFCond_Cloaked))
@@ -2083,6 +2122,18 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 						PrintToServer("(OnPlayerRunCmd) Cancelling out stun to giant %N!", client);
 #endif
 						TF2_RemoveCondition(client, TFCond_Dazed);
+					}
+				}
+
+				// Remind the Super Spy when his health is low that he can regenerate health by backstabbing.
+				if(Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALONHIT) && class == TFClass_Spy && !g_nSpawner[client][g_bSpawnerShownReminder])
+				{
+					if(float(GetClientHealth(client)) / float(SDK_GetMaxHealth(client)) < 0.5)
+					{
+						g_nSpawner[client][g_bSpawnerShownReminder] = true;
+
+						EmitSoundToClient(client, SOUND_SUPERSPY_HINT);
+						PrintCenterText(client, "%t", "Tank_Center_SuperSpyHint");
 					}
 				}
 			}
@@ -2950,7 +3001,7 @@ void Tank_SetDefaultHealth(int team)
 			SetEntProp(iTank, Prop_Data, "m_iMaxHealth", MAX_TANK_HEALTH);
 			SetEntProp(iTank, Prop_Data, "m_iHealth", MAX_TANK_HEALTH);
 
-			SetEntProp(iTank, Prop_Data, "m_takedamage", 1); // buddah
+			SetEntProp(iTank, Prop_Data, "m_takedamage", DAMAGE_EVENTS_ONLY); // buddah
 		}
 		default:
 		{
@@ -4620,6 +4671,7 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 				g_bBombGone = false;
 				g_flBombLastMessage = 0.0;
 				g_finalBombDeployer = 0;
+				g_timeControlPointSkipped = 0.0;
 				
 				DispatchKeyValue(iBomb, "GameType", "2");
 				char strTemp[50];
@@ -4911,7 +4963,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		if((Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK) || Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK_CRITS)) && weapon > MaxClients && victim >= 1 && victim <= MaxClients)
 		{
 			TFClassType classAttacker = TF2_GetPlayerClass(attacker);
-			// Determine if damage done is by the giant's melee weapon
+			// Determine if damage done is by the giant's melee weapon. (damagetype of DMG_CLUB can also indicate melee damage.)
 			int iMelee = GetPlayerWeaponSlot(attacker, WeaponSlot_Melee);
 			if(iMelee > MaxClients && iMelee == weapon && (!Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK_CRITS) || damagetype & DMG_CRIT))
 			{
@@ -4928,7 +4980,6 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 #if defined DEBUG
 				PrintToServer("(Player_OnTakeDamage) Melee damage done by giant! (damage %f) (weapon %d) (force %f %f %f)", damage, weapon, damageForce[0], damageForce[1], damageForce[2]);
 #endif
-
 				float flScale = 3.0;
 				if(GetEntProp(victim, Prop_Send, "m_bIsMiniBoss")) flScale = 2.0;
 
@@ -5022,20 +5073,23 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 			}
 		}
 
-		// Catch when the giant falls into lava in hell and bounce them back out.
-		if(g_nMapHack == MapHack_HightowerEvent && g_hellTeamWinner >= 2 && damage == 500.0 && attacker > MaxClients && attacker == inflictor && strcmp(inflictorClass, "trigger_hurt") == 0)
+		// Make death pits a little kinder to Giant Robots.
+		if(damage >= 450.0 && attacker > MaxClients && attacker == inflictor && strcmp(inflictorClass, "trigger_hurt") == 0 && (g_timeGiantEnteredDeathpit[victim] == 0.0 || GetEngineTime() - g_timeGiantEnteredDeathpit[victim] >= config.LookupFloat(g_hCvarGiantDeathpitCooldown)))
 		{
 #if defined DEBUG
-			PrintToServer("(Player_OnTakeDamage) %N hurt by lava in hell, boosting him out..", victim);
+			PrintToServer("(Player_OnTakeDamage) %N hurt by death pit, boosting him out..", victim);
 #endif
-			float vel[3];
-			vel[0] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[0]");
-			vel[1] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[1]");
-			vel[2] = GetEntPropFloat(victim, Prop_Send, "m_vecVelocity[2]");
-			float push = config.LookupFloat(g_hCvarLavaPush);
-			if(vel[2] < push) vel[2] = push;
+			float fallDamage = config.LookupFloat(g_hCvarGiantDeathpitDamage);
+			if(float(GetClientHealth(victim)) > fallDamage)
+			{
+				g_timeGiantEnteredDeathpit[victim] = GetEngineTime();
 
-			TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, vel);
+				Deathpit_Boost(victim);
+
+				damagetype |= DMG_PREVENT_PHYSICS_FORCE;
+				damage = fallDamage;
+				return Plugin_Changed;
+			}
 		}
 
 		// Cap the damage that the HHH can do against giant robots.
@@ -5370,7 +5424,7 @@ public void OnGameFrame()
 	// Recreate minigun sounds for giant heavies
 	for(int i=1; i<=MaxClients; i++)
 	{
-		if(IsClientInGame(i) && Spawner_HasGiantTag(i, GIANTTAG_MINIGUN_SOUNDS) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
+		if(Spawner_HasGiantTag(i, GIANTTAG_MINIGUN_SOUNDS) && IsClientInGame(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
 		{
 			int iMinigun = GetPlayerWeaponSlot(i, TFWeaponSlot_Primary);
 			if(iMinigun > MaxClients)
@@ -5414,67 +5468,6 @@ public void OnGameFrame()
 			}
 		}
 	}
-	
-	// Allow the giants to be ubered by the medigun
-	/*
-	for(int i=1; i<=MaxClients; i++)
-	{
-		if(IsClientInGame(i) && GetClientTeam(i) >= 2 && IsPlayerAlive(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
-		{
-			bool bCanCheck = false;
-			if(g_nGameMode == GameMode_Race)
-			{
-				// Both teams can uber their giant in plr
-				bCanCheck = true;
-			}else{
-				// If not in tank race, only uber the giant IF they are outside the bomb warn area
-				int iGoal = EntRefToEntIndex(g_iRefPathGoal[TFTeam_Blue]);
-				if(iGoal > MaxClients)
-				{
-					float flPosGoal[3];
-					GetEntPropVector(iGoal, Prop_Send, "m_vecOrigin", flPosGoal);
-					
-					float flPosGiant[3];
-					GetEntPropVector(i, Prop_Send, "m_vecOrigin", flPosGiant);
-					
-					bCanCheck = (GetVectorDistance(flPosGoal, flPosGiant) > config.LookupFloat(g_hCvarBombDistanceWarn));
-				}
-			}
-
-			if(bCanCheck)
-			{
-				// Determine if anyone is healing the giant
-				for(int a=1; a<=MaxClients; a++)
-				{
-					if(i != a && IsClientInGame(a) && GetClientTeam(a) >= 2 && IsPlayerAlive(a))
-					{
-						int iSecondary = GetPlayerWeaponSlot(a, TFWeaponSlot_Secondary);
-						if(iSecondary > MaxClients)
-						{
-							int iItemDefinition = GetEntProp(iSecondary, Prop_Send, "m_iItemDefinitionIndex");
-							static iMedigunDefs[] = {29, 211, 663, 796, 805, 885, 894, 903, 912, 961, 970};
-							for(int b=0; b<sizeof(iMedigunDefs); b++)
-							{
-								if(iItemDefinition == iMedigunDefs[b])
-								{
-									if(GetEntProp(iSecondary, Prop_Send, "m_bChargeRelease") && GetEntPropEnt(iSecondary, Prop_Send, "m_hHealingTarget") == i)
-									{
-										if(!GetEntProp(iSecondary, Prop_Send, "m_bHolstered"))
-										{
-											TF2_AddCondition(i, TFCond_UberchargedCanteen, 1.1);
-										}
-									}
-									
-									break;
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	*/
 
 	// Logic for the giant engineer teleporter
 	for(int iTeam=2; iTeam<=3; iTeam++)
@@ -8110,7 +8103,7 @@ public void OnEntityDestroyed(int entity)
 			if(GetEntPropEnt(iTank, Prop_Send, "moveparent") == entity)
 			{
 				// Give the tank godmode to prevent it from being destroyed by players at this point
-				SetEntProp(iTank, Prop_Data, "m_takedamage", 1); // Buddah
+				SetEntProp(iTank, Prop_Data, "m_takedamage", DAMAGE_EVENTS_ONLY); // Buddah
 
 				if(g_nMapHack == MapHack_Hightower || g_nMapHack == MapHack_HightowerEvent)
 				{
@@ -9057,7 +9050,13 @@ public void Output_On10SecRemaining(const char[] output, int caller, int activat
 	}
 }
 
-public Action Timer_CheckTeams(Handle hTimer)
+int abs(int num)
+{
+	if(num < 0) return num * -1;
+	return num;
+}
+
+public Action Timer_CheckTeams(Handle timer)
 {
 	if(!g_bEnabled) return Plugin_Continue;
 	
@@ -9104,16 +9103,16 @@ public Action Timer_CheckTeams(Handle hTimer)
 	float flRespawnBombRed = config.LookupFloat(g_hCvarRespawnBombRed);
 	float flRespawnRace = config.LookupFloat(g_hCvarRespawnRace);
 
-	// Get the respawn times scaled for player count.
-	flRespawnGiant = float(iPlayerCount) / 24.0 * flRespawnGiant;
-	flRespawnBombRed = float(iPlayerCount) / 24.0 * flRespawnBombRed;
-	flRespawnRace = float(iPlayerCount) / 24.0 * flRespawnRace;
-
 	// Get the minimum respawn time when scaling for player count.
 	float respawnScaleMin = config.LookupFloat(g_hCvarRespawnScaleMin);
 	float respawnGiantMin = flRespawnGiant * respawnScaleMin;
 	float respawnBombRedMin = flRespawnBombRed * respawnScaleMin;
 	float respawnRaceMin = flRespawnRace * respawnScaleMin;
+
+	// Get the respawn times scaled for player count.
+	flRespawnGiant = float(iPlayerCount) / 24.0 * flRespawnGiant;
+	flRespawnBombRed = float(iPlayerCount) / 24.0 * flRespawnBombRed;
+	flRespawnRace = float(iPlayerCount) / 24.0 * flRespawnRace;
 
 	// Enforce a minimum respawn time for the scaled respawn times.
 	if(flRespawnGiant < respawnGiantMin) flRespawnGiant = respawnGiantMin;
@@ -9154,7 +9153,86 @@ public Action Timer_CheckTeams(Handle hTimer)
 	if(g_nGameMode == GameMode_Race)
 	{
 		TF2_SetRespawnTime(TFTeam_Blue, flRespawnRace);
-		TF2_SetRespawnTime(TFTeam_Red, flRespawnRace);		
+		TF2_SetRespawnTime(TFTeam_Red, flRespawnRace);
+
+		// Calculate if a team's tank has fallen behind.
+		float tankProgress[MAX_TEAMS];
+		for(int team=2; team<=3; team++)
+		{
+			int watcher = EntRefToEntIndex(g_iRefTrainWatcher[team]);
+			if(watcher > MaxClients)
+			{
+				tankProgress[team] = GetEntPropFloat(watcher, Prop_Send, "m_flTotalProgress");
+			}
+		}
+
+		int teamTankBehind = -1;
+		if(FloatAbs(tankProgress[TFTeam_Red] - tankProgress[TFTeam_Blue]) > config.LookupFloat(g_hCvarRespawnCartBehind))
+		{
+			teamTankBehind = (tankProgress[TFTeam_Red] < tankProgress[TFTeam_Blue]) ? TFTeam_Red : TFTeam_Blue;
+		}
+
+		// Calculate if a team has a Giant Robot advantage.
+		int numGiants[MAX_TEAMS];
+		for(int i=1; i<=MaxClients; i++)
+		{
+			if(IsClientInGame(i) && IsPlayerAlive(i) && g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
+				&& GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
+			{
+				int team = GetClientTeam(i);
+				if(team >= 0 && team < MAX_TEAMS)
+				{
+					numGiants[team]++;
+				}
+			}
+		}
+
+		int teamWithAdvantage = -1;
+		int advantage = abs(numGiants[TFTeam_Red] - numGiants[TFTeam_Blue]);
+		if(advantage >= 1)
+		{
+			teamWithAdvantage = (numGiants[TFTeam_Red] > numGiants[TFTeam_Blue]) ? TFTeam_Red : TFTeam_Blue;
+		}
+		//PrintToServer("teamWithAdvantage = %d  teamTankBehind = %d", teamWithAdvantage, teamTankBehind);
+
+		// Adjust respawn time by taking into account Giant Robot advantage.
+		if(teamWithAdvantage != -1)
+		{
+			if(teamWithAdvantage == teamTankBehind)
+			{
+				// Has advantage, Tank behind.
+				// Let the normal respawn time scaled for player count carry over from above!
+			}else{
+				// Has advantage, Tank NOT behind.
+				int advantageCap = config.LookupInt(g_hCvarRespawnAdvCap);
+				if(advantageCap > 0)
+				{
+					int cap = advantage;
+					if(cap > advantageCap) cap = advantageCap;
+					float advRespawnTime = config.LookupFloat(g_hCvarRespawnAdvMult) * float(cap) + flRespawnRace;
+
+					TF2_SetRespawnTime(teamWithAdvantage, advRespawnTime);
+				}
+			}
+
+			// If the advantage is great enough, give the opposite team instant respawn as a sort of "anti-spawn camp" mechanic.
+			if(advantage >= config.LookupInt(g_hCvarRespawnAdvRunaway))
+			{
+				int oppositeTeam = (teamWithAdvantage == TFTeam_Red) ? TFTeam_Blue : TFTeam_Red;
+
+				TF2_SetRespawnTime(oppositeTeam, flRespawnBase); // Near instant respawn.
+			}
+		}
+
+		// Adjust respawn time by taking into account the difference in the Tank's progress.
+		if(teamTankBehind != -1)
+		{
+			if(teamTankBehind != teamWithAdvantage)
+			{
+				// Tank behind, no advantage.
+				TF2_SetRespawnTime(teamTankBehind, flRespawnBase); // Near instant respawn.
+			}
+		}
 	}
 
 	// Faking tournament mode allows the advanced spectate gui, shows class limits in the class selection menu, shows team names on the scoreboard, and allows the players to set the team name at the start of the map.
@@ -9237,6 +9315,13 @@ public Action Timer_CheckTeams(Handle hTimer)
 			}
 		}
 	}
+
+	/*
+	int removeMe;
+	float waveRed = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", TFTeam_Red);
+	float waveBlue = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", TFTeam_Blue);
+	PrintCenterTextAll("Respawn times: RED = %1.2f BLUE = %1.2f", waveRed, waveBlue);
+	*/
 
 	return Plugin_Continue;
 }
@@ -9727,10 +9812,39 @@ void Bomb_Think(int iBomb)
 		// Send an annotation to the bomb carrier every 30s or so to let them know where to take the bomb
 		if(g_flBombLastMessage == 0.0 || GetEngineTime() - g_flBombLastMessage > 20.0)
 		{
+			g_flBombLastMessage = GetEngineTime();
+
 			// Send the player an annotation guiding them to the next control point
 			Giant_ShowGuidingAnnotation(client, team, iIndexCP);
+		}
 
-			g_flBombLastMessage = GetEngineTime();
+		// Warn the bomb carrier if they skip a control point.
+		if(g_timeControlPointSkipped == 0.0 && g_flBombLastMessage != 0.0 && GetEngineTime() - g_flBombLastMessage > 5.0)
+		{
+			float playerPos[3];
+			GetClientAbsOrigin(client, playerPos);
+
+			for(int i=iIndexCP+1; i<MAX_LINKS; i++)
+			{
+				if(g_iRefLinkedPaths[team][i] == 0 || g_iRefLinkedCPs[team][i] == 0) continue;
+
+				int nextPath = EntRefToEntIndex(g_iRefLinkedPaths[team][i]);
+				int nextCP = EntRefToEntIndex(g_iRefLinkedCPs[team][i]);
+				if(nextPath <= MaxClients || nextCP <= MaxClients) continue;
+				if(GetEntProp(nextCP, Prop_Send, "m_iTeamNum") == team) continue; // Carrier already owns this point.
+
+				float nextPos[3];
+				GetEntPropVector(nextPath, Prop_Send, "m_vecOrigin", nextPos);
+				if(GetVectorDistance(playerPos, nextPos) < config.LookupFloat(g_hCvarBombSkipDistance))
+				{
+					g_timeControlPointSkipped = GetEngineTime();
+					g_flBombLastMessage = GetEngineTime();
+
+					Bomb_ShowSkippedAnnotation(client, team, iIndexCP);
+
+					break;
+				}				
+			}
 		}
 	}
 	
@@ -10548,6 +10662,7 @@ public void Bomb_OnRobotPickup(const char[] output, int caller, int activator, f
 	if(!g_bIsRoundStarted || g_nGameMode != GameMode_BombDeploy) return;
 	
 	g_flBombLastMessage = 0.0; // Send an annotation to the player that picks up the bomb ASAP
+	g_timeControlPointSkipped = 0.0;
 
 	Timer_KillBombReturn(); // In case a player manages to pick up the bomb while it is sitting on the ground waiting to be returned
 
@@ -10734,11 +10849,7 @@ public Action Command_Test2(int client, int args)
 
 	if(args == 1)
 	{
-		//SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 0.99);
-
-		//float pos[3];
-		//GetEntPropVector(EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]), Prop_Send, "m_vecOrigin", pos);
-		//TeleportEntity(client, pos, NULL_VECTOR, NULL_VECTOR);
+		//
 	}
 
 	return Plugin_Handled;
@@ -13253,7 +13364,7 @@ public void Event_PointCaptured(Handle hEvent, const char[] strEventName, bool b
 			break;
 		}
 	}
-	if(client < 1 || client > MaxClients) return;
+	if(client < 1 || client > MaxClients || !IsClientInGame(client)) return;
 
 	BroadcastSoundToTeam(TFTeam_Spectator, "harbor.blue_whistle");
 
@@ -13289,7 +13400,7 @@ public void Event_PointCaptured(Handle hEvent, const char[] strEventName, bool b
 	int iIndexNext = iIndexCP+1;
 	if(iIndexNext >= 0 && iIndexNext < MAX_LINKS && g_iRefLinkedCPs[team][iIndexNext] != 0 && g_iRefLinkedPaths[team][iIndexNext] != 0)
 	{
-		if(g_nMapHack == MapHack_Borneo && iIndexNext == 3)
+		if(g_nMapHack == MapHack_Borneo && iIndexNext == 3 && GetEntProp(client, Prop_Send, "m_bIsMiniBoss") && GetEntPropFloat(client, Prop_Send, "m_flModelScale") >= 1.6)
 		{
 			// It is not obvious that the giant can fit through the doorway on the penultimate control point.
 			// Let the giant know to take the alternative path.
@@ -15091,8 +15202,108 @@ public void Event_PlayerHealOnHit(Event event, const char[] name, bool dontBroad
 
 	// Block the + particle from appearing over giants when they are healed.
 	int client = event.GetInt("entindex");
-	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALTHONHIT) && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALONHIT) && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 	{
 		event.BroadcastDisabled = true;
+	}
+}
+
+void Deathpit_Boost(int client)
+{
+	float pos[3];
+	GetClientAbsOrigin(client, pos);
+	float ang[3];
+	GetClientEyeAngles(client, ang);
+
+	float vel[3];
+	GetEntPropVector(client, Prop_Data, "m_vecVelocity", vel);
+
+	float zMagnitude = FloatAbs(vel[2]);
+	float xyMagnitude = zMagnitude;
+
+	float vecForward[3];
+	GetAngleVectors(ang, vecForward, NULL_VECTOR, NULL_VECTOR);
+	NormalizeVector(vecForward, vecForward);
+	vecForward[2] = 1.0;
+	for(int i=0; i<3; i++) vecForward[i] *= 1.15;
+
+	float minZMagnitude = config.LookupFloat(g_hCvarGiantDeathpitMinZ);
+	if(g_nMapHack == MapHack_HightowerEvent && g_hellTeamWinner >= 2) minZMagnitude = 500.0;
+	float maxZMagnitude = 1500.0;
+	if(zMagnitude < minZMagnitude) zMagnitude = minZMagnitude;
+	else if(zMagnitude > maxZMagnitude) zMagnitude = maxZMagnitude;
+	
+	float minXyMagnitude = 400.0;
+	float maxXyMagnitude = 1000.0;
+	if(xyMagnitude < minXyMagnitude) xyMagnitude = minXyMagnitude;
+	else if(xyMagnitude > maxXyMagnitude) xyMagnitude = maxXyMagnitude;
+
+	for(int i=0; i<2; i++) vecForward[i] *= minXyMagnitude;
+	vecForward[2] *= zMagnitude;
+
+	/*
+	int removeMe;
+	PrintToServer("============================================");
+	PrintToServer("   m_vecVelocity = %1.2f %1.2f %1.2f", vel[0], vel[1], vel[2]);
+	PrintToServer("   zMagnitude = %1.2f, xyMagnitude = %1.2f", zMagnitude, xyMagnitude);
+	PrintToServer("   vecForward = %1.2f %1.2f %1.2f", vecForward[0], vecForward[1], vecForward[2]);
+	*/
+
+	TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vecForward);
+
+	//StopSound(client, SNDCHAN_AUTO, SOUND_DEATHPIT_BOOST);
+	//EmitSoundToClient(client, SOUND_DEATHPIT_BOOST);
+	EmitSoundToAll(SOUND_DEATHPIT_BOOST, client);
+
+	int particle = -1;
+	if(GetClientTeam(client) == TFTeam_Red)
+	{
+		particle = g_iParticleJumpRed;
+	}else{
+		particle = g_iParticleJumpBlue;
+	}
+	
+	if(particle != -1)
+	{
+		TE_Particle(particle, pos);
+		TE_SendToAll();
+	}
+
+	TF2_AddCondition(client, TFCond_MegaHeal, 1.0);
+}
+
+void Bomb_ShowSkippedAnnotation(int client, int team, int indexCP)
+{
+	if(IsFakeClient(client)) return;
+	if(indexCP < 0 || indexCP >= MAX_LINKS) return;
+
+	int pathTrack = EntRefToEntIndex(g_iRefLinkedPaths[team][indexCP]);
+	if(pathTrack <= MaxClients) return;
+
+	// Send the player an annotation guiding them to the next control point.
+	Handle event = CreateEvent("show_annotation");
+	if(event != INVALID_HANDLE)
+	{
+		float pos[3];
+		GetEntPropVector(pathTrack, Prop_Send, "m_vecOrigin", pos);
+		pos[2] -= 20.0;
+
+		SetEventInt(event, "id", Annotation_BombCaptureSkipped);
+		SetEventFloat(event, "worldPosX", pos[0]);
+		SetEventFloat(event, "worldPosY", pos[1]);
+		SetEventFloat(event, "worldPosZ", pos[2]);
+		
+		SetEventInt(event, "visibilityBitfield", (1 << client)); // Only show to player carrying the bomb.
+
+		char text[256];		
+		Format(text, sizeof(text), "%T", "Tank_Annotation_SkippedControlPoint", client);
+		SetEventString(event, "text", text);
+
+		SetEventFloat(event, "lifetime", 10.0);
+		SetEventString(event, "play_sound", "misc/null.wav");
+		
+		FireEvent(event); // Frees the handle
+
+		EmitSoundToClient(client, SOUND_LOOK_HERE);
 	}
 }

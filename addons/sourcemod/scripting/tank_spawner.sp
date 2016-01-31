@@ -60,6 +60,7 @@ void Spawner_CleanupData(int client)
 	g_nSpawner[client][g_flSpawnerTimeSpawned] = 0.0;
 	g_nSpawner[client][g_iSpawnerFlags] = 0;
 	Spawner_KillEntity(client);
+	g_nSpawner[client][g_bSpawnerShownReminder] = false;
 }
 
 void Spawner_KillEntity(int client)
@@ -734,17 +735,25 @@ public Action Spawner_Timer_Active(Handle hTimer, any client)
 					Handle hEvent = CreateEvent("show_annotation");
 					if(hEvent != INVALID_HANDLE)
 					{
-						float flPosAnnotation[3];
+						float annotationPos[3];
 
-						float flPosEye[3];
-						float flAngEye[3];
-						GetClientEyePosition(client, flPosEye);
-						GetClientEyeAngles(client, flAngEye);
-						GetPositionForward(flPosEye, flAngEye, flPosAnnotation, 1100.0);
+						// Search for the closest sentry gun and place the hint annotation over it.
+						int nearestSentry = TF_GetClosestEnemySentry(client);
+						if(nearestSentry > MaxClients)
+						{
+							GetEntPropVector(nearestSentry, Prop_Send, "m_vecOrigin", annotationPos);
+						}else{
+							// Fall back on placing the annotation directly in front of the Sentry Buster's view.
+							float eyePos[3];
+							float eyeAng[3];
+							GetClientEyePosition(client, eyePos);
+							GetClientEyeAngles(client, eyeAng);
+							GetPositionForward(eyePos, eyeAng, annotationPos, 1100.0);					
+						}
 
-						SetEventFloat(hEvent, "worldPosX", flPosAnnotation[0]);
-						SetEventFloat(hEvent, "worldPosY", flPosAnnotation[1]);
-						SetEventFloat(hEvent, "worldPosZ", flPosAnnotation[2]);
+						SetEventFloat(hEvent, "worldPosX", annotationPos[0]);
+						SetEventFloat(hEvent, "worldPosY", annotationPos[1]);
+						SetEventFloat(hEvent, "worldPosZ", annotationPos[2]);
 
 						SetEventInt(hEvent, "visibilityBitfield", (1 << client));
 
@@ -878,4 +887,36 @@ public Action Timer_GiantBombPickup(Handle timer, any ref)
 	}
 
 	return Plugin_Handled;
+}
+
+/* Returns the entity index of the closest enemy sentrygun. */
+int TF_GetClosestEnemySentry(int client)
+{
+	int team = GetClientTeam(client);
+
+	float playerPos[3];
+	GetClientAbsOrigin(client, playerPos);
+
+	int closestSentry = -1;
+	float minDistance;
+
+	int sentry = MaxClients+1;
+	while((sentry = FindEntityByClassname(sentry, "obj_sentrygun")) > MaxClients)
+	{
+		if(GetEntProp(sentry, Prop_Send, "m_bWasMapPlaced")) continue;
+		if(GetEntProp(sentry, Prop_Send, "m_iTeamNum") == team) continue;
+		if(GetEntProp(sentry, Prop_Data, "m_takedamage") != DAMAGE_YES) continue;
+		if(GetEntProp(sentry, Prop_Send, "m_bPlacing")) continue;
+
+		float sentryPos[3];
+		GetEntPropVector(sentry, Prop_Send, "m_vecOrigin", sentryPos);
+		float dist = GetVectorDistance(playerPos, sentryPos);
+		if(closestSentry == -1 || dist < minDistance)
+		{
+			closestSentry = sentry;
+			minDistance = dist;
+		}
+	}
+
+	return closestSentry;
 }

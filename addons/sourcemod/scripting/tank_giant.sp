@@ -62,7 +62,7 @@
 #define GIANTTAG_CAN_DROP_BOMB				(1 << 13)
 #define GIANTTAG_AIRBLAST_KILLS_STICKIES	(1 << 14)
 #define GIANTTAG_NO_GIB 					(1 << 15)
-#define GIANTTAG_BLOCK_HEALTHONHIT 			(1 << 16)
+#define GIANTTAG_BLOCK_HEALONHIT 			(1 << 16)
 #define GIANTTAG_JARATE_ON_HIT				(1 << 17)
 
 char g_strGiantTags[][] =
@@ -1682,7 +1682,7 @@ void Giant_ShowMain(int client, bool bForceMain=false)
 	}
 	if(iCount == 0) AddMenuItem(hMenu, "", " ", ITEMDRAW_NOTEXT);
 
-	SetMenuTitle(hMenu, "%T", "Tank_Menu_Giant_Main_Title", client, iCount);
+	SetMenuTitle(hMenu, "%T", "Tank_Menu_Giant_Main_Title", client);
 	DisplayMenu(hMenu, client, MENU_TIME_FOREVER);
 }
 
