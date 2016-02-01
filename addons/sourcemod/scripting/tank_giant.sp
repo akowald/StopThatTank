@@ -64,10 +64,11 @@
 #define GIANTTAG_NO_GIB 					(1 << 15)
 #define GIANTTAG_BLOCK_HEALONHIT 			(1 << 16)
 #define GIANTTAG_JARATE_ON_HIT				(1 << 17)
+#define GIANTTAG_DONT_SPAWN_IN_HELL 		(1 << 18)
 
 char g_strGiantTags[][] =
 {
-	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit",
+	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit", "dont_spawn_in_hell",
 };
 
 enum
@@ -1011,8 +1012,13 @@ void Giant_PlayDestructionSound(int client)
 		}
 	}
 
-	// Play sounds indicating that a giant has perished
-	EmitSoundToAll(SOUND_GIANT_EXPLODE);
+	// Play sounds indicating that a giant has perished.
+	if(g_timePlayedDestructionSound == 0.0 || GetEngineTime() - g_timePlayedDestructionSound > 1.0)
+	{
+		g_timePlayedDestructionSound = GetEngineTime();
+
+		EmitSoundToAll(SOUND_GIANT_EXPLODE);
+	}
 }
 
 void Giant_Clear(int client, int reason=0)
@@ -1066,7 +1072,7 @@ void Giant_Clear(int client, int reason=0)
 		}
 	}
 
-	// Check if the giant is being tracked by the team giant object and if so clear it
+	// Check if the giant is being tracked by the team giant object and if so clear it.
 	for(int i=2; i<=3; i++)
 	{
 		if(g_nTeamGiant[i][g_bTeamGiantActive] && g_nTeamGiant[i][g_iTeamGiantQueuedUserId] != 0 && g_nTeamGiant[i][g_iTeamGiantQueuedUserId] == GetClientUserId(client))
@@ -1164,7 +1170,8 @@ int Giant_PickTemplate()
 	Handle hArray = CreateArray();
 	for(int i=0; i<MAX_NUM_TEMPLATES; i++)
 	{
-		if(g_nGiants[i][g_bGiantTemplateEnabled] && !g_nGiants[i][g_bGiantAdminOnly] && !(g_nGiants[i][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
+		if(g_nGiants[i][g_bGiantTemplateEnabled] && !g_nGiants[i][g_bGiantAdminOnly] && !(g_nGiants[i][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) 
+			&& (g_hellTeamWinner == 0 || !(g_nGiants[i][g_iGiantTags] & GIANTTAG_DONT_SPAWN_IN_HELL)))
 		{
 			PushArrayCell(hArray, i);
 		}

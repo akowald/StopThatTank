@@ -31,6 +31,12 @@
 #define SPAWNER_TIME_TANK 	3.0
 #define SPAWNER_TIME_GIANT 	2.0
 
+enum
+{
+	SpawnerReminder_SuperSpyLowHealth=0,
+	SpawnerReminder_BusterSwat,
+};
+
 int g_iNumGiantSpawns[MAX_TEAMS][MAX_NUM_TEMPLATES];
 
 void Spawner_Cleanup(int client=-1)
@@ -60,7 +66,7 @@ void Spawner_CleanupData(int client)
 	g_nSpawner[client][g_flSpawnerTimeSpawned] = 0.0;
 	g_nSpawner[client][g_iSpawnerFlags] = 0;
 	Spawner_KillEntity(client);
-	g_nSpawner[client][g_bSpawnerShownReminder] = false;
+	for(int i=0; i<SPAWNER_MAX_REMINDERS; i++) g_nSpawner[client][g_bSpawnerShownReminder][i] = false;
 }
 
 void Spawner_KillEntity(int client)

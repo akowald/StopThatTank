@@ -101,7 +101,6 @@
 #define SOUND_ANNOUNCER_FINAL_STRETCH_ENEMY "vo/announcer_plr_racegeneral11.mp3"
 #define SOUND_DEATHPIT_BOOST 	"misc/halloween/spell_blast_jump.wav"
 #define SOUND_SUPERSPY_HINT 	"misc/ks_tier_02_kill_02.wav"
-#define SOUND_LOOK_HERE 		"coach/coach_attack_here.wav"
 
 #define EPSILON 				0.0005
 #define TIME_SHIELD_EXPIRE		2.5
@@ -336,7 +335,7 @@ enum // Collision_Group_t in const.h
 	LAST_SHARED_COLLISION_GROUP
 };
 
-// settings for m_takedamage - from shareddefs.h
+// Settings for m_takedamage - from shareddefs.h
 #define	DAMAGE_NO				0
 #define DAMAGE_EVENTS_ONLY		1		// Call damage functions, but don't modify health
 #define	DAMAGE_YES				2
@@ -347,7 +346,7 @@ enum // For use with UTIL_ScreenShake.
 	Shake_Start=0,
 	Shake_Stop,
 	Shake_Amplitude,
-	Shake_Frequency
+	Shake_Frequency,
 };
 
 #define PATH_DISABLED 			(1 << 0)
@@ -544,6 +543,7 @@ Handle g_hCvarRespawnAdvMult;
 Handle g_hCvarRespawnAdvCap;
 Handle g_hCvarRespawnAdvRunaway;
 Handle g_hCvarBombSkipDistance;
+Handle g_hCvarGiantDeathpitBoost;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -854,6 +854,8 @@ enum
 	Annotation_GiantSpawnedRed,
 	Annotation_GiantSpawnedBlue,
 	Annotation_BombCaptureSkipped,
+	Annotation_GiantBusterSwat, // 16-55
+	Annotation_HellHint=56,
 };
 
 enum eTeleporterState
@@ -950,6 +952,7 @@ float g_timeSentryBusterDied;
 float g_timeGiantEnteredDeathpit[MAXPLAYERS+1];
 
 float g_timeControlPointSkipped; // Timestamp when the bomb carrier skips a control point.
+float g_timePlayedDestructionSound; // Timestamp when the giant destruction sounds are played.
 
 enum
 {
@@ -974,19 +977,20 @@ enum eSpawnerType
 #define SPAWNERFLAG_NOPUSHAWAY 		(1 << 1)
 
 #define SPAWNER_SIZE 				MAXPLAYERS+MAX_TEAMS+1
+#define SPAWNER_MAX_REMINDERS 		2
 // Structure for the giant/tank spawner that supports spawning multiple giants at a time onto the playing field.
 enum eSpawnerStruct
 {
-	bool:g_bSpawnerEnabled,				// Flag to show if spawner is enabled
-	Float:g_flSpawnerPos[3],			// Spawn position saved for later
-	Float:g_flSpawnerAng[3],			// Spawn angle saved for later
-	Handle:g_hSpawnerTimer,				// Timer used in the spawn process
-	eSpawnerType:g_nSpawnerType,		// Spawn object type: Spawn_Tank or Spawn_GiantRobot
-	g_iSpawnerGiantIndex,				// Template giant index used
-	Float:g_flSpawnerTimeSpawned, 		// Engine time when the object has been spawned
-	g_iSpawnerFlags, 					// Flags to be used when invoking Spawner_Spawn
-	g_iSpawnerExtraEnt, 				// A reference to any entity
-	bool:g_bSpawnerShownReminder, 		// Flag that a reminder has been shown.
+	bool:g_bSpawnerEnabled,									// Flag to show if spawner is enabled
+	Float:g_flSpawnerPos[3],								// Spawn position saved for later
+	Float:g_flSpawnerAng[3],								// Spawn angle saved for later
+	Handle:g_hSpawnerTimer,									// Timer used in the spawn process
+	eSpawnerType:g_nSpawnerType,							// Spawn object type: Spawn_Tank or Spawn_GiantRobot
+	g_iSpawnerGiantIndex,									// Template giant index used
+	Float:g_flSpawnerTimeSpawned, 							// Engine time when the object has been spawned
+	g_iSpawnerFlags, 										// Flags to be used when invoking Spawner_Spawn
+	g_iSpawnerExtraEnt, 									// A reference to any entity
+	bool:g_bSpawnerShownReminder[SPAWNER_MAX_REMINDERS],	// Flag that a particular reminder has been shown.
 };
 int g_nSpawner[SPAWNER_SIZE][eSpawnerStruct];
 
@@ -1175,6 +1179,7 @@ public void OnPluginStart()
 	g_hCvarGiantDeathpitDamage = CreateConVar("tank_giant_deathpit_damage", "500.0", "The amount of damage the giant should take when they fall into a death pit.");
 	g_hCvarGiantDeathpitCooldown = CreateConVar("tank_giant_deathpit_cooldown", "0.4", "The time (seconds) that must pass before the giant can be hurt/teleported again.");
 	g_hCvarGiantDeathpitMinZ = CreateConVar("tank_giant_deathpit_min_z", "500.0", "Minimum boost scaling in the Z(up) direction.");
+	g_hCvarGiantDeathpitBoost = CreateConVar("tank_giant_deathpit_boost", "1", "0/1 - Enable or disable boosting Giant Robots out of deathpits.");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -1302,6 +1307,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_resetbomb", Command_ResetBomb, ADMFLAG_GENERIC);
 	RegAdminCmd("tank_info", Command_Info, ADMFLAG_GENERIC);
 	RegAdminCmd("tank_config", Command_Config, ADMFLAG_ROOT);
+	RegAdminCmd("tank_explode", Command_Explode, ADMFLAG_ROOT);
 	RegConsoleCmd("sm_buster", Command_Buster);
 	RegConsoleCmd("sm_pass", Command_Pass);
 
@@ -1547,7 +1553,6 @@ public void OnMapStart()
 	PrecacheSound(SOUND_TANK_RANKUP);
 	PrecacheSound(SOUND_DEATHPIT_BOOST);
 	PrecacheSound(SOUND_SUPERSPY_HINT);
-	PrecacheSound(SOUND_LOOK_HERE);
 
 	for(int i=0; i<sizeof(g_soundBombFinalWarning); i++) PrecacheSound(g_soundBombFinalWarning[i]);
 
@@ -1727,6 +1732,7 @@ public void OnMapStart()
 	g_timeLastRobotDamage = 0.0;
 	g_hitWithScorchShot = 0;
 	g_iRefRoundControlPoint = 0;
+	g_timePlayedDestructionSound = 0.0;
 
 	Reanimator_Cleanup();
 	Spawner_Cleanup();
@@ -2033,7 +2039,40 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 						g_flTimeBusterTaunt[client] = 0.0;
 					}
 
-					//buttons &= ~IN_ATTACK2; // Prevents engie sentry busters from picking up their buildings and becoming civilian. Alternative to using the "cannot pick up buildings" attribute.
+					// Show a hint to Giants if a Sentry Buster gets too close letting them know they can swat them away.
+					float busterPos[3];
+					GetClientAbsOrigin(client, busterPos);
+					for(int i=1; i<=MaxClients; i++)
+					{
+						if(i != client && g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) && g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_MELEE_KNOCKBACK && !g_nSpawner[i][g_bSpawnerShownReminder][SpawnerReminder_BusterSwat]
+							&& IsClientInGame(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss") && IsPlayerAlive(i) && GetClientTeam(i) != team)
+						{
+							float giantPos[3];
+							GetClientAbsOrigin(i, giantPos);
+							if(GetVectorDistance(busterPos, giantPos) < 350.0)
+							{
+								// Sentry Buster is invading the Giant's personal space.
+								g_nSpawner[i][g_bSpawnerShownReminder][SpawnerReminder_BusterSwat] = true;
+
+								Handle event = CreateEvent("show_annotation");
+								if(event != INVALID_HANDLE)
+								{
+									SetEventInt(event, "id", Annotation_GiantBusterSwat+i-1);
+									SetEventInt(event, "follow_entindex", client);
+									SetEventInt(event, "visibilityBitfield", (1 << i)); // Only show to the one Giant.
+
+									char text[256];
+									Format(text, sizeof(text), "%T", "Tank_Annotation_Giant_SwatBuster", i);
+									SetEventString(event, "text", text);
+
+									SetEventFloat(event, "lifetime", 5.0);
+									SetEventString(event, "play_sound", "misc/null.wav");
+									
+									FireEvent(event); // Frees the handle.
+								}
+							}
+						}
+					}
 				}
 				
 				if(Spawner_HasGiantTag(client, GIANTTAG_CAN_DROP_BOMB) && g_nGameMode == GameMode_BombDeploy && class == TFClass_Spy)
@@ -2126,11 +2165,11 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				}
 
 				// Remind the Super Spy when his health is low that he can regenerate health by backstabbing.
-				if(Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALONHIT) && class == TFClass_Spy && !g_nSpawner[client][g_bSpawnerShownReminder])
+				if(Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALONHIT) && class == TFClass_Spy && !g_nSpawner[client][g_bSpawnerShownReminder][SpawnerReminder_SuperSpyLowHealth])
 				{
 					if(float(GetClientHealth(client)) / float(SDK_GetMaxHealth(client)) < 0.5)
 					{
-						g_nSpawner[client][g_bSpawnerShownReminder] = true;
+						g_nSpawner[client][g_bSpawnerShownReminder][SpawnerReminder_SuperSpyLowHealth] = true;
 
 						EmitSoundToClient(client, SOUND_SUPERSPY_HINT);
 						PrintCenterText(client, "%t", "Tank_Center_SuperSpyHint");
@@ -4187,6 +4226,10 @@ int Tank_CreateTankEntity(int team)
 	int tank = CreateEntityByName("tank_boss");
 	if(tank > MaxClients)
 	{
+		char tankName[64] = TARGETNAME_TANK_RED;
+		if(team == TFTeam_Blue) tankName = TARGETNAME_TANK_BLUE;
+		DispatchKeyValue(tank, "targetname", tankName);
+
 		// Hook the tank output OnKilled
 		HookSingleEntityOutput(tank, "OnKilled", Tank_OnKilled, true);
 		
@@ -4987,10 +5030,10 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 
 				if(damageForce[2] < 400.0) damageForce[2] = 400.0;
 				//PrintToServer("Final force: %f %f %f", damageForce[0], damageForce[1], damageForce[2]);
-
 				TeleportEntity(victim, NULL_VECTOR, NULL_VECTOR, damageForce);
+
 				damagetype |= DMG_PREVENT_PHYSICS_FORCE;
-				return Plugin_Changed;
+				overrideReturn = true;
 			}
 		}
 
@@ -5074,7 +5117,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		}
 
 		// Make death pits a little kinder to Giant Robots.
-		if(damage >= 450.0 && attacker > MaxClients && attacker == inflictor && strcmp(inflictorClass, "trigger_hurt") == 0 && (g_timeGiantEnteredDeathpit[victim] == 0.0 || GetEngineTime() - g_timeGiantEnteredDeathpit[victim] >= config.LookupFloat(g_hCvarGiantDeathpitCooldown)))
+		if(config.LookupBool(g_hCvarGiantDeathpitBoost) && damage >= 450.0 && attacker > MaxClients && attacker == inflictor && strcmp(inflictorClass, "trigger_hurt") == 0 && (g_timeGiantEnteredDeathpit[victim] == 0.0 || GetEngineTime() - g_timeGiantEnteredDeathpit[victim] >= config.LookupFloat(g_hCvarGiantDeathpitCooldown)))
 		{
 #if defined DEBUG
 			PrintToServer("(Player_OnTakeDamage) %N hurt by death pit, boosting him out..", victim);
@@ -5314,7 +5357,7 @@ public Action Player_TraceAttack(int victim, int &attacker, int &inflictor, floa
 void Tank_CleanUp()
 {
 	int iTank = MaxClients+1;
-	while((iTank = FindEntityByClassname(iTank, "tank_boss")) != -1)
+	while((iTank = FindEntityByClassname(iTank, "tank_boss")) > MaxClients)
 	{
 		AcceptEntityInput(iTank, "Kill");
 	}
@@ -8147,7 +8190,7 @@ public void OnEntityDestroyed(int entity)
 						g_bEnableMapHack[a] = false; // disengages the special lift move logic
 					}
 
-					if(g_nMapHack == MapHack_HightowerEvent)
+					if(g_nMapHack == MapHack_HightowerEvent && g_hellTeamWinner == 0)
 					{
 						g_hellTeamWinner = iTeam;
 #if defined DEBUG
@@ -8173,6 +8216,33 @@ public void OnEntityDestroyed(int entity)
 
 						Hell_KillGateTimer();
 						g_hellGateTimer = CreateTimer(config.LookupFloat(g_hCvarHellTowerTimeGate), Timer_GatesOfHell, _, TIMER_REPEAT);
+
+						// Kill off any alive Sentry Busters so they aren't teleported to hell.
+						for(int i=1; i<=MaxClients; i++)
+						{
+							if(Spawner_HasGiantTag(i, GIANTTAG_SENTRYBUSTER) && IsClientInGame(i))
+							{
+								if(GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
+								{
+									if(IsPlayerAlive(i))
+									{
+										ForcePlayerSuicide(i);
+										FakeClientCommand(i, "explode");
+									}
+
+									if(GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
+									{
+#if defined DEBUG
+										PrintToServer("(OnEntityDestroyed) Clearing giant: %N!", i);
+#endif
+										Giant_Clear(i);
+									}
+								}
+
+								Spawner_Cleanup(i);
+							}
+						}
+
 					}
 
 					// Nuke a bunch of map logic to hopefully prevent some helltower crashes
@@ -10817,8 +10887,12 @@ int Teleporter_BuildEntrance(int iBuilder, float flPos[3], int iMaxHealth)
 		SetVariantInt(iMaxHealth);
 		AcceptEntityInput(iEntrance, "SetHealth");
 
-		SetEntProp(iEntrance, Prop_Send, "m_iState", 7); // Trip the teleporter's think function to make the teleporter link up and become active
-
+		SetEntProp(iEntrance, Prop_Send, "m_iState", 7); // Trip the teleporter's think function to make the teleporter link up and become active.
+		
+		// Remove the team glow outline.
+		int flags = GetEntProp(iEntrance, Prop_Send, "m_fEffects");
+		flags |= EF_NODRAW;
+		SetEntProp(iEntrance, Prop_Send, "m_fEffects", flags);
 #if defined DEBUG
 		PrintToServer("(Teleporter_BuildEntrance) Entrance built for %N: %d!", iBuilder, iEntrance);
 #endif
@@ -10830,27 +10904,7 @@ int Teleporter_BuildEntrance(int iBuilder, float flPos[3], int iMaxHealth)
 
 public Action Command_Test2(int client, int args)
 {
-	if(args == 2)
-	{
-		// Destroys a particular team's tank. Only meant for testing purposes.
-		char strArg1[5];
-		GetCmdArg(1, strArg1, sizeof(strArg1));
-
-		char strArg2[5];
-		GetCmdArg(2, strArg2, sizeof(strArg2));
-
-		int iTank = EntRefToEntIndex(g_iRefTank[StringToInt(strArg1)]);
-		if(iTank > MaxClients)
-		{
-			SetVariantInt(MAX_TANK_HEALTH);
-			AcceptEntityInput(iTank, "RemoveHealth");
-		}
-	}
-
-	if(args == 1)
-	{
-		//
-	}
+	//
 
 	return Plugin_Handled;
 }
@@ -10895,7 +10949,6 @@ public void Event_PlayerTeam(Handle event, const char[] name, bool dontBroadcast
 			}
 		}
 		Spawner_Cleanup(client);
-
 
 		// A player switched teams so check to see if they fit in their new team.
 		int team = GetEventInt(event, "team");
@@ -11014,7 +11067,8 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "Dec-18: Added support for pl_snowycoast.");
+	DrawPanelText(hPanel, "Feb-1: Rebalances for Payload Race.");
+	//DrawPanelText(hPanel, "Dec-18: Added support for pl_snowycoast.");
 	//DrawPanelText(hPanel, "Nov-28: Added transparent Tanks on Setup.");
 	//DrawPanelText(hPanel, "Nov-1: Added Hellstone support!");
 	if(GetConVarBool(g_hCvarOfficialServer))
@@ -14116,6 +14170,29 @@ public Action Timer_GatesOfHell(Handle timer, any unused)
 #endif
 	}
 
+	// Show a helpful annotation of what to do in hell.
+	Handle event = CreateEvent("show_annotation");
+	if(event != INVALID_HANDLE)
+	{
+		float pos[3] = {-201.50, 489.36, -8329.50};
+
+		SetEventInt(event, "id", Annotation_HellHint);
+		SetEventFloat(event, "worldPosX", pos[0]);
+		SetEventFloat(event, "worldPosY", pos[1]);
+		SetEventFloat(event, "worldPosZ", pos[2]);
+		
+		SetEventInt(event, "visibilityBitfield", 0); // Show to everyone.
+
+		char text[256];		
+		Format(text, sizeof(text), "%T", "Tank_Annotation_HellHint", LANG_SERVER);
+		SetEventString(event, "text", text);
+
+		SetEventFloat(event, "lifetime", 7.0);
+		SetEventString(event, "play_sound", "misc/null.wav");
+		
+		FireEvent(event); // Frees the handle.
+	}
+
 	g_hellGateTimer = INVALID_HANDLE;
 	return Plugin_Stop;
 }
@@ -15300,10 +15377,32 @@ void Bomb_ShowSkippedAnnotation(int client, int team, int indexCP)
 		SetEventString(event, "text", text);
 
 		SetEventFloat(event, "lifetime", 10.0);
-		SetEventString(event, "play_sound", "misc/null.wav");
+		SetEventString(event, "play_sound", "coach/coach_attack_here.wav");
 		
-		FireEvent(event); // Frees the handle
-
-		EmitSoundToClient(client, SOUND_LOOK_HERE);
+		FireEvent(event); // Frees the handle.
 	}
+}
+
+public Action Command_Explode(int client, int args)
+{
+	if(!g_bEnabled) return Plugin_Continue;
+
+	if(g_nGameMode != GameMode_Tank || !g_bIsRoundStarted)
+	{
+		ReplyToCommand(client, "This command may only be used during the Tank period.");
+		return Plugin_Handled;
+	}
+
+	int tank = EntRefToEntIndex(g_iRefTank[TFTeam_Blue]);
+	if(tank > MaxClients)
+	{
+		SetVariantInt(MAX_TANK_HEALTH);
+		AcceptEntityInput(tank, "RemoveHealth");
+
+		ShowActivity2(client, "[SM] ", "%N blew up the BLU Tank.", client);
+	}else{
+		ReplyToCommand(client, "Failed to destroy tank: Find to find BLU Tank.");
+	}
+
+	return Plugin_Handled;
 }
