@@ -243,7 +243,7 @@ void MapLogic_GodmodeTank(int team, bool enable)
 		char map[PLATFORM_MAX_PATH];
 		GetMapName(map, sizeof(map));
 
-		LogMessage("Map (%s) godmode (enable %d) request failed for Tank (team %d): Tank missing!", map, enable, team);
+		LogMessage("Map (%s) godmode (enable=%d) request failed for Tank (team=%d): Tank missing!", map, enable, team);
 		return;
 	}
 

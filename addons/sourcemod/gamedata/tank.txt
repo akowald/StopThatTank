@@ -183,12 +183,6 @@
 				"linux"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x89\x1C\x24\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\x55\x0C"
 				"windows"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\xCF"
 			}
-			"Patch_DisableNavMesh"
-			{
-				"library"		"server"
-				"linux"		"\x80\x7D\x8C\x00\x75\x2A\x3D\xCE\xFA\xED\xFE\x74\x2A\x8D\x85"
-				"windows"		"\x80\x7D\xCC\x00\x0F\x85\x2A\x2A\x2A\x2A\x3D\xCE\xFA\xED\xFE\x0F\x85"
-			}
 		}
 		"Addresses"
 		{
@@ -203,10 +197,6 @@
 			"Patch_Knockback"
 			{
 				"signature"	"Patch_Knockback"
-			}
-			"Patch_DisableNavMesh"
-			{
-				"signature"	"Patch_DisableNavMesh"
 			}
 		}
 		"Offsets"
@@ -230,20 +220,10 @@
 				"linux"		"7"
 				"windows"		"7"
 			}
-			"Patch_DisableNavMesh"
-			{
-				"linux"		"4"
-				"windows"		"5"
-			}
 			"Payload_Knockback"
 			{
 				"linux"		"113" // SHORT JNO
 				"windows"		"113" // SHORT JNO
-			}
-			"Payload_DisableNavMesh"
-			{
-				"linux"		"113" // SHORT JNO
-				"windows"		"129" // NEAR JNO
 			}
 			"CBaseEntity::GetBaseEntity"
 			{

@@ -99,9 +99,8 @@ bool Spawner_HasGiantTag(int client, int iTag)
 
 void Spawner_CheckGiantSpawns(int team, int pointIndex, float pos[3], float ang[3])
 {
-	int length = g_giantSpawns.Length;
 	int giantSpawn[ARRAY_GIANTSPAWN_SIZE];
-	for(int i=0; i<length; i++)
+	for(int i=0,length=g_giantSpawns.Length; i<length; i++)
 	{
 		g_giantSpawns.GetArray(i, giantSpawn, sizeof(giantSpawn));
 
@@ -131,11 +130,25 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 	float pos[3];
 	float ang[3];
 
+	Spawner_LookupSpawnPosition(team, spawnType, pos, ang);
+
 	for(int i=0; i<3; i++)
 	{
-		g_nSpawner[client][g_flSpawnerPos][i] = 0.0;
-		g_nSpawner[client][g_flSpawnerAng][i] = 0.0;		
+		g_nSpawner[client][g_flSpawnerPos][i] = pos[i];
+		g_nSpawner[client][g_flSpawnerAng][i] = ang[i];
 	}
+}
+
+void Spawner_LookupSpawnPosition(int team, eSpawnerType spawnType, float spawnPos[3], float spawnAng[3], bool bypassDistanceCheck=false)
+{
+	for(int i=0; i<3; i++)
+	{
+		spawnPos[i] = 0.0;
+		spawnAng[i] = 0.0;		
+	}
+
+	float pos[3];
+	float ang[3];
 
 	// The tank will always spawn where the team's cart resides.
 	if(spawnType == Spawn_Tank)
@@ -148,8 +161,8 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 
 			for(int i=0; i<3; i++)
 			{
-				g_nSpawner[client][g_flSpawnerPos][i] = pos[i];
-				g_nSpawner[client][g_flSpawnerAng][i] = ang[i];
+				spawnPos[i] = pos[i];
+				spawnAng[i] = ang[i];
 			}
 		}
 
@@ -165,12 +178,13 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 		if(strcmp(targetName, "spawn_loot_winner") == 0)
 		{
 			// In an effort to give some kind of reward for winning the payload race, spawn the winning team's giant a little closer to the gate.
-			g_nSpawner[client][g_flSpawnerPos][0] = -1896.09;
-			g_nSpawner[client][g_flSpawnerPos][1] = -294.79;
-			g_nSpawner[client][g_flSpawnerPos][2] = -8384.29;
-			g_nSpawner[client][g_flSpawnerAng][0] = 0.0;
-			g_nSpawner[client][g_flSpawnerAng][1] = 173.77;
-			g_nSpawner[client][g_flSpawnerAng][2] = 0.0;
+			spawnPos[0] = -1896.09;
+			spawnPos[1] = -294.79;
+			spawnPos[2] = -8384.29;
+
+			spawnAng[0] = 0.0;
+			spawnAng[1] = 173.77;
+			spawnAng[2] = 0.0;
 
 			return;
 		}else{
@@ -197,8 +211,8 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 
 				for(int i=0; i<3; i++)
 				{
-					g_nSpawner[client][g_flSpawnerPos][i] = pos[i];
-					g_nSpawner[client][g_flSpawnerAng][i] = ang[i];
+					spawnPos[i] = pos[i];
+					spawnAng[i] = ang[i];
 				}
 
 				delete list;
@@ -233,8 +247,8 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 
 			for(int a=0; a<3; a++)
 			{
-				g_nSpawner[client][g_flSpawnerPos][a] = pos[a];
-				g_nSpawner[client][g_flSpawnerAng][a] = ang[a];
+				spawnPos[a] = pos[a];
+				spawnAng[a] = ang[a];
 			}
 
 			return;
@@ -258,7 +272,7 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 
 				float distanceToGoal = Path_GetDistance(pathTrack, pathGoal);
 				float maxDistance = config.LookupFloat(g_hCvarDistanceMove);
-				if(distanceToGoal > maxDistance)
+				if(bypassDistanceCheck || distanceToGoal > maxDistance)
 				{
 #if defined DEBUG
 					PrintToServer("(Spawner_SaveSpawnPosition) Payload race or BLU on payload: Control point #%d: Distance to goal: %0.1f/%0.1f", i, distanceToGoal, maxDistance);
@@ -269,8 +283,8 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 
 					for(int a=0; a<3; a++)
 					{
-						g_nSpawner[client][g_flSpawnerPos][a] = pos[a];
-						g_nSpawner[client][g_flSpawnerAng][a] = ang[a];
+						spawnPos[a] = pos[a];
+						spawnAng[a] = ang[a];
 					}
 
 					return;
@@ -297,8 +311,8 @@ void Spawner_SaveSpawnPosition(int client, eSpawnerType spawnType)
 
 			for(int a=0; a<3; a++)
 			{
-				g_nSpawner[client][g_flSpawnerPos][a] = pos[a];
-				g_nSpawner[client][g_flSpawnerAng][a] = ang[a];
+				spawnPos[a] = pos[a];
+				spawnAng[a] = ang[a];
 			}
 
 			return;

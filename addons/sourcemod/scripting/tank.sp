@@ -521,7 +521,6 @@ Handle g_hCvarGiantHealthMultiplier;
 Handle g_hCvarDistanceSeparation;
 Handle g_hCvarUpdatesPanel;
 Handle g_hCvarOfficialServer;
-Handle g_hCvarNavMesh;
 Handle g_hCvarTags;
 Handle g_hCvarTeleportStartRed;
 Handle g_hCvarTeleportStartBlue;
@@ -1218,7 +1217,6 @@ public void OnPluginStart()
 	g_hCvarBusterFormulaSentryMult = CreateConVar("tank_buster_formula_sentry_mult", "5.0", "Sentry multiplier part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterExemptMedicUber = CreateConVar("tank_buster_excempt_medic_uber", "0.5", "Uber built to excempt the player from becoming a sentry buster. 0.5 = 50%.");
 	g_hCvarBusterCap = CreateConVar("tank_buster_cap", "1000", "Damage cap against giant robots.");
-	g_hCvarNavMesh = CreateConVar("tank_nav_mesh", "1", "0/1 - Enable or disable the memory patch that disables TF2's nav mesh system. This fixes multiple server crashes at the cost of preventing the bots from working correctly.");
 
 	g_hCvarSuperSpyMoveSpeed = CreateConVar("tank_superspy_move_speed", "1.5", "Super spy move speed percentage while cloaked.");
 	g_hCvarSuperSpyJumpHeight = CreateConVar("tank_superspy_jump_height", "2.0", "Super spy jump height percentage while cloaked.");
@@ -1293,7 +1291,6 @@ public void OnPluginStart()
 	HookEvent("teamplay_point_captured", Event_PointCaptured);
 	HookEvent("post_inventory_application", Event_Inventory);
 	HookEvent("object_destroyed", Event_ObjectDestroyed);
-	HookEvent("server_spawn", Event_ServerSpawn);
 	HookEvent("teamplay_win_panel", Event_WinPanel, EventHookMode_Pre);
 	HookEvent("player_healonhit", Event_PlayerHealOnHit, EventHookMode_Pre);
 
@@ -4425,55 +4422,36 @@ void Train_MoveTo(int iTrackTrain, int iPathTrack)
 	SetVariantEntity(iPathTrack);
 	AcceptEntityInput(iTrackTrain, "TeleportToPathTrack");
 	
+	// If frontier, there are two func_tracktrain so we need to move the flatbed one as well
+	// The flagbed can't be moved in the bomb deployment mode, players will be stuck in it. :(
+	// If we decide to have the second tank after a giant, this plugin needs to move the cart back when the round starts
+	if(g_nMapHack == MapHack_Frontier && g_iRefTrackTrain2[TFTeam_Blue] != 0)
+	{
+		int flatbed = EntRefToEntIndex(g_iRefTrackTrain2[TFTeam_Blue]);
+		if(flatbed > MaxClients)
+		{
+			// The flatbed rides along on the previous path_track so check to see if one exists
+			//SetEntData(flatbed, Offset_GetPathOffset(flatbed), GetEntityAddress(iPathTrack));
+			
+			SetEntProp(flatbed, Prop_Send, "m_nSolidType", 0);
+			SetEntityRenderMode(flatbed, RENDER_NONE);
+
+			SetVariantEntity(iPathTrack);
+			AcceptEntityInput(flatbed, "TeleportToPathTrack");
+
+			float posFlatbed[3];
+			GetEntPropVector(iPathTrack, Prop_Send, "m_vecOrigin", posFlatbed);
+			posFlatbed[2] -= 50.0;
+
+			TeleportEntity(flatbed, posFlatbed, NULL_VECTOR, NULL_VECTOR);
+		}
+	}
+
 	int iPathPrevious = GetEntDataEnt2(iPathTrack, Offset_GetPreviousOffset(iPathTrack));
 	if(iPathPrevious > MaxClients)
 	{
 		// Disable the path previous path from where we spawned the tank so it doesn't start reversing and go somewhere
 		AcceptEntityInput(iPathPrevious, "DisablePath");
-		
-		// For now, just remove the flatbed, (giant could spawn in it) if we decide to have more than one tank in a round, we'll need to revisit this
-		/*
-		if(g_nMapHack == MapHack_Frontier && g_iRefTrackTrain2[TFTeam_Blue] != 0)
-		{
-			int iFlatBed = EntRefToEntIndex(g_iRefTrackTrain2[TFTeam_Blue]);
-			if(iFlatBed > MaxClients)
-			{
-				StopSound(iFlatBed, SNDCHAN_STATIC, "ambient/machines/train_wheels_loop1.wav");
-
-				AcceptEntityInput(iFlatBed, "Kill");
-			}
-			g_iRefTrackTrain2[TFTeam_Blue] = 0;
-		}
-		*/
-
-		// If frontier, there are two func_tracktrain so we need to move the flatbed one as well
-		// The flagbed can't be moved in the bomb deployment mode, players will be stuck in it. :(
-		// If we decide to have the second tank after a giant, this plugin needs to move the cart back when the round starts
-		if(g_nMapHack == MapHack_Frontier && g_iRefTrackTrain2[TFTeam_Blue] != 0)
-		{
-			AcceptEntityInput(iPathPrevious, "Enable");
-			int iTrain2 = EntRefToEntIndex(g_iRefTrackTrain2[TFTeam_Blue]);
-			if(iTrain2 > MaxClients)
-			{
-				// The flatbed rides along on the previous path_track so check to see if one exists
-				//SetEntData(iTrain2, Offset_GetPathOffset(iTrain2), GetEntityAddress(iPathPrevious));
-				
-				//DispatchKeyValue(iTrain2, "solid", "0");
-				SetEntProp(iTrain2, Prop_Send, "m_nSolidType", 0);
-
-				SetVariantEntity(iPathPrevious);
-				AcceptEntityInput(iTrain2, "TeleportToPathTrack");
-
-				float flPosFlatbed[3];
-				GetEntPropVector(iPathPrevious, Prop_Send, "m_vecOrigin", flPosFlatbed);
-				flPosFlatbed[2] -= 30.0;
-				float flAngFlatbed[3];
-				Path_GetOrientation(iPathPrevious, flAngFlatbed);
-				flAngFlatbed[0] = 0.0;
-				
-				TeleportEntity(iTrain2, flPosFlatbed, flAngFlatbed, NULL_VECTOR);
-			}
-		}
 	}
 	
 	// Make the bomb prop non-solid again in case it was reset from parenting for the finale
@@ -4738,13 +4716,11 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 				
 				AcceptEntityInput(iBomb, "Enable");
 				
-				int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[TFTeam_Blue]);
-				if(iTrackTrain > MaxClients)
-				{
-					float flPos[3];
-					GetEntPropVector(iTrackTrain, Prop_Send, "m_vecOrigin", flPos);
-					TeleportEntity(iBomb, flPos, NULL_VECTOR, NULL_VECTOR);
-				}
+				float pos[3];
+				float ang[3];
+				Spawner_LookupSpawnPosition(TFTeam_Blue, Spawn_GiantRobot, pos, ang, true);
+				pos[2] -= 20.0;
+				TeleportEntity(iBomb, pos, ang, NULL_VECTOR);
 				
 				HookSingleEntityOutput(iBomb, "OnReturn", Bomb_OnReturned, false);
 				HookSingleEntityOutput(iBomb, "OnDrop", Bomb_OnDropped, false);
@@ -7179,51 +7155,6 @@ void SDK_Init()
 				payload[0] = patchPayload;
 
 				g_patchKnockback = new MemoryPatch(addrKnockback+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
-			}
-		}
-	}
-
-	// This patch should fix all related nav crashes by completely disabling the nav mesh system.
-	Address addrNavMesh = GameConfGetAddress(hGamedata, "Patch_DisableNavMesh");
-	if(addrNavMesh == Address_Null)
-	{
-		LogMessage("Failed to find address: Patch_DisableNavMesh!");
-	}else{
-		int patchOffset = GameConfGetOffset(hGamedata, "Patch_DisableNavMesh");
-		if(patchOffset <= -1)
-		{
-			LogMessage("Failed to find offset: Patch_DisableNavMesh!");
-		}else{
-			int patchPayload = GameConfGetOffset(hGamedata, "Payload_DisableNavMesh");
-			if(patchPayload <= -1)
-			{
-				LogMessage("Failed to find payload: Payload_DisableNavMesh!");
-			}else{
-				int payload[1];
-				payload[0] = patchPayload;
-
-				g_patchNavMesh = new MemoryPatch(addrNavMesh+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
-			}
-		}
-	}
-
-	// The DisableNavMesh patch needs to be enabled before OnMapStart() and OnConfigsExecuted() for it to have any effect.
-	// Unfortunately, this means that any cvars set in cfg files won't be read.
-	if(Mod_CanBeLoaded())
-	{
-		if(Mod_ShouldApplyNavMeshPatch())
-		{
-			if(g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
-			{
-				LogMessage("Patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
-				g_patchNavMesh.enablePatch();
-			}
-		}else{
-			// Make sure the patch isn't applied on Helltower.
-			if(g_patchNavMesh != null && g_patchNavMesh.isEnabled())
-			{
-				LogMessage("Un-patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
-				g_patchNavMesh.disablePatch();
 			}
 		}
 	}
@@ -10325,89 +10256,43 @@ public void Bomb_OnReturned(char[] output, int caller, int activator, float dela
 	}
 }
 
-void Bomb_MoveBack(int iBomb)
+void Bomb_MoveBack(int bomb)
 {
-	int team = GetEntProp(iBomb, Prop_Send, "m_iTeamNum");
+	int team = GetEntProp(bomb, Prop_Send, "m_iTeamNum");
 
-	AcceptEntityInput(iBomb, "ForceReset");
+	AcceptEntityInput(bomb, "ForceReset");
 
 	BroadcastSoundToTeam(TFTeam_Spectator, "MVM.Warning");
 
-	int iPathTrack = 0;
+	float pos[3];
+	float ang[3];
+	Spawner_LookupSpawnPosition(team, Spawn_GiantRobot, pos, ang, true);
+	pos[2] -= 20.0;
 
-	for(int i=MAX_LINKS-1; i>=0; i--)
+	TeleportEntity(bomb, pos, ang, NULL_VECTOR);
+
+	// Show a message to the robots where the bomb has been sent back
+	Handle event = CreateEvent("show_annotation");
+	if(event != INVALID_HANDLE)
 	{
-		if(g_iRefLinkedPaths[team][i] == 0 || g_iRefLinkedCPs[team][i] == 0) continue;
-		if(g_iRefLinkedPaths[team][i] == g_iRefPathGoal[team]) continue; // Bypass the final control point
+		SetEventInt(event, "id", Annotation_BombMovedBack);
+		SetEventFloat(event, "worldPosX", pos[0]);
+		SetEventFloat(event, "worldPosY", pos[1]);
+		SetEventFloat(event, "worldPosZ", pos[2]);
+		SetEventFloat(event, "lifetime", 5.0);
+		SetEventString(event, "play_sound", "misc/null.wav");
+		
+		char text[256];
+		Format(text, sizeof(text), "%T", "Tank_Annotation_Bomb_MovedBack", LANG_SERVER);
+		SetEventString(event, "text", text);
+		
+		int iBitString;
+		for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) == team) iBitString |= (1 << i);
 
-		int iCP = EntRefToEntIndex(g_iRefLinkedCPs[team][i]);
-		int iPath = EntRefToEntIndex(g_iRefLinkedPaths[team][i]);
-
-		if(iCP <= MaxClients || iPath <= MaxClients) continue;
-
-		bool bCaptured = (GetEntProp(iCP, Prop_Send, "m_nSkin") != 0);
-		if(bCaptured)
-		{
-			iPathTrack = iPath;
-
-#if defined DEBUG
-			PrintToServer("(Bomb_MoveBack) Returning to the bomb to CP #%d: %d!", i, iCP);
-#endif
-			break;
-		}
+		SetEventInt(event, "visibilityBitfield", iBitString); // Only the robots should see this message.
+		
+		FireEvent(event); // Clears the handle.
 	}
-
-	if(iPathTrack <= MaxClients)
-	{
-		// No capped control points available so spawn the bomb at the cart start
-		iPathTrack = EntRefToEntIndex(g_iRefPathStart[team]);
-
-		// Spawn point needs to be 1 path ahead for frontier, otherwise the bomb ends up in the respawn area
-		if(g_nGameMode == GameMode_BombDeploy && g_nMapHack == MapHack_Frontier)
-		{
-			int iPathNext = GetEntDataEnt2(iPathTrack, Offset_GetNextOffset(iPathTrack));
-			if(iPathNext > MaxClients)
-			{
-				iPathTrack = iPathNext;
-			}
-		}
-#if defined DEBUG
-		PrintToServer("(Bomb_MoveBack) Returning to the bomb to start: %d!", iPathTrack);
-#endif
-	}
-
-	if(iPathTrack > MaxClients)
-	{
-		// We've found the first control point that is not captured
-		float flPos[3];
-		GetEntPropVector(iPathTrack, Prop_Send, "m_vecOrigin", flPos);
-		flPos[2] -= 20.0;
-
-		TeleportEntity(iBomb, flPos, NULL_VECTOR, NULL_VECTOR);
-
-		// Show a message to the robots where the bomb has been sent back
-		Handle hEvent = CreateEvent("show_annotation");
-		if(hEvent != INVALID_HANDLE)
-		{
-			SetEventInt(hEvent, "id", Annotation_BombMovedBack);
-			SetEventFloat(hEvent, "worldPosX", flPos[0]);
-			SetEventFloat(hEvent, "worldPosY", flPos[1]);
-			SetEventFloat(hEvent, "worldPosZ", flPos[2]);
-			SetEventFloat(hEvent, "lifetime", 5.0);
-			SetEventString(hEvent, "play_sound", "misc/null.wav");
-			
-			char text[256];
-			Format(text, sizeof(text), "%T", "Tank_Annotation_Bomb_MovedBack", LANG_SERVER);
-			SetEventString(hEvent, "text", text);
-			
-			int iBitString;
-			for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && !IsFakeClient(i) && GetClientTeam(i) == team) iBitString |= (1 << i);
-
-			SetEventInt(hEvent, "visibilityBitfield", iBitString); // Only the robots should see this message
-			
-			FireEvent(hEvent); // Clears the handle		
-		}
-	}	
 }
 
 public void Bomb_3SecRemain(char[] output, int caller, int activator, float delay)
@@ -14924,21 +14809,6 @@ void Mod_Toggle(bool enable)
 			LogMessage("Patching Knockback at 0x%X..", g_patchKnockback.Get(MemoryIndex_Address));
 			g_patchKnockback.enablePatch();
 		}
-		if(Mod_ShouldApplyNavMeshPatch())
-		{
-			if(g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
-			{
-				LogMessage("Patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
-				g_patchNavMesh.enablePatch();
-			}
-		}else{
-			// Make sure the patch isn't applied on Helltower.
-			if(g_patchNavMesh != null && g_patchNavMesh.isEnabled())
-			{
-				LogMessage("Un-patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
-				g_patchNavMesh.disablePatch();
-			}
-		}
 
 		LogMessage("Stop that Tank!: Ready");
 	}else{
@@ -14965,11 +14835,6 @@ void Mod_Toggle(bool enable)
 			LogMessage("Un-patching Knockback at 0x%X..", g_patchKnockback.Get(MemoryIndex_Address));
 			g_patchKnockback.disablePatch();
 		}
-		if(g_patchNavMesh != null && g_patchNavMesh.isEnabled())
-		{
-			LogMessage("Un-patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
-			g_patchNavMesh.disablePatch();
-		}
 
 		// User should reset cvars in server.cfg.
 
@@ -14994,53 +14859,6 @@ bool Mod_CanBeLoaded()
 	}
 
 	return false;
-}
-
-public void Event_ServerSpawn(Handle event, const char[] eventName, bool dontBroadcast)
-{
-#if defined DEBUG
-	PrintToServer("(Event_ServerSpawn)");
-#endif
-	// DisableNavMesh needs to be patched before OnMapStart() and OnConfigsExecuted() to have any effect.
-	// Unfortunately, this means that cfg values set in server.cfg won't be respected.
-	// This is the best way until I find a different way to disable the nav system or hook when the server config is executed.
-	if(Mod_CanBeLoaded())
-	{
-		if(Mod_ShouldApplyNavMeshPatch())
-		{
-			if(g_patchNavMesh != null && !g_patchNavMesh.isEnabled())
-			{
-				LogMessage("Patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
-				g_patchNavMesh.enablePatch();
-			}
-		}else{
-			// Make sure the patch isn't applied on Helltower.
-			if(g_patchNavMesh != null && g_patchNavMesh.isEnabled())
-			{
-				LogMessage("Un-patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
-				g_patchNavMesh.disablePatch();
-			}
-		}
-	}else{
-		if(g_patchNavMesh != null && g_patchNavMesh.isEnabled())
-		{
-			LogMessage("Un-patching DisableNavMesh at 0x%X..", g_patchNavMesh.Get(MemoryIndex_Address));
-			g_patchNavMesh.disablePatch();
-		}
-	}
-}
-
-bool Mod_ShouldApplyNavMeshPatch()
-{
-	if(GetConVarBool(g_hCvarNavMesh) == false) return false;
-
-	char map[PLATFORM_MAX_PATH];
-	GetMapName(map, sizeof(map));
-	
-	if(strcmp(map, "plr_hightower_event", false) == 0) return false; // Don't patch NavMesh on Helltower so skeletons will work.
-	if(strcmp(map, "pl_millstone_event", false) == 0) return false;
-
-	return true;
 }
 
 void Mod_DetermineGameMode()
