@@ -1010,8 +1010,6 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 
 	sharesys->AddNatives(myself, g_ExtensionNatives);
 
-	g_bShouldTransmitReady = false;
-
 	return true;
 }
 
