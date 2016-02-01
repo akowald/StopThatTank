@@ -198,6 +198,10 @@
 	{
 		"en"			"!!!!!! YOU WERE BACKSTABBED !!!!!"
 	}
+	"Tank_Center_SuperSpyHint"
+	{
+		"en"			"OUCH! Get back some health by backstabbing enemies."
+	}
 	"Tank_Annotation_Bomb_Spawned"
 	{
 		"en"			"A bomb has entered the area!"
@@ -246,6 +250,10 @@
 		"#format"		"{1:s}"
 		"en"			"{1} has the bomb!"
 	}
+	"Tank_Annotation_SkippedControlPoint"
+	{
+		"en"			"TURN AROUND dum-dum.\nCapture this control point first!"
+	}
 	"Tank_Menu_Settings_Title"
 	{
 		"en"			"Stop That Tank Settings"
@@ -278,8 +286,7 @@
 	}
 	"Tank_Menu_Giant_Main_Title"
 	{
-		"#format"		"{1:d}"
-		"en"			"{1} Giant Robot Templates:"
+		"en"			"Learn more about the Giants:"
 	}
 	"Tank_Menu_Giant_Desc_WillBecome"
 	{
@@ -308,5 +315,13 @@
 	{
 		"#format"		"{1:c},{2:s},{3:c}"
 		"en"			"{1} Failed to load {2}Stop that Tank!{3}. See logs for more information. The round will restart now.."
+	}
+	"Tank_Annotation_Giant_SwatBuster"
+	{
+		"en"			"Swat Busters away with your melee!"
+	}
+	"Tank_Annotation_HellHint"
+	{
+		"en"			"Fight your way to Skull Island!"
 	}
 }
