@@ -1228,7 +1228,7 @@ public void OnPluginStart()
 
 	g_hCvarHellTowerTimeGate = CreateConVar("tank_helltower_time_gates_open", "30.0", "Seconds after hell starts that the gates open in hell. This triggers the relay which will then delay an additional 29 seconds.");
 	g_hCvarGiantHHHCap = CreateConVar("tank_giant_hhh_cap", "250.0", "Damage cap for the HHH Halloween boss against the giant.");
-	g_hCvarJarateOnHitTime = CreateConVar("tank_jarate_on_hit_time", "3.0", "Seconds that jarate is applied for the jarate_on_hit giant tag.");
+	g_hCvarJarateOnHitTime = CreateConVar("tank_jarate_on_hit_time", "4.0", "Seconds that jarate is applied for the jarate_on_hit giant tag.");
 
 	g_hCvarClassLimits[TFTeam_Red][1] = CreateConVar("tank_classlimit_red_scout", "2", "Class limit for scout. Set to -1 for no limit.");
 	g_hCvarClassLimits[TFTeam_Red][2] = CreateConVar("tank_classlimit_red_sniper", "2", "Class limit for sniper. Set to -1 for no limit.");
