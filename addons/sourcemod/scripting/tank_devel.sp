@@ -101,7 +101,7 @@ public void EntityOutput_ParentRed(const char[] output, int caller, int activato
 	PrintToServer("(EntityOutput_ParentRed) caller: %d, activator: %d, delay: %f!", caller, activator, delay);
 #endif
 
-	MapLogic_ParentTank(TFTeam_Red, true);
+	MapLogic_ParentTank(TFTeam_Red);
 }
 
 public void EntityOutput_UnParentRed(const char[] output, int caller, int activator, float delay)
@@ -110,7 +110,7 @@ public void EntityOutput_UnParentRed(const char[] output, int caller, int activa
 	PrintToServer("(EntityOutput_UnParentRed) caller: %d, activator: %d, delay: %f!", caller, activator, delay);
 #endif
 
-	MapLogic_ParentTank(TFTeam_Red, false);
+	MapLogic_UnParentTank(TFTeam_Red);
 }
 
 public void EntityOutput_ParentBlue(const char[] output, int caller, int activator, float delay)
@@ -119,7 +119,7 @@ public void EntityOutput_ParentBlue(const char[] output, int caller, int activat
 	PrintToServer("(EntityOutput_ParentBlue) caller: %d, activator: %d, delay: %f!", caller, activator, delay);
 #endif
 
-	MapLogic_ParentTank(TFTeam_Blue, true);
+	MapLogic_ParentTank(TFTeam_Blue);
 }
 
 public void EntityOutput_UnParentBlue(const char[] output, int caller, int activator, float delay)
@@ -128,10 +128,56 @@ public void EntityOutput_UnParentBlue(const char[] output, int caller, int activ
 	PrintToServer("(EntityOutput_UnParentBlue) caller: %d, activator: %d, delay: %f!", caller, activator, delay);
 #endif
 
-	MapLogic_ParentTank(TFTeam_Blue, false);
+	MapLogic_UnParentTank(TFTeam_Blue);
 }
 
-void MapLogic_ParentTank(int team, bool enable)
+void MapLogic_ParentTank(int team)
+{
+	// Map is requesting to parent a team's tank.
+	if(!g_bEnabled) return;
+	
+	int tank = EntRefToEntIndex(g_iRefTank[team]);
+	if(tank <= MaxClients)
+	{
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
+		
+		LogMessage("Map (%s) parent request failed for tank (team %d): Tank missing!", map, team);
+		return;
+	}
+
+	int cart = EntRefToEntIndex(g_iRefTrackTrain[team]);
+	if(cart <= MaxClients)
+	{
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
+		
+		LogMessage("Map (%s) parent request failed for tank (team %d): Cart missing!", map, team);
+		return;
+	}
+
+	if(g_bRaceParentedForHill[team])
+	{
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
+		
+		LogMessage("Map (%s) parent request failed for tank (team %d): Under uphill path control!", map, team);
+		return;
+	}
+
+	if(GetEntPropEnt(tank, Prop_Send, "moveparent") > MaxClients)
+	{
+		char map[PLATFORM_MAX_PATH];
+		GetMapName(map, sizeof(map));
+		
+		LogMessage("Map (%s) parent request failed for tank (team %d): Tank is already parented!", map, team);
+		return;
+	}
+
+	Tank_Parent(team);
+}
+
+void MapLogic_UnParentTank(int team)
 {
 	// Map is requesting to parent a team's tank.
 	if(!g_bEnabled) return;
@@ -142,7 +188,7 @@ void MapLogic_ParentTank(int team, bool enable)
 		char map[PLATFORM_MAX_PATH];
 		GetMapName(map, sizeof(map));
 		
-		LogMessage("Map (%s) parent (enable=%d) request failed for Tank (team=%d): Tank missing!", map, enable, team);
+		LogMessage("Map (%s) un-parent request failed for tank (team %d): Tank missing!", map, team);
 		return;
 	}
 
@@ -152,7 +198,7 @@ void MapLogic_ParentTank(int team, bool enable)
 		char map[PLATFORM_MAX_PATH];
 		GetMapName(map, sizeof(map));
 		
-		LogMessage("Map (%s) parent (enable=%d) request failed for Tank (team=%d): Cart missing!", map, enable, team);
+		LogMessage("Map (%s) un-parent request failed for tank (team %d): Cart missing!", map, team);
 		return;
 	}
 
@@ -161,25 +207,20 @@ void MapLogic_ParentTank(int team, bool enable)
 		char map[PLATFORM_MAX_PATH];
 		GetMapName(map, sizeof(map));
 		
-		LogMessage("Map (%s) parent (enable=%d) request failed for Tank (team=%d): Under uphill path control!", map, enable, team);
+		LogMessage("Map (%s) un-parent request failed for tank (team %d): Under uphill path control!", map, team);
 		return;
 	}
 
-	if(GetEntPropEnt(tank, Prop_Send, "moveparent") > MaxClients)
+	if(GetEntPropEnt(tank, Prop_Send, "moveparent") <= MaxClients)
 	{
 		char map[PLATFORM_MAX_PATH];
 		GetMapName(map, sizeof(map));
 		
-		LogMessage("Map (%s) parent (enable=%d) request failed for Tank (team=%d): Tank is already parented!", map, enable, team);
+		LogMessage("Map (%s) un-parent request failed for tank (team %d): Tank is not parented at the moment!", map, team);
 		return;
 	}
 
-	if(enable)
-	{
-		Tank_Parent(team);
-	}else{
-		Tank_UnParent(team);
-	}
+	Tank_UnParent(team);
 }
 
 void MapLogic_OnIntermission()
@@ -243,7 +284,7 @@ void MapLogic_GodmodeTank(int team, bool enable)
 		char map[PLATFORM_MAX_PATH];
 		GetMapName(map, sizeof(map));
 
-		LogMessage("Map (%s) godmode (enable=%d) request failed for Tank (team=%d): Tank missing!", map, enable, team);
+		LogMessage("Map (%s) godmode (enable %d) request failed for Tank (team %d): Tank missing!", map, enable, team);
 		return;
 	}
 
