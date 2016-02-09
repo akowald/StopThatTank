@@ -1093,7 +1093,7 @@ public void OnPluginStart()
 	g_hCvarHealthDistance = CreateConVar("tank_health_distance", "1.0", "Multiplier for the health based on how long the track is for the current stage.");
 	g_hCvarRobot = CreateConVar("tank_robot", "1", "0/1 - Make use of robot player models.");
 	g_hCvarDistanceWarn = CreateConVar("tank_distance_warn", "500.0", "Distance the tank must be from the goal before warning sounds will play.");
-	g_hCvarTankCooldown = CreateConVar("tank_cooldown", "28.0", "Seconds after a tank is killed that another one will spawn on the track.");
+	g_hCvarTankCooldown = CreateConVar("tank_cooldown", "28.0", "Seconds after the tank is killed that a Giant Robot will spawn into the game.");
 	g_hCvarDistanceMove = CreateConVar("tank_distance_move", "4600.0", "Distance the control point must be from the goal for tanks to spawn on it.");
 	g_hCvarCurrencyCrit = CreateConVar("tank_currency_crit", "5.0", "(Seconds) Crit duration after a RED team member touches a currencypack.");
 	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.2", "Tank health percentage earned when a checkpoint is reached.");
@@ -1160,7 +1160,7 @@ public void OnPluginStart()
 	g_hCvarBombHealDuration = CreateConVar("tank_bomb_heal_duration", "3.0", "Time (seconds) duration of heal effect when a normal robot picks up the bomb.");
 	g_hCvarBombMiniCritsDuration = CreateConVar("tank_bomb_minicrits_duration", "-1.0", "Time (seconds) duration of minicrits when a normal robot picks up the bomb.");
 	g_hCvarBombHealCooldown = CreateConVar("tank_bomb_heal_cooldown", "10.0", "Time (seconds) between dropping the bomb and picking it up that heal effects are granted.");
-	g_hCvarBombBuffsCuttoff = CreateConVar("tank_bomb_buffs_cutoff", "10", "Minimum player count required bomb carrier buffs to be activated.");
+	g_hCvarBombBuffsCuttoff = CreateConVar("tank_bomb_buffs_cutoff", "10", "Minimum player count required for bomb carrier buffs to be activated.");
 	g_hCvarBombWinSpeed = CreateConVar("tank_bomb_win_speed", "500.0", "Speed of the payload cart when the robots deploy the bomb, winning the round.");
 	g_hCvarBombSkipDistance = CreateConVar("tank_bomb_skip_distance", "500.0", "Distance you must be to a locked control point to trigger the skipped annotation.");
 
@@ -10414,17 +10414,17 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 		return; // Don't detect the drop when the bomb is removed
 	}
 
-	float flPos[3];
-	GetEntPropVector(caller, Prop_Send, "m_vecOrigin", flPos);
+	float bombPos[3];
+	GetEntPropVector(caller, Prop_Data, "m_vecAbsOrigin", bombPos);
 
-	float flPos2[3]; // A little bit higher
-	for(int i=0; i<3; i++) flPos2[i] = flPos[i];
-	flPos2[2] += 100.0; // Because the bomb drops to the ground, try a position slightly above
+	float bombPos2[3]; // A little bit higher
+	for(int i=0; i<3; i++) bombPos2[i] = bombPos[i];
+	bombPos2[2] += 100.0; // Because the bomb drops to the ground, try a position slightly above
 
 	bool bNeedsReset = false;
 	
 #if defined DEBUG
-	PrintToServer("(Bomb_OnDropped) g_flTimeBombFell = %f", GetEngineTime() - g_flTimeBombFell);
+	PrintToServer("(Bomb_OnDropped) g_flTimeBombFell = %f, pos = (%1.2f %1.2f %1.2f)", GetEngineTime() - g_flTimeBombFell, bombPos[0], bombPos[1], bombPos[2]);
 #endif
 	if(g_flTimeBombFell != 0.0 && GetEngineTime() > g_flTimeBombFell && GetEngineTime() - g_flTimeBombFell < 0.1)
 	{
@@ -10451,7 +10451,7 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 				continue;
 			}
 
-			if(SDK_PointIsWithin(iTriggerHurt, flPos) || SDK_PointIsWithin(iTriggerHurt, flPos2))
+			if(SDK_PointIsWithin(iTriggerHurt, bombPos) || SDK_PointIsWithin(iTriggerHurt, bombPos2))
 			{
 #if defined DEBUG
 				PrintToServer("(Bomb_OnDropped) Dropped in trigger_hurt %d (%0.2f dmg), resetting bomb %d!..", iTriggerHurt, GetEntPropFloat(iTriggerHurt, Prop_Data, "m_flDamage"), caller);
@@ -10462,10 +10462,8 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 		}
 	}
 
-	if(!bNeedsReset && g_nMapHack == MapHack_Frontier && flPos[2] < -1400.00)
+	if(!bNeedsReset && g_nMapHack == MapHack_Frontier && bombPos[2] < -400.00)
 	{
-		// Check if the bomb fell into the satelite dish, this won't catch if the bomb fell on that antenna thingy in the middle
-		// When the bomb falls on the death pit doors or the antenna, the bomb's m_vecOrigin is inaccurate and cannot be used
 #if defined DEBUG
 		PrintToServer("(Bomb_OnDropped) Detected the bomb in the satelite dish, resetting bomb %d!", caller);
 #endif
@@ -10478,7 +10476,7 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 		int iParticle = CreateEntityByName("info_particle_system");
 		if(iParticle > MaxClients)
 		{
-			TeleportEntity(iParticle, flPos, NULL_VECTOR, NULL_VECTOR);
+			TeleportEntity(iParticle, bombPos, NULL_VECTOR, NULL_VECTOR);
 			
 			DispatchKeyValue(iParticle, "effect_name", "cinefx_goldrush");
 			
@@ -10526,9 +10524,9 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 					if(hEvent != INVALID_HANDLE)
 					{
 						SetEventInt(hEvent, "id", Annotation_BombPickupGiant);
-						SetEventFloat(hEvent, "worldPosX", flPos[0]);
-						SetEventFloat(hEvent, "worldPosY", flPos[1]);
-						SetEventFloat(hEvent, "worldPosZ", flPos[2]);
+						SetEventFloat(hEvent, "worldPosX", bombPos[0]);
+						SetEventFloat(hEvent, "worldPosY", bombPos[1]);
+						SetEventFloat(hEvent, "worldPosZ", bombPos[2]);
 						SetEventFloat(hEvent, "lifetime", 5.0);
 						SetEventString(hEvent, "play_sound", "misc/null.wav");
 						
@@ -10562,9 +10560,9 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 		if(!g_bBombGone && hEvent != INVALID_HANDLE)
 		{
 			SetEventInt(hEvent, "id", Annotation_BombPickupRobots);
-			SetEventFloat(hEvent, "worldPosX", flPos[0]);
-			SetEventFloat(hEvent, "worldPosY", flPos[1]);
-			SetEventFloat(hEvent, "worldPosZ", flPos[2]);
+			SetEventFloat(hEvent, "worldPosX", bombPos[0]);
+			SetEventFloat(hEvent, "worldPosY", bombPos[1]);
+			SetEventFloat(hEvent, "worldPosZ", bombPos[2]);
 			SetEventFloat(hEvent, "lifetime", 5.0);
 			SetEventString(hEvent, "play_sound", "misc/null.wav");
 			SetEventInt(hEvent, "visibilityBitfield", iBits); // Only the robots should see this message, minus the giant
@@ -13019,20 +13017,9 @@ int CaptureTriggers_Create(int team, int index)
 		SetEntProp(iTrigger, Prop_Send, "m_usSolidFlags", 12);
 		SetEntProp(iTrigger, Prop_Send, "m_fEffects", 32);
 
-		float pos[3];
-		GetEntPropVector(iControlPoint, Prop_Send, "m_vecOrigin", pos);
-
 		// Find the absolute origin should the team_control_point be parented.
-		int parent = iControlPoint;
-		for(int i=0; i<12; i++)
-		{
-			parent = GetEntPropEnt(parent, Prop_Send, "moveparent");
-			if(parent <= 0) break;
-
-			float parentPos[3];
-			GetEntPropVector(parent, Prop_Send, "m_vecOrigin", parentPos);
-			for(int j=0; j<3; j++) pos[j] += parentPos[j];
-		}
+		float pos[3];
+		GetEntPropVector(iControlPoint, Prop_Data, "m_vecAbsOrigin", pos);
 
 		// Teleport the trigger_capture_area onto the control point and set its size
 		TeleportEntity(iTrigger, pos, NULL_VECTOR, NULL_VECTOR);
