@@ -535,6 +535,24 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 
 	Attributes_Clear(client);
 
+	int team = GetClientTeam(client);
+	int oppositeTeam = (team == TFTeam_Red) ? TFTeam_Blue : TFTeam_Red;
+
+	TFClassType playerClass = TF2_GetPlayerClass(client);
+	if(playerClass == TFClass_Unknown) playerClass = TFClass_DemoMan;
+
+	TFClassType giantClass = g_nGiants[iIndex][g_nGiantClass];
+	if(giantClass == TFClass_Unknown) giantClass = playerClass;
+
+	// Respawn the player and move them to the tank spawn spot
+	g_iClassOverride = client; // Flag this player as immune to class restrictions
+	TF2_SetPlayerClass(client, giantClass, true, true);
+	TF2_RespawnPlayer(client);
+	g_iClassOverride = 0;
+
+	// Sets the player's old class as the desired next class
+	if(playerClass != TFClass_Unknown) SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", playerClass);
+
 	// Set character attributes on the player
 	char strAttributeName[MAXLEN_GIANT_STRING];
 	float flAttribValue;
@@ -547,15 +565,6 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 #endif
 		Tank_SetAttributeValueByName(client, strAttributeName, flAttribValue);
 	}
-
-	int iTeam = GetClientTeam(client);
-	int iOppositeTeam = (iTeam == TFTeam_Red) ? TFTeam_Blue : TFTeam_Red;
-
-	TFClassType playerClass = TF2_GetPlayerClass(client);
-	if(playerClass == TFClass_Unknown) playerClass = TFClass_DemoMan;
-
-	TFClassType giantClass = g_nGiants[iIndex][g_nGiantClass];
-	if(giantClass == TFClass_Unknown) giantClass = playerClass;
 
 	// Give a level base of health for sentry busters of all classes.
 	static int busterExtraHealth[10] = {
@@ -574,7 +583,7 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 	if(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) shimHealth = busterExtraHealth[giantClass];
 
 	// Set the max health attribute on the player to give the giant incresed health
-	int maxHealth = RoundToNearest(float(g_nGiants[iIndex][g_iGiantHealth]) * Giant_GetScaleForPlayers(iOppositeTeam)) + shimHealth;
+	int maxHealth = RoundToNearest(float(g_nGiants[iIndex][g_iGiantHealth]) * Giant_GetScaleForPlayers(oppositeTeam)) + shimHealth;
 	// Apply the "tank_giant_health_multiplier" config value.
 	if(!(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
 	{
@@ -592,18 +601,6 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 	// Apply increased ammo attributes on the player
 	Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_PRIMARY_INCREASED, config.LookupFloat(g_hCvarGiantAmmoMultiplier));
 	Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_SECONDARY_INCREASED, config.LookupFloat(g_hCvarGiantAmmoMultiplier));
-
-	// Respawn the player and move them to the tank spawn spot
-	g_iClassOverride = client; // Flag this player as immune to class restrictions
-	TF2_SetPlayerClass(client, giantClass, true, true);
-	TF2_RespawnPlayer(client);
-	g_iClassOverride = 0;
-
-	// Sets the player's old class as the desired next class
-	if(playerClass != TFClass_Unknown) SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", playerClass);
-
-	// Delay a frame or two to replace the players weapons, this is to prevent client crashes related to wearables
-	CreateTimer(0.1, Timer_GiantReplaceWeapons, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 	
 	// Check to see if a model was specified for this giants and apply it.
 	if(strlen(g_nGiants[iIndex][g_strGiantModel]) > 3 && FileExists(g_nGiants[iIndex][g_strGiantModel], true))
@@ -637,6 +634,9 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 	{
 		TF2_RemoveCondition(client, TFCond_HalloweenGhostMode);
 	}
+
+	// Delay a frame or two to replace the players weapons, this is to prevent client crashes related to wearables
+	CreateTimer(0.1, Timer_GiantReplaceWeapons, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
 /***

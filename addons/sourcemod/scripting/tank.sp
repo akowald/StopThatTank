@@ -14777,7 +14777,7 @@ void Mod_Toggle(bool enable)
 		// Fixes sentry guns not targeting the tank on stage 2 maps
 		// See: https://github.com/ValveSoftware/source-sdk-2013/blob/master/sp/src/game/server/baseentity.cpp#L2858
 		SetConVarInt(g_hCvarLOSMode, 1);
-		SetConVarInt(g_cvar_mp_bonusroundtime, 15); // Map logic on pl_goldrush & pl_frontier_final rely on the default bonus round time.
+		SetConVarInt(g_cvar_mp_bonusroundtime, 15); // Map logic on pl_goldrush & pl_hoodoo_final rely on the default bonus round time.
 		ServerCommand("exec stt_cvars.cfg");
 		Tournament_RestoreNames();
 
