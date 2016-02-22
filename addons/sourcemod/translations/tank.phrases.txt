@@ -10,6 +10,11 @@
 		"#format"		"{1:s},{2:c},{3:s},{4:d},{5:c}"
 		"en"			"{1} Tank{2} inbound: {3}{4}{5} HP"
 	}
+	"Tank_Chat_Inbound_Multiple"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:c}"
+		"en"			"{1} Tanks{2} inbound: Shoot the enemy {3}Tank{4} to slow it down."
+	}
 	"Tank_Chat_TeamScramble_Triggered"
 	{
 		"#format"		"{1:c},{2:s},{3:c}"
