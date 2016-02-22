@@ -3147,7 +3147,7 @@ void Tank_StartRound()
 		g_numGiantWave = 0;
 		RaceTimer_Create();
 
-		PrintToChatAll("%t", "Tank_Chat_Inbound_Multiple", g_strRankColors[Rank_Strange], 0x01, g_strRankColors[Rank_Strange], 0x01);
+		PrintToChatAll("%t", "Tank_Chat_Inbound_Multiple", "\x07729E42", 0x01, "\x07729E42", 0x01);
 	}else{
 		BroadcastSoundToTeam(TFTeam_Red, "Announcer.MVM_Tank_Alert_Spawn");
 	}
@@ -15140,7 +15140,7 @@ void Tank_EnforceRespawnTimes()
 	TF2_SetRespawnTime(TFTeam_Blue, flRespawnBase);
 	TF2_SetRespawnTime(TFTeam_Red, flRespawnBase);
 
-	if(g_nGameMode == GameMode_Tank)
+	if(g_nGameMode == GameMode_Tank && g_bIsRoundStarted)
 	{
 		TF2_SetRespawnTime(TFTeam_Blue, flRespawnTank);
 	}
