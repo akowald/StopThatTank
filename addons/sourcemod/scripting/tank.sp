@@ -228,6 +228,7 @@
 #define ITEM_BOX_TROT 30615
 #define ITEM_ZOOMIN_BROOM 30672
 #define ITEM_MANNROBICS 1162
+#define ITEM_PDA_DESTROY 26
 
 #define ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED 140
 #define ATTRIB_MAXAMMO_PRIMARY_INCREASED 76
@@ -1104,7 +1105,7 @@ public void OnPluginStart()
 	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "26.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.2", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
-	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "2.0", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
+	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "2.2", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
 	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "2.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: x/24*this = final respawn time.");
@@ -3147,7 +3148,7 @@ void Tank_StartRound()
 		g_numGiantWave = 0;
 		RaceTimer_Create();
 
-		PrintToChatAll("%t", "Tank_Chat_Inbound_Multiple", "\x07729E42", 0x01, "\x07729E42", 0x01);
+		PrintToChatAll("%t", "Tank_Chat_Inbound_Multiple", "\x07ADFF2F", 0x01, "\x07ADFF2F", 0x01);
 	}else{
 		BroadcastSoundToTeam(TFTeam_Red, "Announcer.MVM_Tank_Alert_Spawn");
 	}
@@ -9401,7 +9402,17 @@ public void NextFrame_Building(int iRef)
 #if defined _SENDPROXYMANAGER_INC_
 public Action SendProxy_BuildingNotSapped(int entity, char[] propName, int &value, int element)
 {
-	value = false;
+	int builder = GetEntPropEnt(entity, Prop_Send, "m_hBuilder");
+	if(builder >= 1 && builder <= MaxClients && g_nSpawner[builder][g_bSpawnerEnabled] && g_nSpawner[builder][g_nSpawnerType] == Spawn_GiantRobot && IsClientInGame(builder))
+	{
+		int activeWeapon = GetEntPropEnt(builder, Prop_Send, "m_hActiveWeapon");
+		if(activeWeapon > MaxClients && GetEntProp(activeWeapon, Prop_Send, "m_iItemDefinitionIndex") == ITEM_PDA_DESTROY)
+		{
+			// Don't spoof m_bHasSapper unless the Destroy PDA is active.
+			value = false;
+		}
+	}
+	
 	return Plugin_Changed;
 }
 #endif
@@ -12225,20 +12236,6 @@ void Attributes_Set(int client)
 	TFClassType class = TF2_GetPlayerClass(client);
 	int team = GetClientTeam(client);
 
-	// Special attributes for RED players and ALL players in plr_ maps
-	if(team == TFTeam_Red || g_nGameMode == GameMode_Race)
-	{
-		switch(class)
-		{
-			case TFClass_Engineer:
-			{
-				// Engineers has an increased metal amount
-				Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_METAL_INCREASED, config.LookupFloat(g_hCvarAttribMetalMult));
-				SetEntProp(client, Prop_Send, "m_iAmmo", MaxMetal_Get(client), 4, 3);
-			}
-		}
-	}
-
 	// BLU team in payload, ALL players in payload race.
 	if(team == TFTeam_Blue || g_nGameMode == GameMode_Race)
 	{
@@ -12261,6 +12258,12 @@ void Attributes_Set(int client)
 			{
 				Tank_SetAttributeValue(client, ATTRIB_UBERCHARGE_RATE_BONUS, SETUP_UBER_CHARG_RATE);
 			}
+		}
+		case TFClass_Engineer:
+		{
+			// Experiment with giving Engineers increased metal capacity.
+			Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_METAL_INCREASED, config.LookupFloat(g_hCvarAttribMetalMult));
+			SetEntProp(client, Prop_Send, "m_iAmmo", MaxMetal_Get(client), 4, 3);
 		}
 	}
 }
