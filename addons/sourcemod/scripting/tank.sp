@@ -9468,6 +9468,7 @@ public Action Giant_OnTouch(int iHealthKit, int iToucher)
 
 public Action TF2Items_OnGiveNamedItem(int client, char[] classname, int iItemDefinitionIndex, Handle &hItem)
 {
+	if(!g_bEnabled) return Plugin_Continue;
 	if(!config.LookupBool(g_hCvarRobot)) return Plugin_Continue;
 
 	if(GetClientTeam(client) == TFTeam_Blue || g_nGameMode == GameMode_Race)
