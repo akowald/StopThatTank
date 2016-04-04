@@ -58,12 +58,6 @@
 				"linux"		"@_ZN14CAttributeList15RemoveAttributeEPK28CEconItemAttributeDefinition"
 				"windows"		"\x55\x8B\xEC\x51\x53\x8B\xD9\x56\x33\xF6\x8B\x43\x2A\x89\x45\x2A\x85\xC0\x7E\x2A\x57\x33\xFF"
 			}
-			"CAttributeManager::ClearCache"
-			{
-				"library"		"server"
-				"linux"		"@_ZN17CAttributeManager10ClearCacheEv"
-				"windows"		"\x55\x8B\xEC\x51\x56\x8B\xF1\x80\x7E\x2A\x00\x0F\x85\x2A\x2A\x2A\x2A\xC7\x46\x2A\x2A\x2A\x2A\x00\x83\x7E\x50\x00"
-			}
 			"CTFPlayer::PlaySpecificSequence"
 			{
 				"library"		"server"
