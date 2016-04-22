@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2015 Alex Kowald
+ * Copyright (C) 2014-2016 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-//#define DEBUG
+#define DEBUG
 
 #define PLUGIN_VERSION 				"1.5.3"
 
@@ -7173,6 +7173,102 @@ void SDK_Init()
 		}
 	}
 
+	// This patch allows bonked players to pick up the bomb.
+	Address addrTouchBonk = GameConfGetAddress(hGamedata, "Patch_FlagTouchBonk");
+	if(addrTouchBonk == Address_Null)
+	{
+		LogMessage("Failed to find address: Patch_FlagTouchBonk!");
+	}else{
+		int patchOffset = GameConfGetOffset(hGamedata, "Patch_FlagTouchBonk");
+		if(patchOffset <= -1)
+		{
+			LogMessage("Failed to find offset: Patch_FlagTouchBonk!");
+		}else{
+			int patchPayload = GameConfGetOffset(hGamedata, "Payload_FlagTouchBonk");
+			if(patchPayload <= -1)
+			{
+				LogMessage("Failed to find payload: Payload_FlagTouchBonk!");
+			}else{
+				int payload[1];
+				payload[0] = patchPayload;
+
+				g_patchTouchBonk = new MemoryPatch(addrTouchBonk+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+			}
+		}
+	}
+
+	// This patch allows ubered players to pick up the bomb.
+	Address addrTouchUber = GameConfGetAddress(hGamedata, "Patch_FlagTouchUber");
+	if(addrTouchUber == Address_Null)
+	{
+		LogMessage("Failed to find address: Patch_FlagTouchUber!");
+	}else{
+		int patchOffset = GameConfGetOffset(hGamedata, "Patch_FlagTouchUber");
+		if(patchOffset <= -1)
+		{
+			LogMessage("Failed to find offset: Patch_FlagTouchUber!");
+		}else{
+			int patchPayload = GameConfGetOffset(hGamedata, "Payload_FlagTouchUber");
+			if(patchPayload <= -1)
+			{
+				LogMessage("Failed to find payload: Payload_FlagTouchUber!");
+			}else{
+				int payload[1];
+				payload[0] = patchPayload;
+
+				g_patchTouchUber = new MemoryPatch(addrTouchUber+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+			}
+		}
+	}	
+
+	// This patch allows players to activate bonk while carrying the bomb.
+	Address addrTauntBonk = GameConfGetAddress(hGamedata, "Patch_FlagTauntBonk");
+	if(addrTauntBonk == Address_Null)
+	{
+		LogMessage("Failed to find address: Patch_FlagTauntBonk!");
+	}else{
+		int patchOffset = GameConfGetOffset(hGamedata, "Patch_FlagTauntBonk");
+		if(patchOffset <= -1)
+		{
+			LogMessage("Failed to find offset: Patch_FlagTauntBonk!");
+		}else{
+			int patchPayload = GameConfGetOffset(hGamedata, "Payload_FlagTauntBonk");
+			if(patchPayload <= -1)
+			{
+				LogMessage("Failed to find payload: Payload_FlagTauntBonk!");
+			}else{
+				int payload[1];
+				payload[0] = patchPayload;
+
+				g_patchTauntBonk = new MemoryPatch(addrTauntBonk+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+			}
+		}
+	}	
+
+	// This patch prevents the bomb from being dropped when the player activates bonk while carrying the bomb.
+	Address addrDropBonk = GameConfGetAddress(hGamedata, "Patch_FlagDropBonk");
+	if(addrDropBonk == Address_Null)
+	{
+		LogMessage("Failed to find address: Patch_FlagDropBonk!");
+	}else{
+		int patchOffset = GameConfGetOffset(hGamedata, "Patch_FlagDropBonk");
+		if(patchOffset <= -1)
+		{
+			LogMessage("Failed to find offset: Patch_FlagDropBonk!");
+		}else{
+			int patchPayload = GameConfGetOffset(hGamedata, "Payload_FlagDropBonk");
+			if(patchPayload <= -1)
+			{
+				LogMessage("Failed to find payload: Payload_FlagDropBonk!");
+			}else{
+				int payload[1];
+				payload[0] = patchPayload;
+
+				g_patchDropBonk = new MemoryPatch(addrDropBonk+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+			}
+		}
+	}
+
 	delete hGamedata;
 }
 
@@ -9592,18 +9688,15 @@ void Bomb_Think(int iBomb)
 					int iMedigun = GetPlayerWeaponSlot(i, TFWeaponSlot_Secondary);
 					if(iMedigun > MaxClients)
 					{
-						if(GetEntProp(iMedigun, Prop_Send, "m_bChargeRelease") && (i == client || GetEntPropEnt(iMedigun, Prop_Send, "m_hHealingTarget") == client))
+						int def = GetEntProp(iMedigun, Prop_Send, "m_iItemDefinitionIndex");
+						if(def == ITEM_QUICK_FIX && GetEntProp(iMedigun, Prop_Send, "m_bChargeRelease") && (i == client || GetEntPropEnt(iMedigun, Prop_Send, "m_hHealingTarget") == client))
 						{
-							int def = GetEntProp(iMedigun, Prop_Send, "m_iItemDefinitionIndex");
-							if(def == ITEM_QUICK_FIX)
-							{
 #if defined DEBUG
-								PrintToServer("(Bomb_Think) Removing quick-fix or uber on %N..", i);
+							PrintToServer("(Bomb_Think) Removing quick-fix or uber on %N..", i);
 #endif
-								// Let the uber end naturally to avoid lingering sounds and other issues
-								SetEntPropFloat(iMedigun, Prop_Send, "m_flChargeLevel", 0.0001);
-								EmitSoundToClient(i, SOUND_FIZZLE);
-							}
+							// Let the uber end naturally to avoid lingering sounds and other issues
+							SetEntPropFloat(iMedigun, Prop_Send, "m_flChargeLevel", 0.0001);
+							EmitSoundToClient(i, SOUND_FIZZLE);
 						}
 					}
 				}
@@ -10666,6 +10759,16 @@ int Teleporter_BuildEntrance(int iBuilder, float flPos[3], int iMaxHealth)
 public Action Command_Test2(int client, int args)
 {
 	//
+	if(args == 1) SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 1.0);
+	if(args == 2)
+	{
+		int flag = MaxClients+1;
+		while((flag = FindEntityByClassname(flag, "item_teamflag")) > MaxClients)
+		{
+			PrintToChatAll("Setting type 6 on flag %d..", flag);
+			SetEntProp(flag, Prop_Send, "m_nType", 6);
+		}
+	}
 
 	return Plugin_Handled;
 }
@@ -10986,6 +11089,12 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 					AcceptEntityInput(relay, "Disable");
 
 					CreateTimer(0.1, Timer_SnowyCoastDoors, g_iRefTrainWatcher[TFTeam_Blue], TIMER_FLAG_NO_MAPCHANGE);
+				}
+
+				int door = Entity_FindEntityByName("mine_door", "func_door");
+				if(door > MaxClients)
+				{
+					AcceptEntityInput(door, "Open");
 				}
 			}
 		}
@@ -12691,7 +12800,7 @@ void Stats_Reset()
 void Tank_PrintLicense()
 {
 	PrintToServer("======================================================");
-	PrintToServer("Stop that Tank!  Copyright (C) 2014-2015  Alex Kowald");
+	PrintToServer("Stop that Tank!  Copyright (C) 2014-2016  Alex Kowald");
 	PrintToServer("This program comes with ABSOLUTELY NO WARRANTY.");
 	PrintToServer("This is free software, and you are welcome to");
 	PrintToServer("redistribute it under certain conditions.");
@@ -14671,19 +14780,39 @@ void Mod_Toggle(bool enable)
 		if(g_patchPhysics != null && !g_patchPhysics.isEnabled())
 		{
 			LogMessage("Patching PhysicsSimulate at 0x%X..", g_patchPhysics.Get(MemoryIndex_Address));
-			g_patchPhysics.enablePatch();
+			g_patchPhysics.enable();
 		}
 		if(g_patchUpgrade != null && !g_patchUpgrade.isEnabled())
 		{
 			LogMessage("Patching UpgradeHistory at 0x%X..", g_patchUpgrade.Get(MemoryIndex_Address));
-			g_patchUpgrade.enablePatch();
+			g_patchUpgrade.enable();
 
 			g_bEnableGameModeHook = true;
 		}
 		if(g_patchKnockback != null && !g_patchKnockback.isEnabled())
 		{
 			LogMessage("Patching Knockback at 0x%X..", g_patchKnockback.Get(MemoryIndex_Address));
-			g_patchKnockback.enablePatch();
+			g_patchKnockback.enable();
+		}
+		if(g_patchTouchBonk != null && !g_patchTouchBonk.isEnabled())
+		{
+			LogMessage("Patching FlagTouchBonk at 0x%X..", g_patchTouchBonk.Get(MemoryIndex_Address));
+			g_patchTouchBonk.enable();
+		}
+		if(g_patchTouchUber != null && !g_patchTouchUber.isEnabled())
+		{
+			LogMessage("Patching FlagTouchUber at 0x%X..", g_patchTouchUber.Get(MemoryIndex_Address));
+			g_patchTouchUber.enable();
+		}
+		if(g_patchTauntBonk != null && !g_patchTauntBonk.isEnabled())
+		{
+			LogMessage("Patching FlagTauntBonk at 0x%X..", g_patchTauntBonk.Get(MemoryIndex_Address));
+			g_patchTauntBonk.enable();
+		}
+		if(g_patchDropBonk != null && !g_patchDropBonk.isEnabled())
+		{
+			LogMessage("Patching FlagDropBonk at 0x%X..", g_patchDropBonk.Get(MemoryIndex_Address));
+			g_patchDropBonk.enable();
 		}
 
 		LogMessage("Stop that Tank!: Ready");
@@ -14697,19 +14826,39 @@ void Mod_Toggle(bool enable)
 		if(g_patchPhysics != null && g_patchPhysics.isEnabled())
 		{
 			LogMessage("Un-patching PhysicsSimulate at 0x%X..", g_patchPhysics.Get(MemoryIndex_Address));
-			g_patchPhysics.disablePatch();
+			g_patchPhysics.disable();
 		}
 		if(g_patchUpgrade != null && g_patchUpgrade.isEnabled())
 		{
 			LogMessage("Un-patching UpgradeHistory at 0x%X..", g_patchUpgrade.Get(MemoryIndex_Address));
-			g_patchUpgrade.disablePatch();
+			g_patchUpgrade.disable();
 
 			g_bEnableGameModeHook = false;
 		}
 		if(g_patchKnockback != null && g_patchKnockback.isEnabled())
 		{
 			LogMessage("Un-patching Knockback at 0x%X..", g_patchKnockback.Get(MemoryIndex_Address));
-			g_patchKnockback.disablePatch();
+			g_patchKnockback.disable();
+		}
+		if(g_patchTouchBonk != null && g_patchTouchBonk.isEnabled())
+		{
+			LogMessage("Un-patching FlagTouchBonk at 0x%X..", g_patchTouchBonk.Get(MemoryIndex_Address));
+			g_patchTouchBonk.disable();
+		}
+		if(g_patchTouchUber != null && g_patchTouchUber.isEnabled())
+		{
+			LogMessage("Un-patching FlagTouchUber at 0x%X..", g_patchTouchUber.Get(MemoryIndex_Address));
+			g_patchTouchUber.disable();
+		}
+		if(g_patchTauntBonk != null && g_patchTauntBonk.isEnabled())
+		{
+			LogMessage("Un-patching FlagTauntBonk at 0x%X..", g_patchTauntBonk.Get(MemoryIndex_Address));
+			g_patchTauntBonk.disable();
+		}
+		if(g_patchDropBonk != null && g_patchDropBonk.isEnabled())
+		{
+			LogMessage("Un-patching FlagDropBonk at 0x%X..", g_patchDropBonk.Get(MemoryIndex_Address));
+			g_patchDropBonk.disable();
 		}
 
 		// User should reset cvars in server.cfg.
@@ -14878,12 +15027,6 @@ public Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunCharge
 		int bomb = EntRefToEntIndex(g_iRefBombFlag);
 		if(bomb > MaxClients && GetEntPropEnt(bomb, Prop_Send, "moveparent") == client)
 		{
-			if(g_bombAtFinalCheckpoint)
-			{
-				result = false;
-				return Plugin_Handled;
-			}
-
 			result = true;
 			return Plugin_Handled;
 		}

@@ -177,6 +177,30 @@
 				"linux"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x89\x1C\x24\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\x55\x0C"
 				"windows"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\xCF"
 			}
+			"Patch_FlagTouchBonk"
+			{
+				"library"		"server"
+				"linux"		"\xC7\x44\x24\x04\x0E\x00\x00\x00\x89\x3C\x24\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F\x85\x2A\x2A\x2A\x2A\xC7\x44\x24\x08\x00\x00\x00\x00\xC7\x44\x24\x04\x00\x00\x00\x00"
+				"windows"		"\x6A\x0E\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F\x85\x2A\x2A\x2A\x2A\x6A\x00\x6A\x00\x8B\xCB"
+			}
+			"Patch_FlagTouchUber"
+			{
+				"library"		"server"
+				"linux"		"\x89\x3C\x24\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x83\xBB\x2A\x2A\x2A\x2A\x06\x0F\x85"
+				"windows"		"\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\x83\xBF\x2A\x2A\x2A\x2A\x06\x0F\x85"
+			}
+			"Patch_FlagTauntBonk"
+			{
+				"library"		"server"
+				"linux"		"\x85\xC0\x75\x2A\xA1\x2A\x2A\x2A\x2A\x80\xB8\x2A\x2A\x2A\x2A\x00\x0F\x85\x2A\x2A\x2A\x2A\x8B\x83\x2A\x2A\x2A\x2A\x8B\x0D\x2A\x2A\x2A\x2A\x83\xF8\xFF"
+				"windows"		"\xA1\x2A\x2A\x2A\x2A\x80\xB8\x2A\x2A\x2A\x2A\x00\x75\x2A\x8B\xCE\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F\x85"
+			}
+			"Patch_FlagDropBonk"
+			{
+				"library"		"server"
+				"linux"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\xA1\x2A\x2A\x2A\x2A\x80\xB8\x2A\x2A\x2A\x2A\x00\x0F\x85\x2A\x2A\x2A\x2A\xC7\x44\x24\x04\x00\x00\x00\x00\x89\x1C\x24"
+				"windows"		"\xE8\x2A\x2A\x2A\x2A\x84\xC0\x74\x2A\xA1\x2A\x2A\x2A\x2A\x80\xB8\x2A\x2A\x2A\x2A\x00\x74\x2A\x8B\xCF\xE8"
+			}
 		}
 		"Addresses"
 		{
@@ -191,6 +215,22 @@
 			"Patch_Knockback"
 			{
 				"signature"	"Patch_Knockback"
+			}
+			"Patch_FlagTouchBonk"
+			{
+				"signature"	"Patch_FlagTouchBonk"
+			}
+			"Patch_FlagTouchUber"
+			{
+				"signature"	"Patch_FlagTouchUber"
+			}
+			"Patch_FlagTauntBonk"
+			{
+				"signature"	"Patch_FlagTauntBonk"
+			}
+			"Patch_FlagDropBonk"
+			{
+				"signature"	"Patch_FlagDropBonk"
 			}
 		}
 		"Offsets"
@@ -215,6 +255,46 @@
 				"windows"		"7"
 			}
 			"Payload_Knockback"
+			{
+				"linux"		"113" // SHORT JNO
+				"windows"		"113" // SHORT JNO
+			}
+			"Patch_FlagTouchBonk"
+			{
+				"linux"		"19"
+				"windows"		"12"
+			}
+			"Payload_FlagTouchBonk"
+			{
+				"linux"		"128" // NEAR JO
+				"windows"		"128" // NEAR JO
+			}
+			"Patch_FlagTouchUber"
+			{
+				"linux"		"10"
+				"windows"		"9"
+			}
+			"Payload_FlagTouchUber"
+			{
+				"linux"		"113" // SHORT JNO
+				"windows"		"113" // SHORT JNO
+			}
+			"Patch_FlagTauntBonk"
+			{
+				"linux"		"17"
+				"windows"		"12"
+			}
+			"Payload_FlagTauntBonk"
+			{
+				"linux"		"129" // NEAR JNO
+				"windows"		"113" // SHORT JNO
+			}
+			"Patch_FlagDropBonk"
+			{
+				"linux"		"7"
+				"windows"		"7"
+			}
+			"Payload_FlagDropBonk"
 			{
 				"linux"		"113" // SHORT JNO
 				"windows"		"113" // SHORT JNO

@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2015 Alex Kowald
+ * Copyright (C) 2014-2016 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -977,7 +977,7 @@ methodmap MemoryPatch < ArrayList
 	 * Activates a memory patch.
 	 *
 	 */
-	public void enablePatch()
+	public void enable()
 	{
 		if(this.isEnabled()) return; // Memory is already patched, do nothing.
 
@@ -1006,7 +1006,7 @@ methodmap MemoryPatch < ArrayList
 	 * Disables and cleans up a memory patch.
 	 *
 	 */
-	public void disablePatch()
+	public void disable()
 	{
 		if(!this.isEnabled()) return; // Memory is not patched, do nothing.
 
@@ -1030,3 +1030,7 @@ methodmap MemoryPatch < ArrayList
 MemoryPatch g_patchPhysics = null;
 MemoryPatch g_patchUpgrade = null;
 MemoryPatch g_patchKnockback = null;
+MemoryPatch g_patchTouchBonk = null;
+MemoryPatch g_patchTouchUber = null;
+MemoryPatch g_patchTauntBonk = null;
+MemoryPatch g_patchDropBonk = null;
