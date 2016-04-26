@@ -40,7 +40,7 @@
 #include "include/tank.inc"
 
 // Enable this for diagnostic messages in server console (very verbose)
-#define DEBUG
+//#define DEBUG
 
 #define PLUGIN_VERSION 				"1.5.3"
 
@@ -466,6 +466,7 @@ Handle g_hCvarRaceDamageBase;
 Handle g_hCvarRaceDamageAverage;
 Handle g_hCvarReanimatorMaxHealthMult;
 Handle g_hCvarReanimatorReviveMult;
+Handle g_hCvarReanimatorVacUber;
 Handle g_hCvarBusterExplodeRadius;
 Handle g_hCvarBusterExplodeMagnitude;
 Handle g_hCvarBusterTriggerTank;
@@ -572,6 +573,7 @@ Handle g_hSDKFindHealerIndex;
 Handle g_hSDKWeaponSwitch;
 Handle g_hSDKSolidMask;
 Handle g_hSDKSetBossHealth;
+Handle g_hSDKSendWeaponAnim;
 
 Handle g_cookieInfoPanel;
 
@@ -812,6 +814,7 @@ bool g_bBombSentDropNotice;
 bool g_bBombGone;
 float g_flTimeBombFell;
 bool g_bombAtFinalCheckpoint;
+float g_timeBombWarning[MAXPLAYERS+1];
 
 Handle g_hHudSync;
 
@@ -1174,7 +1177,7 @@ public void OnPluginStart()
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
 	g_hCvarGiantForce = CreateConVar("tank_giant_force", "-1", "Index of giant template to pick. (-1 = random)");
 	g_hCvarBusterForce = CreateConVar("tank_buster_force", "-1", "Index of giant templete to pick for the sentry buster. (-1 = random)");
-	g_hCvarGiantKnifeDamage = CreateConVar("tank_giant_knife_damage", "500", "Increase backstab damage against Giant Robots by given damage.");
+	g_hCvarGiantKnifeDamage = CreateConVar("tank_giant_knife_damage", "750", "Set backstab damage against Giant Robots by given damage.");
 	g_hCvarGiantWarnTime = CreateConVar("tank_giant_warn_time", "5.0", "Minimum time (in seconds) that a giant must be warned before that giant is spawned into the game.");
 	g_hCvarGiantWarnCutoff = CreateConVar("tank_giant_cutoff_time", "17.0", "Seconds after a bomb deploy round begins that a giant can no longer replace an afk/disconnected giant. (May need to add 5.0s, round start is when the countdown begins)");
 	g_hCvarGiantTimeAFK = CreateConVar("tank_giant_time_afk", "7.0", "Seconds after spawning when a giant will be considered AFK.");
@@ -1208,6 +1211,7 @@ public void OnPluginStart()
 
 	g_hCvarReanimatorReviveMult = CreateConVar("tank_reanimator_revive_multiplier", "10", "The health added for each successful revive of a player.");
 	g_hCvarReanimatorMaxHealthMult = CreateConVar("tank_reanimator_maxhealth_multiplier", "0.5", "The max health multiplier of the player's max health.");
+	g_hCvarReanimatorVacUber = CreateConVar("tank_reanimator_vac_uber", "0.75", "Percent of max health to instantly heal when the player pops a vaccinator uber while healing a revive marker.");
 
 	g_hCvarBusterExplodeMagnitude = CreateConVar("tank_buster_explode_damage", "2500", "Damage dealt inside explosion radius.");
 	g_hCvarBusterExplodeRadius = CreateConVar("tank_buster_explode_radius", "300", "Explosion radius.");
@@ -4695,6 +4699,7 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 				for(int i=0; i<MAXPLAYERS+1; i++)
 				{
 					g_flTimeBombDropped[i] = 0.0;
+					g_timeBombWarning[i] = 0.0;
 				}
 				g_flBombGameEnd = 0.0;
 				g_flGlobalCooldown = 0.0;
@@ -5174,7 +5179,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 				char weaponClass[32];
 				GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
 
-				if(damagecustom == TF_CUSTOM_BACKSTAB && damagetype & DMG_CRIT && strcmp(weaponClass, "tf_weapon_knife") == 0) // damagecustom TF_CUSTOM_BACKSTAB as an alternative??
+				if(damagecustom == TF_CUSTOM_BACKSTAB && damagetype & DMG_CRIT && strcmp(weaponClass, "tf_weapon_knife") == 0)
 				{
 					// Someone just backstabbed the giant so set a custom damage and apply a less severe force
 					damage = config.LookupFloat(g_hCvarGiantKnifeDamage) / 3.0; // Crits multiply damage force by 3
@@ -5187,8 +5192,10 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 
 					//PrintToChatAll("New velocity %0.2fx%0.2fy%0.2fz", damageForce[0], damageForce[1], damageForce[2]);
 
-					// Indicate to the giant that he is getting backstabbed
+					// Indicate to the giant that he is getting backstabbed.
 					EmitSoundToClient(victim, SOUND_BACKSTAB);
+					
+
 					g_overrideSound = true;
 					EmitSoundToClient(victim, g_soundBusterStabbed[GetRandomInt(0, sizeof(g_soundBusterStabbed)-1)]);
 					PrintCenterText(victim, "%t", "Tank_Center_Backstabbed");
@@ -5206,6 +5213,14 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 
 						EndMessage();
 					}
+
+					// Block the attacker from making repetitive backstabs. In contrast to the razorback, we will allow the spy to cloak. 
+					EmitSoundToClient(attacker, SOUND_BACKSTAB);
+					SDK_SendWeaponAnim(weapon, 0x61B);
+					float gameTime = GetGameTime()+2.5;
+					SetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack", gameTime);
+					SetEntPropFloat(attacker, Prop_Send, "m_flNextAttack", gameTime);
+					//SetEntDataFloat(weapon, g_offset_m_knifeSapped, GetGameTime()); // This prevents the player from being to switch weapons.
 
 					return Plugin_Changed;
 				}else if(inflictor > MaxClients && damagetype & DMG_PREVENT_PHYSICS_FORCE && strcmp(weaponClass, "tf_weapon_flaregun") == 0 && GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex") == ITEM_SCORCH_SHOT)
@@ -6561,6 +6576,18 @@ void SDK_SetSize(int iEntity, float flMins[3], float flMaxs[3])
 	}
 }
 
+void SDK_SendWeaponAnim(int weapon, int anim)
+{
+	if(g_hSDKSendWeaponAnim != INVALID_HANDLE)
+	{
+#if defined DEBUG
+		PrintToServer("(SDK_SendWeaponAnim) Sending animation %d on %d..", anim, weapon);
+#endif
+		SDKCall(g_hSDKSendWeaponAnim, weapon, anim);
+	}
+}
+
+
 void SDK_PlaySpecificSequence(int client, const char[] strSequence)
 {
 	if(g_hSDKPlaySpecificSequence != INVALID_HANDLE)
@@ -7099,6 +7126,16 @@ void SDK_Init()
 	if(g_hSDKFindHealerIndex == INVALID_HANDLE)
 	{
 		LogMessage("Failed to create call: CTFPlayerShared::FindHealerIndex!");
+	}
+
+	// This call is used to play the knife blocked animation.
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, "CTFWeaponBase::SendWeaponAnim");
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+	g_hSDKSendWeaponAnim = EndPrepSDKCall();
+	if(g_hSDKSendWeaponAnim == INVALID_HANDLE)
+	{
+		LogMessage("Failed to create call: CTFWeaponBase::SendWeaponAnim!");
 	}
 
 	// Set up memory patches but don't enable them just yet.
@@ -9676,30 +9713,72 @@ void Bomb_Think(int iBomb)
 	// Sound an alert sound ONCE when the robots get near the hatch with the bomb carried
 	if(flDistanceToGoal < config.LookupFloat(g_hCvarBombDistanceWarn))
 	{
-		// Disable quick-fix effects when the giant approaches the final control point
-		if(bIsGoal && TF2_IsPlayerInCondition(client, TFCond_MegaHeal))
+		// Just for the cactus canyon special deploy, cancel out the medigun and quick fix uber effects on the bomb carrier.
+		// The uber effect only needs to be zapped if the carrier is a medic.
+		if(bIsGoal && g_nMapHack == MapHack_CactusCanyon && g_bIsFinale)
 		{
-			// Quick-fix removes stun on bomb deployment so it must go
-			for(int i=1; i<=MaxClients; i++)
+			// Cancel out the uber charge on the bomb carrier.
+			if(TF2_IsPlayerInCondition(client, TFCond_Ubercharged))
 			{
-				// Loop through all the player's healing the giant and null their uber
-				if(IsClientInGame(i) && GetClientTeam(i) == team && TF2_GetPlayerClass(i) == TFClass_Medic)
+				int medigun = GetPlayerWeaponSlot(client, WeaponSlot_Secondary);
+				if(medigun > MaxClients)
 				{
-					int iMedigun = GetPlayerWeaponSlot(i, TFWeaponSlot_Secondary);
-					if(iMedigun > MaxClients)
+					char classname[24];
+					GetEdictClassname(medigun, classname, sizeof(classname));
+					if(strcmp(classname, "tf_weapon_medigun") == 0 && GetEntProp(medigun, Prop_Send, "m_bChargeRelease"))
 					{
-						int def = GetEntProp(iMedigun, Prop_Send, "m_iItemDefinitionIndex");
-						if(def == ITEM_QUICK_FIX && GetEntProp(iMedigun, Prop_Send, "m_bChargeRelease") && (i == client || GetEntPropEnt(iMedigun, Prop_Send, "m_hHealingTarget") == client))
+						int def = GetEntProp(medigun, Prop_Send, "m_iItemDefinitionIndex");
+						if(def != ITEM_QUICK_FIX && def != ITEM_VACCINATOR && def != ITEM_KRITZKRIEG)
 						{
 #if defined DEBUG
-							PrintToServer("(Bomb_Think) Removing quick-fix or uber on %N..", i);
+							PrintToServer("(Bomb_Think) Removing medigun uber on %N..", client);
 #endif
-							// Let the uber end naturally to avoid lingering sounds and other issues
-							SetEntPropFloat(iMedigun, Prop_Send, "m_flChargeLevel", 0.0001);
-							EmitSoundToClient(i, SOUND_FIZZLE);
+							SetEntPropFloat(medigun, Prop_Send, "m_flChargeLevel", 0.0001);
+							EmitSoundToClient(client, SOUND_FIZZLE);
 						}
 					}
 				}
+			}
+
+			// Cancel out the quick fix uber on the bomb carrier.
+			if(TF2_IsPlayerInCondition(client, TFCond_MegaHeal))
+			{
+				for(int i=1; i<=MaxClients; i++)
+				{
+					if(IsClientInGame(i) && GetClientTeam(i) == team && IsPlayerAlive(i))
+					{
+						int medigun = GetPlayerWeaponSlot(i, WeaponSlot_Secondary);
+						if(medigun > MaxClients && GetEntProp(medigun, Prop_Send, "m_iItemDefinitionIndex") == ITEM_QUICK_FIX && GetEntProp(medigun, Prop_Send, "m_bChargeRelease"))
+						{
+							if(i == client || GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget") == client)
+							{
+#if defined DEBUG
+								PrintToServer("(Bomb_Think) Removing quick-fix uber on %N..", i);
+#endif
+								SetEntPropFloat(medigun, Prop_Send, "m_flChargeLevel", 0.0001);
+								EmitSoundToClient(i, SOUND_FIZZLE);
+							}
+						}
+					}
+				}
+			}
+
+			if(TF2_IsPlayerInCondition(client, TFCond_Bonked))
+			{
+#if defined DEBUG
+				PrintToServer("(Bomb_Think) Removing condition %d on %N..", TFCond_Bonked, client);
+#endif
+				TF2_RemoveCondition(client, TFCond_Bonked);
+				EmitSoundToClient(client, SOUND_FIZZLE);
+			}
+
+			if(TF2_IsPlayerInCondition(client, TFCond_UberchargedCanteen))
+			{
+#if defined DEBUG
+				PrintToServer("(Bomb_Think) Removing condition %d on %N..", TFCond_UberchargedCanteen, client);
+#endif
+				TF2_RemoveCondition(client, TFCond_UberchargedCanteen);
+				EmitSoundToClient(client, SOUND_FIZZLE);
 			}
 		}
 
@@ -9902,7 +9981,7 @@ void Bomb_Think(int iBomb)
 			{
 				// The same player is still planting so make sure they are still on track to delivering the bomb
 				// Make sure they are still on the ground
-				if(GetEntPropEnt(client, Prop_Send, "m_hGroundEntity") != -1 && !lostConnection)
+				if(GetEntPropEnt(client, Prop_Send, "m_hGroundEntity") != -1 && !lostConnection && Bomb_CanPlayerDeploy(client))
 				{
 					// Check if enough time has passed, then the robots have won! ~ 1.90s
 					if(GetEngineTime() - g_flBombPlantStart > config.LookupFloat(g_hCvarBombTimeDeploy))
@@ -10077,11 +10156,11 @@ void Bomb_Think(int iBomb)
 				}
 			}
 		}else{
-			// A new player is planting at the final control point
-			if(bIsGoal && !lostConnection)
+			// A new player is planting at the final control point.
+			if(bIsGoal)
 			{
-				// A new player is planting, check to see if they are on the ground
-				if(GetEntPropEnt(client, Prop_Send, "m_hGroundEntity") != -1)
+				// A new player is planting, check to see if they are on the ground.
+				if(GetEntPropEnt(client, Prop_Send, "m_hGroundEntity") != -1 && !lostConnection && Bomb_CanPlayerDeploy(client))
 				{
 #if defined DEBUG
 					PrintToServer("(Bomb_Think) %N is planting the bomb!..", client);
@@ -10112,6 +10191,14 @@ void Bomb_Think(int iBomb)
 					// Reset the planter
 					g_iBombPlayerPlanting = 0;
 					g_flBombPlantStart = 0.0;
+
+					if(!Bomb_CanPlayerDeploy(client) && (g_timeBombWarning[client] == 0.0 || GetEngineTime() - g_timeBombWarning[client] > 1.0))
+					{
+						g_timeBombWarning[client] = GetEngineTime();
+
+						PrintCenterText(client, "%t", "Tank_Center_CantDeploy");
+						//SendHudNotification(client, message, "eotl_duck", GetClientTeam(client));
+					}
 				}
 			}
 		}
@@ -10760,15 +10847,6 @@ public Action Command_Test2(int client, int args)
 {
 	//
 	if(args == 1) SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 1.0);
-	if(args == 2)
-	{
-		int flag = MaxClients+1;
-		while((flag = FindEntityByClassname(flag, "item_teamflag")) > MaxClients)
-		{
-			PrintToChatAll("Setting type 6 on flag %d..", flag);
-			SetEntProp(flag, Prop_Send, "m_nType", 6);
-		}
-	}
 
 	return Plugin_Handled;
 }
@@ -11221,9 +11299,6 @@ void Reanimator_Cleanup(int client=0)
 			g_iRefReanimatorDummy[client] = 0;
 		}
 
-		// Have the message disappear when they respawn / switch teams
-		//if(g_bReanimatorIsBeingRevied[client] && IsClientInGame(client)) ShowSyncHudText(client, g_hHudSync, "");
-
 		g_bReanimatorIsBeingRevied[client] = false;
 	}
 }
@@ -11492,65 +11567,6 @@ public void Event_ReviveComplete(Handle hEvent, char[] strEventName, bool bDontB
 		}
 	}
 }
-
-/*
-Reanimator_UpdateHud()
-{
-	// Handle the revive cancel hud that the dead player being revived will see (this function is called every 0.3 seconds)
-	//SetHudTextParams(Float:x, Float:y, Float:holdTime, r, g, b, a, effect = 0, Float:fxTime=6.0, Float:fadeIn=0.1, Float:fadeOut=0.2)
-	SetHudTextParams(-1.0, 0.4, 0.7, 117, 107, 95, 255, 1, 6.0, 0.2, 6.0);
-	for(int i=1; i<=MaxClients; i++)
-	{
-		if(g_bReanimatorIsBeingRevied[i] && g_iRefReanimator[i] != 0 && IsClientInGame(i) && GetClientTeam(i) == TFTeam_Red && !IsPlayerAlive(i))
-		{
-			int iMarker = EntRefToEntIndex(g_iRefReanimator[i]);
-			if(iMarker > MaxClients)
-			{
-				//PrintToServer("Health: %d / %d", GetEntProp(iMarker, Prop_Send, "m_iHealth"), GetEntProp(iMarker, Prop_Send, "m_iMaxHealth"));
-
-				int iMaxHealth = GetEntProp(iMarker, Prop_Send, "m_iMaxHealth");
-				if(iMaxHealth > 0)
-				{
-					ShowSyncHudText(i, g_hHudSync, "%d%% - BEING REVIVED!\nTo decline - call for MEDIC!", RoundToNearest(float(GetEntProp(iMarker, Prop_Send, "m_iHealth")) / float(iMaxHealth) * 100.0));
-				}
-			}else{
-				g_bReanimatorIsBeingRevied[i] = false;
-			}
-		}else{
-			g_bReanimatorIsBeingRevied[i] = false;
-		}
-	}
-}
-
-public Action Listener_Voicemenu(int client, const char[] command, int argc)
-{
-	if(argc != 2) return Plugin_Continue;
-
-	// Catch calling for MEDIC! to cancel being revived by a RED medic
-	if(g_bReanimatorIsBeingRevied[client] && client >= 1 && client <= MaxClients && IsClientInGame(client) && !IsPlayerAlive(client) && GetClientTeam(client) == TFTeam_Red)
-	{
-		char strArg1[5];
-		char strArg2[5];
-		GetCmdArg(1, strArg1, sizeof(strArg1));
-		GetCmdArg(2, strArg2, sizeof(strArg2));
-		// Check if the player called for a MEDIC!
-		if(strArg1[0] == '0' && strArg2[0] == '0')
-		{
-			// Make sure we don't accidentally catch them calling for MEDIC! at the time of death
-			if(g_flTimeLastDied[client] == 0.0 || GetEngineTime() - g_flTimeLastDied[client] > 0.5)
-			{ 
-				// Cancel the revive
-				Reanimator_Cleanup(client);
-
-				EmitSoundToClient(client, SOUND_FIZZLE);
-				PrintToChat(client, "\x01 You declined \x07B8383Brevive\x01 by calling for MEDIC!");
-			}
-		}
-	}
-
-	return Plugin_Continue;
-}
-*/
 
 bool g_inJoinClass = false;
 public Action Listener_Joinclass(int client, const char[] command, int argc)
@@ -12150,34 +12166,6 @@ public void TF2_OnConditionRemoved(int client, TFCond condition)
 			}
 		}
 	}
-}
-
-public Action Event_ChargeDeployed(Handle hEvent, const char[] strEventName, bool bDontBroadcast)
-{
-	if(!g_bEnabled) return Plugin_Continue;
-
-	if(Tank_IsInSetup())
-	{
-		// Block the "chargedeployed" log action to prevent stats point farming 
-		g_blockLogAction = true;
-
-		// Block the points awarded for invulns on the scoreboard
-		int client = GetClientOfUserId(GetEventInt(hEvent, "userid"));
-		if(client >= 1 && client <= MaxClients && IsClientInGame(client))
-		{
-			int medigun = GetPlayerWeaponSlot(client, WeaponSlot_Secondary);
-			if(medigun > MaxClients)
-			{
-				if(GetEntProp(medigun, Prop_Send, "m_iItemDefinitionIndex") != ITEM_VACCINATOR)
-				{
-					// This will cancel out the 1 point awarded for deploying an uber.
-					Tank_IncrementStat(client, TFStat_PlayerInvulnerable, -1);
-				}
-			}
-		}
-	}
-
-	return Plugin_Continue;
 }
 
 public Action OnGameLog(const char[] message)
@@ -14479,7 +14467,10 @@ public Action Timer_OvertimeStarted(Handle hTimer)
 
 	// Leave the timer up to enforce that it is overtime.
 	g_isRaceInOvertime = true;
-	ShowGameMessage("The Tanks will no longer roll backwards.", "ico_notify_ten_seconds", 5.0);
+
+	char message[256];
+	Format(message, sizeof(message), "%T", "Tank_Game_Overtime", LANG_SERVER);
+	ShowGameMessage(message, "ico_notify_ten_seconds", 5.0);
 
 	g_timerFailsafe = INVALID_HANDLE;
 	return Plugin_Stop;
@@ -15015,19 +15006,29 @@ public MRESReturn CMonsterResource_SetBossHealthPercentage(int pThis, Handle hRe
 
 public Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunChargeType, bool &result)
 {
-	//PrintToServer("(Tank_OnCanRecieveMedigunChargeEffect) client=%d, medigunChargeType=%d", client, medigunChargeType);
+	//PrintToServer("(Tank_OnCanRecieveMedigunChargeEffect) client=%N, medigunChargeType=%d", client, medigunChargeType);
 	if(!g_bEnabled) return Plugin_Continue;
 
 	// We are only able to block the stock uber effect with this detour so we don't need to worry about blocking other medigun charge effects.
 	// The default behavior will block the stock uber effect on bomb carriers due to a check for: CTFGameRules::m_bPlayingMannVsMachine.
-	// When the bomb carrier is near the hatch, return false, otherwise return true.
 	if(g_nGameMode == GameMode_BombDeploy && g_iRefBombFlag != 0 && client >= 1 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == TFTeam_Blue)
 	{
-		// Confirm the player is the bomb carrier.
+		// Check if the player is the bomb carrier.
 		int bomb = EntRefToEntIndex(g_iRefBombFlag);
 		if(bomb > MaxClients && GetEntPropEnt(bomb, Prop_Send, "moveparent") == client)
 		{
+			// Allow uber effect on the bomb carrier.
 			result = true;
+
+			if(g_nMapHack == MapHack_CactusCanyon && g_bIsFinale && g_bombAtFinalCheckpoint)
+			{
+				if(medigunChargeType == -1 || medigunChargeType == MedigunChargeEffect_Uber || medigunChargeType == MedigunChargeEffect_Quickfix)
+				{
+					// Block uber effect for the special deploy in the cactus canyon finale.
+					result = false;
+				}
+			}
+
 			return Plugin_Handled;
 		}
 	}
@@ -15402,3 +15403,141 @@ void Tank_EnforceRespawnTimes()
 	PrintCenterTextAll("Respawn times: RED = %1.2f BLU = %1.2f", waveRed, waveBlue);
 	*/
 }
+
+bool Bomb_CanPlayerDeploy(int client)
+{
+	if(TF2_IsPlayerInCondition(client, TFCond_Ubercharged)) return false;
+	if(TF2_IsPlayerInCondition(client, TFCond_UberchargedHidden)) return false;
+	if(TF2_IsPlayerInCondition(client, TFCond_UberchargedCanteen)) return false;
+	if(TF2_IsPlayerInCondition(client, TFCond_UberchargedOnTakeDamage)) return false;
+
+	if(TF2_IsPlayerInCondition(client, TFCond_MegaHeal)) return false;
+	if(TF2_IsPlayerInCondition(client, TFCond_Bonked)) return false;
+
+	return true;
+}
+
+/* A HUD bug prevents these messages from being seen if the player is healing or being healed.
+void SendHudNotification(int client, const char[] message, const char[] icon="ico_notify_partner_taunt", int background=0)
+{
+	Handle msg = StartMessageOne("HudNotifyCustom", client, USERMSG_BLOCKHOOKS);
+	if(msg != null)
+	{
+		BfWriteString(msg, message);
+		BfWriteString(msg, icon);
+		BfWriteByte(msg, background);
+
+		EndMessage();
+	}
+}
+*/
+
+public Action Event_ChargeDeployed(Handle hEvent, const char[] strEventName, bool bDontBroadcast)
+{
+	if(!g_bEnabled) return Plugin_Continue;
+
+	bool isSetup = Tank_IsInSetup();
+
+	// Block the "chargedeployed" log action to prevent stats point farming.
+	if(isSetup) g_blockLogAction = isSetup;
+
+	int client = GetClientOfUserId(GetEventInt(hEvent, "userid"));
+	if(client >= 1 && client <= MaxClients && IsClientInGame(client))
+	{
+		int medigun = GetPlayerWeaponSlot(client, WeaponSlot_Secondary);
+		if(medigun > MaxClients)
+		{
+			int def = GetEntProp(medigun, Prop_Send, "m_iItemDefinitionIndex");
+
+			if(isSetup && def != ITEM_VACCINATOR)
+			{
+				// This will cancel out the 1 point awarded for deploying an uber.
+				Tank_IncrementStat(client, TFStat_PlayerInvulnerable, -1);
+			}
+
+			// Vaccinator ubers seem to not have any effect while healing revive markers outside of MVM. This fixes that.
+			if(def == ITEM_VACCINATOR)
+			{
+				int marker = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
+				if(marker > MaxClients)
+				{
+					char classname[24];
+					GetEdictClassname(marker, classname, sizeof(classname));
+					if(strcmp(classname, "entity_revive_marker") == 0)
+					{
+#if defined DEBUG
+						PrintToServer("(Event_ChargeDeployed) %N used a vac uber while reviving, fast reviving..", client);
+#endif
+						int maxHealth = GetEntProp(marker, Prop_Send, "m_iMaxHealth");
+						int health = GetEntProp(marker, Prop_Send, "m_iHealth");
+
+						// Heal 90% or so of the revive marker's health when a vac uber is popped.
+						health += RoundToCeil(float(maxHealth) * config.LookupFloat(g_hCvarReanimatorVacUber));
+						if(health >= maxHealth) health = maxHealth-1;
+
+						SetEntProp(marker, Prop_Send, "m_iHealth", health);
+					}
+				}
+			}
+		}
+	}
+
+	return Plugin_Continue;
+}
+
+/*
+bool Vaccinator_IsChargeReleased(int client)
+{
+	return (TF2_IsPlayerInCondition(client, TFCond_UberBulletResist) || TF2_IsPlayerInCondition(client, TFCond_UberBlastResist) || TF2_IsPlayerInCondition(client, TFCond_UberFireResist));
+}
+
+void Reviving_Think()
+{
+	// Fix the vaccinator not rapidly healing reanimators while under an uber resist condition.
+	// This was broken when Valve changed the functionality of the vaccinator's uber. Hopefully, it was unintentional.
+	for(int i=1; i<=MaxClients; i++)
+	{
+		bool healingReviveMarker = false;
+
+		if(IsClientInGame(i) && IsPlayerAlive(i) && GetClientTeam(i) == TFTeam_Red && TF2_GetPlayerClass(i) == TFClass_Medic && Vaccinator_IsChargeReleased(i))
+		{
+			int medigun = GetPlayerWeaponSlot(i, WeaponSlot_Secondary);
+			if(medigun > MaxClients && GetEntProp(medigun, Prop_Send, "m_iItemDefinitionIndex") == ITEM_VACCINATOR)
+			{
+				int marker = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
+				if(marker > MaxClients)
+				{
+					char classname[24];
+					GetEdictClassname(marker, classname, sizeof(classname));
+					if(strcmp(classname, "entity_revive_marker") == 0)
+					{
+						healingReviveMarker = true;		
+#if defined DEBUG
+						if(!g_reviving[i])
+						{
+							PrintToServer("(Reviving_Think) Applying vac conpensation on %N..", i);
+						}
+#endif
+						g_reviving[i] = true;
+
+						Tank_SetAttributeValue(i, ATTRIB_HEAL_RATE_BONUS, 4.0);
+					}
+				}
+			}
+		}
+
+		if(g_reviving[i] && !healingReviveMarker)
+		{
+			g_reviving[i] = false;
+
+			if(IsClientInGame(i))
+			{
+#if defined DEBUG
+				PrintToServer("(Reviving_Think) Removing vac conpensation on %N..", i);
+#endif
+				Tank_RemoveAttribute(i, ATTRIB_HEAL_RATE_BONUS);
+			}
+		}
+	}
+}
+*/

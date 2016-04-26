@@ -329,4 +329,12 @@
 	{
 		"en"			"Fight your way to Skull Island!"
 	}
+	"Tank_GameText_Overtime"
+	{
+		"en"			"The Tanks will no longer roll backwards."
+	}
+	"Tank_Center_CantDeploy"
+	{
+		"en"			"You cannot deploy while INVULNERABLE!"
+	}
 }
