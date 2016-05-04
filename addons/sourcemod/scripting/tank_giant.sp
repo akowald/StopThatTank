@@ -42,6 +42,7 @@
 #define MAXLEN_GIANT_TAGS 	((MAX_GIANT_TAGS * MAXLEN_GIANT_TAG) + MAX_GIANT_TAGS + 1)
 #define MAX_CONFIG_WEAPONS	6
 #define TF_COND_TEAM_GLOWS 	114
+#define AOE_HEALING_RADIUS	202500 // 450 radius
 
 #define FLAG_DONT_DROP_WEAPON 				0x23E173A2
 #define OFFSET_DONT_DROP					36
@@ -65,10 +66,12 @@
 #define GIANTTAG_BLOCK_HEALONHIT 			(1 << 16)
 #define GIANTTAG_JARATE_ON_HIT				(1 << 17)
 #define GIANTTAG_DONT_SPAWN_IN_HELL 		(1 << 18)
+#define GIANTTAG_THE_DONALD					(1 << 19)
+#define GIANTTAG_GUNSLINGER_COMBO			(1 << 20)
 
 char g_strGiantTags[][] =
 {
-	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit", "dont_spawn_in_hell",
+	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit", "dont_spawn_in_hell", "the_donald", "gunslinger_combo",
 };
 
 enum
@@ -709,6 +712,7 @@ public Action Timer_GiantReplaceWeapons(Handle hTimer, any iUserId)
 	if(client >= 1 && client <= MaxClients && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 	{
 		Giant_GiveWeapons(client);
+		Giant_OnPostSpawn(client);
 	}
 
 	return Plugin_Handled;
@@ -839,7 +843,6 @@ void Giant_GiveWeapons(int client)
 
 			Giant_FlagWeaponDontDrop(iWeapon);
 		}
-
 	}
 
 	Giant_ApplyConditions(client, iIndex);
@@ -976,6 +979,12 @@ void Giant_GiveWeapons(int client)
 	}
 }
 
+void Giant_OnPostSpawn(int client)
+{
+	g_timeNextMeleeAttack[client] = 0.0;
+	g_numSuccessiveHits[client] = 0;
+}
+
 void Giant_ApplyConditions(int client, int templateIndex)
 {
 	for(int i=0,size=GetArraySize(g_nGiants[templateIndex][g_hGiantConditions]); i<size; i++)
@@ -1042,6 +1051,11 @@ void Giant_Clear(int client, int reason=0)
 
 			g_bBlockRagdoll = true;
 		}
+	}
+
+	if(Spawner_HasGiantTag(client, GIANTTAG_MEDIC_AOE))
+	{
+		Giant_OnMedicRadiusHealEnd(client);
 	}
 
 	Spawner_Cleanup(client);
@@ -1138,7 +1152,6 @@ void Giant_Clear(int client, int reason=0)
 		EmitSoundToAll("misc/null.wav", client, SNDCHAN_WEAPON);
 	}
 
-	SDK_HealRadius(client, false);
 	RageMeter_Cleanup(client);
 
 	TF2_AddCondition(client, TFCond_SpeedBuffAlly, 0.001);
@@ -2194,4 +2207,111 @@ float Giant_GetScaleForHealing(int team)
 	}
 
 	return result;
+}
+
+void Giant_PulseMedicRadiusHeal(int giant)
+{
+	// Recreate the medic's amputator taunt radius heal aoe.
+
+	// We were using Valve's code but it has a few problems:
+	// 1. When the medic stops healing a player with the medigun, it breaks aoe healing.
+	// 2. When a valid player suddenly becomes an invalid player, (by switching teams or by undisgusing while in-radius) radius healing effects do not stop.
+	// Currently, these are not exploitable because the aoe is short and the medic can't use their medigun during the effect.
+	// As far as I can tell, the aoe healing is only used while taunting with the amputator and condition 55 (unused), linked to the unused on-hit attribute: "aoe_heal_chance".
+	if(!IsPlayerAlive(giant)) return;
+
+	float giantPos[3];
+	GetClientEyePosition(giant, giantPos);
+	int team = GetClientTeam(giant);
+
+	int healingTarget = -1;
+	int medigun = GetPlayerWeaponSlot(giant, WeaponSlot_Secondary);
+	if(medigun > MaxClients)
+	{
+		char classname[24];
+		GetEdictClassname(medigun, classname, sizeof(classname));
+		if(strcmp(classname, "tf_weapon_medigun") == 0)
+		{
+			healingTarget = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
+		}
+	}
+
+	for(int client=1; client<=MaxClients; client++)
+	{
+		if(client != giant && IsClientInGame(client))
+		{
+			bool isInRadius = false;
+
+			if(IsPlayerAlive(client))
+			{
+				float playerPos[3];
+				GetClientEyePosition(client, playerPos);
+				if(GetVectorDistance(giantPos, playerPos, true) < AOE_HEALING_RADIUS)
+				{
+					if(team == GetClientTeam(client) || (TF2_IsPlayerInCondition(client, TFCond_Disguised) && GetEntProp(client, Prop_Send, "m_nDisguiseTeam")))
+					{
+						TR_TraceRayFilter(giantPos, playerPos, 16395, RayType_EndPoint, TraceFilter_HitWorld); // CONTENTS_SOLID|CONTENTS_WINDOW|CONTENTS_GRATE|CONTENTS_UNUSED6
+
+						if(!TR_DidHit())
+						{
+							isInRadius = true;
+						}
+					}
+				}
+			}
+
+			if(isInRadius)
+			{
+				TF2_AddCondition(client, TFCond_InHealRadius, 1.0);
+
+				// Heal the player if they are not being healed by the giant.
+				if(SDK_FindHealerIndex(client, giant) == -1)
+				{
+#if defined DEBUG
+					PrintToServer("(Giant_PulseMedicRadiusHeal) Healing %N from %N's AOE..", client, giant);
+#endif
+					SDK_Heal(client, giant, 25.0, 1.0, 1.0, false, 0);
+				}
+			}else{
+				// Player is outside the aoe radius.
+				// Remove any non-medigun healing effect on the player.
+				if(healingTarget != client)
+				{
+					SDK_StopHealing(client, giant);
+				}
+			}
+
+			SDK_RecalculateChargeEffects(client, false);
+		}
+	}
+}
+
+void Giant_OnMedicRadiusHealEnd(int giant)
+{
+	// Terminate the amputator taunt healing effects.
+	int healingTarget = -1;
+	int medigun = GetPlayerWeaponSlot(giant, WeaponSlot_Secondary);
+	if(medigun > MaxClients)
+	{
+		char classname[24];
+		GetEdictClassname(medigun, classname, sizeof(classname));
+		if(strcmp(classname, "tf_weapon_medigun") == 0)
+		{
+			healingTarget = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
+		}
+	}
+
+	for(int client=1; client<=MaxClients; client++)
+	{
+		if(client != giant && IsClientInGame(client))
+		{
+			// Remove any non-medigun healing effect on the player.
+			if(healingTarget != client)
+			{
+				SDK_StopHealing(client, giant);
+			}
+
+			SDK_RecalculateChargeEffects(client, false);
+		}
+	}
 }

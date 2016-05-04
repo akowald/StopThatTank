@@ -548,6 +548,7 @@ Handle g_hCvarBombSkipDistance;
 Handle g_hCvarGiantDeathpitBoost;
 Handle g_hCvarTeleBuildMult;
 Handle g_hCvarRespawnTank;
+Handle g_hCvarGiantHandScale;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -566,9 +567,9 @@ Handle g_hSDKTaunt;
 Handle g_hSDKGetMaxClip;
 Handle g_hSDKStartTouch;
 Handle g_hSDKEndTouch;
-Handle g_hSDKHealRadius;
 Handle g_hSDKChargeEffects;
 Handle g_hSDKHeal;
+Handle g_hSDKStopHealing;
 Handle g_hSDKFindHealerIndex;
 Handle g_hSDKWeaponSwitch;
 Handle g_hSDKSolidMask;
@@ -750,7 +751,6 @@ int g_iOffset_m_pprevious;
 int g_iOffset_m_ppath;
 int g_iOffsetReviveMarker;
 int g_iOffset_m_Shared;
-int g_iOffset_m_HealingRadius;
 int g_iOffset_m_numGibs;
 int g_iOffset_m_buildingPercentage;
 int g_iOffset_m_uberChunk;
@@ -961,6 +961,9 @@ float g_timeGiantEnteredDeathpit[MAXPLAYERS+1];
 float g_timeControlPointSkipped; // Timestamp when the bomb carrier skips a control point.
 float g_timePlayedDestructionSound; // Timestamp when the giant destruction sounds are played.
 
+float g_timeNextMeleeAttack[MAXPLAYERS+1];
+int g_numSuccessiveHits[MAXPLAYERS+1];
+
 enum
 {
 	Interest_None=0,
@@ -1105,7 +1108,7 @@ public void OnPluginStart()
 	g_hCvarDistanceMove = CreateConVar("tank_distance_move", "4600.0", "Distance the control point must be from the goal for tanks to spawn on it.");
 	g_hCvarCurrencyCrit = CreateConVar("tank_currency_crit", "5.0", "(Seconds) Crit duration after a RED team member touches a currencypack.");
 	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.2", "Tank health percentage earned when a checkpoint is reached.");
-	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "26.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
+	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "20.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.2", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
 	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "2.2", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
@@ -1122,7 +1125,7 @@ public void OnPluginStart()
 	g_hCvarRespawnAdvRunaway = CreateConVar("tank_respawn_advantage_runaway", "2", "When the Giant Robot advantage is equal to or greater than this, the opposite team's respawn is reduced. Set to a really high number like 100 to disable.");
 
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
-	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.1", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
+	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.03", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
 	g_hCvarScrambleEnabled = CreateConVar("tank_scramble_enabled", "1", "0/1 - Enable or disable triggering team scrambles.");
 	g_hCvarScrambleProgress = CreateConVar("tank_scramble_progress", "0.25", "Scramble teams if the difference between the two team's tanks is more than this percentage. Set to over 1.0 to disable.");
 	g_hCvarWeaponInspect = CreateConVar("tank_weapon_inspect", "2", "0 - no changes to the game | 1 - only the giant's weapons can be inspected | 2 - every weapon can be inspected.");
@@ -1189,6 +1192,7 @@ public void OnPluginStart()
 	g_hCvarGiantDeathpitCooldown = CreateConVar("tank_giant_deathpit_cooldown", "0.4", "The time (seconds) that must pass before the giant can be hurt/teleported again.");
 	g_hCvarGiantDeathpitMinZ = CreateConVar("tank_giant_deathpit_min_z", "500.0", "Minimum boost scaling in the Z(up) direction.");
 	g_hCvarGiantDeathpitBoost = CreateConVar("tank_giant_deathpit_boost", "1", "0/1 - Enable or disable boosting Giant Robots out of deathpits.");
+	g_hCvarGiantHandScale = CreateConVar("tank_giant_hand_scale", "1.9", "Giant hand scale to use when the special giant tag is set.");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -1944,74 +1948,8 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 
 				if(Spawner_HasGiantTag(client, GIANTTAG_MEDIC_AOE))
 				{
-					// Keep the AoE healing effect active on the giant medic, it will get removed if the giant taunts
-					SDK_HealRadius(client, true);
-					
-					// If the giant medic stops healing someone with his medigun, it will stop the healing effects of the AoE
-					// Reapply the healing effects for all players inside the AoE, taking into account the player being healed with the giant medic's medigun
-					// Go through all the players in the giant's AoE
-					if(g_iOffset_m_Shared > 0 && g_iOffset_m_HealingRadius > 0 && g_hSDKFindHealerIndex != INVALID_HANDLE)
-					{
-						int iNumInRadius = GetEntData(client, g_iOffset_m_Shared+g_iOffset_m_HealingRadius);
-						if(iNumInRadius < 0 || iNumInRadius > MaxClients) iNumInRadius = 0;
-						Address ptrArray = view_as<Address>(GetEntData(client, g_iOffset_m_Shared+g_iOffset_m_HealingRadius-12));
-						if(ptrArray == Address_Null) iNumInRadius = 0;
-						for(int i=0; i<iNumInRadius; i++)
-						{
-							int iPlayerIndex = LoadFromAddress(ptrArray+view_as<Address>(4*i), NumberType_Int32);
-							if(iPlayerIndex >= 1 && iPlayerIndex <= MaxClients && IsClientInGame(iPlayerIndex) && IsPlayerAlive(iPlayerIndex) && GetClientTeam(iPlayerIndex) == team)
-							{
-								// Ensure that the player is being healed by the giant
-								if(SDK_FindHealerIndex(iPlayerIndex, client) == -1)
-								{
-#if defined DEBUG
-									PrintToServer("(OnPlayerRunCmd) %N should be healing %N, fixing..", client, iPlayerIndex);
-#endif
-									// The player is NOT being healed by the giant, enforce healing
-									SDK_Heal(iPlayerIndex, client, 25.0, 1.0, 1.0, false, 0);
-								}
-							}
-						}
-					}
-
-					// Recalculate medigun effects for all players on the giant's team
-					for(int i=1; i<=MaxClients; i++)
-					{
-						if(i != client && IsClientInGame(i) && GetClientTeam(i) == team && IsPlayerAlive(i))
-						{
-							SDK_RecalculateChargeEffects(i, false);
-						}
-					}
+					Giant_PulseMedicRadiusHeal(client);
 				}
-
-				/* No longer needed thanks to the Medigun patch!
-				if(Spawner_HasGiantTag(client, GIANTTAG_FIX_KRITZ))
-				{
-					new iWeaponActive = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-					new iWeaponSecondary = GetPlayerWeaponSlot(client, WeaponSlot_Secondary);
-					if(iWeaponActive > MaxClients && iWeaponSecondary > MaxClients && GetEntProp(iWeaponSecondary, Prop_Send, "m_iItemDefinitionIndex") == ITEM_KRITZKRIEG)
-					{
-						// Check if the medigun is active or not
-						if(iWeaponActive != iWeaponSecondary)
-						{
-							// Medigun is not active so remove any charge effects that may be on the player
-							if(TF2_IsPlayerInCondition(client, TFCond_CritDemoCharge)) TF2_RemoveCondition(client, TFCond_CritDemoCharge);
-						}else{
-							// Medigun is active - start the charge effects if the medic is ready
-							if(buttons & IN_ATTACK2 && GetGameTime() > GetEntPropFloat(iWeaponActive, Prop_Send, "m_flNextPrimaryAttack") && GetEntPropFloat(iWeaponActive, Prop_Send, "m_flChargeLevel") >= 1.0 && !GetEntProp(iWeaponActive, Prop_Send, "m_bChargeRelease", 1))
-							{
-								// After this is set, the medigun should begin draining and the kritz effect will be applied to the player being healed
-								SetEntProp(iWeaponActive, Prop_Send, "m_bChargeRelease", true, 1);
-								// The medic will be missing charge effects so supply those
-								TF2_AddCondition(client, TFCond_CritDemoCharge, TFCondDuration_Infinite, client);
-							}else if(TF2_IsPlayerInCondition(client, TFCond_CritDemoCharge) && !GetEntProp(iWeaponActive, Prop_Send, "m_bChargeRelease", 1))
-							{
-								TF2_RemoveCondition(client, TFCond_CritDemoCharge);
-							}
-						}
-					}
-				}
-				*/
 
 				if(Spawner_HasGiantTag(client, GIANTTAG_SENTRYBUSTER))
 				{
@@ -2156,6 +2094,17 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 							TF2_AddCondition(client, TFCond_SpeedBuffAlly, 0.001);
 						}
 						Tank_RemoveAttribute(client, ATTRIB_MAJOR_INCREASED_JUMP_HEIGHT);
+					}
+				}
+
+				// Increase the scale of the Giant's hands while un-disguised.
+				if(Spawner_HasGiantTag(client, GIANTTAG_THE_DONALD))
+				{
+					if(TF2_IsPlayerInCondition(client, TFCond_Disguised))
+					{
+						SetEntPropFloat(client, Prop_Send, "m_flHandScale", 1.0);
+					}else{
+						SetEntPropFloat(client, Prop_Send, "m_flHandScale", config.LookupFloat(g_hCvarGiantHandScale));
 					}
 				}
 
@@ -4994,7 +4943,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 	if(attacker >= 1 && attacker <= MaxClients && g_nSpawner[attacker][g_bSpawnerEnabled] && g_nSpawner[attacker][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(attacker, Prop_Send, "m_bIsMiniBoss"))
 	{
 		// Increase knockback on victim for melee damage
-		if((Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK) || Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK_CRITS)) && weapon > MaxClients && victim >= 1 && victim <= MaxClients)
+		if((Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK) || Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK_CRITS)) && weapon > MaxClients && victim != attacker && victim >= 1 && victim <= MaxClients)
 		{
 			TFClassType classAttacker = TF2_GetPlayerClass(attacker);
 			// Determine if damage done is by the giant's melee weapon. (damagetype of DMG_CLUB can also indicate melee damage.)
@@ -5025,6 +4974,29 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 
 				damagetype |= DMG_PREVENT_PHYSICS_FORCE;
 				overrideReturn = true;
+			}
+		}
+
+		// Keep track of melee strikes for the "gunslinger_combo" giant template tag.
+		if(Spawner_HasGiantTag(attacker, GIANTTAG_GUNSLINGER_COMBO) && weapon > MaxClients && victim != attacker && victim >= 1 && victim <= MaxClients)
+		{
+			int melee = GetPlayerWeaponSlot(attacker, WeaponSlot_Melee);
+			if(melee > MaxClients && melee == weapon)
+			{
+				if(damagetype & DMG_CRIT)
+				{
+					g_numSuccessiveHits[attacker] = -1;
+				}else if(g_timeNextMeleeAttack[attacker] != 0.0 && GetGameTime() < g_timeNextMeleeAttack[attacker])
+				{
+					g_numSuccessiveHits[attacker]++;
+				}else{
+					g_numSuccessiveHits[attacker] = 0;
+				}
+
+#if defined DEBUG
+				PrintToServer("(Player_OnTakeDamage) Time between melee hits for %N (%d): %1.2f", attacker, g_numSuccessiveHits[attacker], g_timeNextMeleeAttack[attacker] - GetGameTime());
+#endif
+				g_timeNextMeleeAttack[attacker] = GetEntPropFloat(melee, Prop_Send, "m_flNextPrimaryAttack") + 0.5;
 			}
 		}
 
@@ -5650,11 +5622,11 @@ bool Player_FindFreePosition2(int client, float position[3], float mins[3], floa
 
 				// Perform a line of sight check to avoid spawning players in unreachable map locations.
 				// The tank has this weird bug where players can be pushed into map displacements and can sometimes go completely through a wall.
-				TR_TraceRayFilter(position, freePosition, mask, RayType_EndPoint, TraceEntityFilter_LOS);
+				TR_TraceRayFilter(position, freePosition, mask, RayType_EndPoint, TraceFilter_LOS);
 
 				if(!TR_DidHit())
 				{
-					TR_TraceHullFilter(freePosition, freePosition, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+					TR_TraceHullFilter(freePosition, freePosition, mins, maxs, mask, TraceFilter_NotTeam, team);
 
 					if(!TR_DidHit())
 					{
@@ -5730,7 +5702,7 @@ bool Player_FindFreePosition(int client, float position[3], float mins[3], float
 
 				int mask = MASK_RED;
 				if(team != TFTeam_Red) mask = MASK_BLUE;
-				TR_TraceHullFilter(flPos, flPos, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+				TR_TraceHullFilter(flPos, flPos, mins, maxs, mask, TraceFilter_NotTeam, team);
 
 				if(!TR_DidHit())
 				{
@@ -5738,7 +5710,7 @@ bool Player_FindFreePosition(int client, float position[3], float mins[3], float
 
 					// Perform a line of sight check to avoid spawning players in unreachable map locations.
 					// The tank has this weird bug where players can be pushed into map displacements and can sometimes go completely into a wall.
-					TR_TraceRayFilter(position, flPos, mask, RayType_EndPoint, TraceEntityFilter_LOS);
+					TR_TraceRayFilter(position, flPos, mask, RayType_EndPoint, TraceFilter_LOS);
 
 					if(!TR_DidHit())
 					{
@@ -5774,7 +5746,7 @@ bool Player_FindFreePosition(int client, float position[3], float mins[3], float
 }
 */
 
-public bool TraceEntityFilter_NotTeam(int entity, int contentsMask, int team)
+public bool TraceFilter_NotTeam(int entity, int contentsMask, int team)
 {
 	if(entity >= 1 && entity <= MaxClients && GetClientTeam(entity) == team)
 	{
@@ -5784,7 +5756,7 @@ public bool TraceEntityFilter_NotTeam(int entity, int contentsMask, int team)
 	return true;
 }
 
-public bool TraceEntityFilter_LOS(int entity, int contentsMask, int notUsed)
+public bool TraceFilter_LOS(int entity, int contentsMask, int notUsed)
 {
 	if(entity <= 0) return true; // Hit the world.
 
@@ -5801,6 +5773,13 @@ public bool TraceEntityFilter_LOS(int entity, int contentsMask, int notUsed)
 	}
 
 	return true;
+}
+
+public bool TraceFilter_HitWorld(int entity, int contentsMask, int notUsed)
+{
+	if(entity <= 0) return true; // Hit the world.
+
+	return false;
 }
 
 void Tank_Think(int iTank)
@@ -6782,20 +6761,6 @@ int SDK_EndTouch(int iEntity, int iOther)
 	return -1;
 }
 
-int SDK_HealRadius(int client, bool enable)
-{
-	if(g_hSDKHealRadius != INVALID_HANDLE && g_iOffset_m_Shared > 0 && client >= 1 && client <= MaxClients && IsClientInGame(client))
-	{
-#if defined DEBUG
-		//PrintToServer("(SDK_HealRadius) Calling on %N..", client);
-#endif
-		Address addrPlayerShared = GetEntityAddress(client) + view_as<Address>(g_iOffset_m_Shared);
-		return SDKCall(g_hSDKHealRadius, addrPlayerShared, enable);
-	}
-
-	return -1;
-}
-
 int SDK_RecalculateChargeEffects(int client, bool enable)
 {
 	if(g_hSDKChargeEffects != INVALID_HANDLE && g_iOffset_m_Shared > 0 && client >= 1 && client <= MaxClients && IsClientInGame(client))
@@ -6814,8 +6779,25 @@ int SDK_Heal(int playerToHeal, int entityDoingHealing, float flAmountToHeal, flo
 {
 	if(g_hSDKHeal != INVALID_HANDLE && g_iOffset_m_Shared > 0 && playerToHeal >= 1 && playerToHeal <= MaxClients && IsClientInGame(playerToHeal) && IsValidEntity(entityDoingHealing))
 	{
+#if defined DEBUG
+		//PrintToServer("(SDK_Heal) %N is being healed by %N..", playerToHeal, entityDoingHealing);
+#endif
 		Address addrPlayerShared = GetEntityAddress(playerToHeal) + view_as<Address>(g_iOffset_m_Shared);
 		return SDKCall(g_hSDKHeal, addrPlayerShared, entityDoingHealing, flAmountToHeal, flHealTime, flHealTime2, unk5, unk6);
+	}
+
+	return -1;
+}
+
+int SDK_StopHealing(int client, int entity)
+{
+	if(g_hSDKStopHealing != INVALID_HANDLE && g_iOffset_m_Shared > 0 && client >= 1 && client <= MaxClients && IsClientInGame(client) && IsValidEntity(entity))
+	{
+		Address addrPlayerShared = GetEntityAddress(client) + view_as<Address>(g_iOffset_m_Shared);
+#if defined DEBUG
+		//PrintToServer("(SDK_StopHealing) [0x%X -> 0x%X](0x%X)", GetEntityAddress(client), addrPlayerShared, GetEntityAddress(entity));
+#endif
+		return SDKCall(g_hSDKStopHealing, addrPlayerShared, entity);
 	}
 
 	return -1;
@@ -6888,13 +6870,6 @@ void SDK_Init()
 	{
 		LogMessage("Failed to load gamedata: tank.txt!");
 		return;
-	}
-
-	// This offset stores the number of players being healed in the medic's radius heal
-	g_iOffset_m_HealingRadius = GameConfGetOffset(hGamedata, "CTFPlayerShared::m_HealingRadius");
-	if(g_iOffset_m_HealingRadius == -1)
-	{
-		LogMessage("Failed to get offset: CTFPlayerShared::m_HealingRadius!");
 	}
 	
 	int offset = GameConfGetOffset(hGamedata, "CBaseEntity::PhysicsSolidMaskForEntity");
@@ -7081,17 +7056,7 @@ void SDK_Init()
 		LogMessage("Failed to create call: CTFWeaponBase::GetMaxClip1!");
 	}
 
-	// This call sets up the amputator AoE healing effect
-	StartPrepSDKCall(SDKCall_Raw);
-	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTFPlayerShared::Heal_Radius");
-	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-	g_hSDKHealRadius = EndPrepSDKCall();
-	if(g_hSDKHealRadius == INVALID_HANDLE)
-	{
-		LogMessage("Failed to create call: CTFPlayerShared::Heal_Radius!");
-	}
-
-	// This call reactivates medigun charge effects based on healing
+	// This call reactivates medigun charge effects based on healing.
 	StartPrepSDKCall(SDKCall_Raw);
 	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTFPlayerShared::RecalculateChargeEffects");
 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
@@ -7101,7 +7066,7 @@ void SDK_Init()
 		LogMessage("Failed to create call: CTFPlayerShared::RecalculateChargeEffects!");
 	}
 
-	// This call heals another player, used to simulate the AoE healing effect when it is broken
+	// This call is used for the medic healing aoe.
 	StartPrepSDKCall(SDKCall_Raw);
 	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTFPlayerShared::Heal");
 	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
@@ -7116,8 +7081,7 @@ void SDK_Init()
 		LogMessage("Failed to create call: CTFPlayerShared::Heal!");
 	}
 
-	// This call allows us to determine if a player is being healed by a specific entity
-	// If you are keeping track, that's 4 game calls, 1 memory patch, and 1 offset JUST to make the medic aoe effect work -_-
+	// This call allows us to determine if a player is being healed by a specific entity.
 	StartPrepSDKCall(SDKCall_Raw);
 	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTFPlayerShared::FindHealerIndex");
 	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
@@ -7126,6 +7090,17 @@ void SDK_Init()
 	if(g_hSDKFindHealerIndex == INVALID_HANDLE)
 	{
 		LogMessage("Failed to create call: CTFPlayerShared::FindHealerIndex!");
+	}
+
+	// This call is used for the medic healing aoe.
+	StartPrepSDKCall(SDKCall_Raw);
+	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTFPlayerShared::StopHealing");
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	PrepSDKCall_SetReturnInfo(SDKType_Float, SDKPass_Plain);
+	g_hSDKStopHealing = EndPrepSDKCall();
+	if(g_hSDKStopHealing == INVALID_HANDLE)
+	{
+		LogMessage("Failed to create call: CTFPlayerShared::StopHealing!");
 	}
 
 	// This call is used to play the knife blocked animation.
@@ -7923,7 +7898,7 @@ public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLAT
 					int mask = MASK_RED;
 					if(team != TFTeam_Red) mask = MASK_BLUE;
 
-					TR_TraceHullFilter(pos, pos, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+					TR_TraceHullFilter(pos, pos, mins, maxs, mask, TraceFilter_NotTeam, team);
 					if(TR_DidHit())
 					{
 #if defined DEBUG
@@ -12140,7 +12115,7 @@ public void TF2_OnConditionRemoved(int client, TFCond condition)
 				int mask = MASK_RED;
 				if(team != TFTeam_Red) mask = MASK_BLUE;
 
-				TR_TraceHullFilter(pos, pos, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+				TR_TraceHullFilter(pos, pos, mins, maxs, mask, TraceFilter_NotTeam, team);
 				if(TR_DidHit())
 				{
 #if defined DEBUG
@@ -14469,7 +14444,7 @@ public Action Timer_OvertimeStarted(Handle hTimer)
 	g_isRaceInOvertime = true;
 
 	char message[256];
-	Format(message, sizeof(message), "%T", "Tank_Game_Overtime", LANG_SERVER);
+	Format(message, sizeof(message), "%T", "Tank_GameText_Overtime", LANG_SERVER);
 	ShowGameMessage(message, "ico_notify_ten_seconds", 5.0);
 
 	g_timerFailsafe = INVALID_HANDLE;
@@ -14975,7 +14950,7 @@ public void EntityOutput_TriggerTeleport(const char[] output, int caller, int ac
 			int mask = MASK_RED;
 			if(team != TFTeam_Red) mask = MASK_BLUE;
 
-			TR_TraceHullFilter(pos, pos, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+			TR_TraceHullFilter(pos, pos, mins, maxs, mask, TraceFilter_NotTeam, team);
 			if(TR_DidHit())
 			{
 #if defined DEBUG
@@ -15485,59 +15460,24 @@ public Action Event_ChargeDeployed(Handle hEvent, const char[] strEventName, boo
 	return Plugin_Continue;
 }
 
-/*
-bool Vaccinator_IsChargeReleased(int client)
+public Action TF2_CalcIsAttackCritical(int client, int weapon, char[] weaponname, bool &result)
 {
-	return (TF2_IsPlayerInCondition(client, TFCond_UberBulletResist) || TF2_IsPlayerInCondition(client, TFCond_UberBlastResist) || TF2_IsPlayerInCondition(client, TFCond_UberFireResist));
-}
-
-void Reviving_Think()
-{
-	// Fix the vaccinator not rapidly healing reanimators while under an uber resist condition.
-	// This was broken when Valve changed the functionality of the vaccinator's uber. Hopefully, it was unintentional.
-	for(int i=1; i<=MaxClients; i++)
+	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_GUNSLINGER_COMBO) && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss") && IsPlayerAlive(client))
 	{
-		bool healingReviveMarker = false;
-
-		if(IsClientInGame(i) && IsPlayerAlive(i) && GetClientTeam(i) == TFTeam_Red && TF2_GetPlayerClass(i) == TFClass_Medic && Vaccinator_IsChargeReleased(i))
+		int melee = GetPlayerWeaponSlot(client, WeaponSlot_Melee);
+		if(melee > MaxClients && melee == weapon)
 		{
-			int medigun = GetPlayerWeaponSlot(i, WeaponSlot_Secondary);
-			if(medigun > MaxClients && GetEntProp(medigun, Prop_Send, "m_iItemDefinitionIndex") == ITEM_VACCINATOR)
-			{
-				int marker = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
-				if(marker > MaxClients)
-				{
-					char classname[24];
-					GetEdictClassname(marker, classname, sizeof(classname));
-					if(strcmp(classname, "entity_revive_marker") == 0)
-					{
-						healingReviveMarker = true;		
-#if defined DEBUG
-						if(!g_reviving[i])
-						{
-							PrintToServer("(Reviving_Think) Applying vac conpensation on %N..", i);
-						}
-#endif
-						g_reviving[i] = true;
-
-						Tank_SetAttributeValue(i, ATTRIB_HEAL_RATE_BONUS, 4.0);
-					}
-				}
-			}
-		}
-
-		if(g_reviving[i] && !healingReviveMarker)
-		{
-			g_reviving[i] = false;
-
-			if(IsClientInGame(i))
+			// Award a critical for every 3 successive melee strikes for the "gunslinger_combo" giant template tag.
+			if(g_numSuccessiveHits[client] >= 1 && g_timeNextMeleeAttack[client] != 0.0 && GetGameTime() < g_timeNextMeleeAttack[client])
 			{
 #if defined DEBUG
-				PrintToServer("(Reviving_Think) Removing vac conpensation on %N..", i);
+				PrintToServer("(TF2_CalcIsAttackCritical) %N triggered a gunslinger combo crit (%d)!", client, g_numSuccessiveHits[client]);
 #endif
-				Tank_RemoveAttribute(i, ATTRIB_HEAL_RATE_BONUS);
+				result = true;
+				return Plugin_Changed;
 			}
 		}
 	}
+
+	return Plugin_Continue;
 }
-*/

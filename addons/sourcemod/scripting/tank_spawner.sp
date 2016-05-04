@@ -685,7 +685,7 @@ public Action Spawner_Timer_Spawn(Handle hTimer, int client)
 			int mask = MASK_RED;
 			if(team != TFTeam_Red) mask = MASK_BLUE;
 
-			TR_TraceHullFilter(flPos, flPos, mins, maxs, mask, TraceEntityFilter_NotTeam, team);
+			TR_TraceHullFilter(flPos, flPos, mins, maxs, mask, TraceFilter_NotTeam, team);
 			if(TR_DidHit())
 			{
 #if defined DEBUG
