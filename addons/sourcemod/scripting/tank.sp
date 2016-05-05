@@ -10869,14 +10869,6 @@ public Action Command_Test2(int client, int args)
 {
 	//
 	if(args == 1) SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 1.0);
-	if(args == 2)
-	{
-		GameRules_SetProp("m_bPlayingMannVsMachine", true);
-	}
-	if(args == 3)
-	{
-		GameRules_SetProp("m_bPlayingMannVsMachine", false);
-	}
 
 	return Plugin_Handled;
 }
@@ -11039,7 +11031,7 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "May-5: Multiple bug fixes.");
+	DrawPanelText(hPanel, "May-5: Carry the bomb while ubered/bonked.");
 
 	if(GetConVarBool(g_hCvarOfficialServer))
 	{
