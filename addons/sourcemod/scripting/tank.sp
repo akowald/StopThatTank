@@ -7131,6 +7131,7 @@ void SDK_Init()
 			g_patchPhysics = new MemoryPatch(addrPhysics, payload, patchLength, NumberType_Int8);
 		}
 	}
+	if(g_patchPhysics == null) LogMessage("Failed to create patch: Patch_PhysicsSimulate!");
 
 	// This patch prevents a windows crash on spawn due to player upgrade history.
 	Address addrUpgrade = GameConfGetAddress(hGamedata, "Patch_UpgradeHistory");
@@ -7183,6 +7184,7 @@ void SDK_Init()
 			}
 		}
 	}
+	if(g_patchKnockback == null) LogMessage("Failed to create patch: Patch_Knockback!");
 
 	// This patch allows bonked players to pick up the bomb.
 	Address addrTouchBonk = GameConfGetAddress(hGamedata, "Patch_FlagTouchBonk");
@@ -7207,6 +7209,7 @@ void SDK_Init()
 			}
 		}
 	}
+	if(g_patchTouchBonk == null) LogMessage("Failed to create patch: Patch_FlagTouchBonk!");
 
 	// This patch allows ubered players to pick up the bomb.
 	Address addrTouchUber = GameConfGetAddress(hGamedata, "Patch_FlagTouchUber");
@@ -7230,7 +7233,8 @@ void SDK_Init()
 				g_patchTouchUber = new MemoryPatch(addrTouchUber+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
 			}
 		}
-	}	
+	}
+	if(g_patchTouchUber == null) LogMessage("Failed to create patch: Patch_FlagTouchUber!");
 
 	// This patch allows players to activate bonk while carrying the bomb.
 	Address addrTauntBonk = GameConfGetAddress(hGamedata, "Patch_FlagTauntBonk");
@@ -7254,7 +7258,8 @@ void SDK_Init()
 				g_patchTauntBonk = new MemoryPatch(addrTauntBonk+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
 			}
 		}
-	}	
+	}
+	if(g_patchTauntBonk == null) LogMessage("Failed to create patch: Patch_FlagTauntBonk!");
 
 	// This patch prevents the bomb from being dropped when the player activates bonk while carrying the bomb.
 	Address addrDropBonk = GameConfGetAddress(hGamedata, "Patch_FlagDropBonk");
@@ -7279,6 +7284,7 @@ void SDK_Init()
 			}
 		}
 	}
+	if(g_patchDropBonk == null) LogMessage("Failed to create patch: Patch_FlagDropBonk!");
 
 	// This patch lets arrow projectiles pass through entity_revive_marker's of another team.
 	Address addrReviveArrow = GameConfGetAddress(hGamedata, "Patch_ReviveArrow");
@@ -7302,7 +7308,8 @@ void SDK_Init()
 				g_patchReviveArrow = new MemoryPatch(addrReviveArrow+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
 			}
 		}
-	}	
+	}
+	if(g_patchReviveArrow == null) LogMessage("Failed to create patch: Patch_ReviveArrow!");
 
 	// This patch lets rocket projectiles pass through entity_revive_marker's of another team.
 	Address addrReviveRocket = GameConfGetAddress(hGamedata, "Patch_ReviveRocket");
@@ -7326,7 +7333,8 @@ void SDK_Init()
 				g_patchReviveRocket = new MemoryPatch(addrReviveRocket+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
 			}
 		}
-	}	
+	}
+	if(g_patchReviveRocket == null) LogMessage("Failed to create patch: Patch_ReviveRocket!");
 
 	delete hGamedata;
 }

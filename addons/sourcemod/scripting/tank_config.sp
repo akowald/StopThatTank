@@ -948,7 +948,7 @@ methodmap MemoryPatch < ArrayList
 	 */
 	public MemoryPatch(Address address, int[] payload, int payloadCount, NumberType size)
 	{
-		if(address < (view_as<Address>(Address_MinimumValid)) || payloadCount == 0) return null;
+		if(address == Address_Null || payloadCount <= 0) return null;
 
 		ArrayList list = new ArrayList();
 
