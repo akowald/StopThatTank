@@ -968,7 +968,6 @@ enum
 {
 	Interest_None=0,
 	Interest_Dispenser,
-	Interest_ReviveMarker
 };
 int g_entitiesOfInterest[MAX_EDICTS+1];
 
@@ -1213,7 +1212,7 @@ public void OnPluginStart()
 	g_hCvarRaceGiantHealthMin = CreateConVar("tank_race_giant_health_min", "0.5", "Minimum percentage that giant health and overheal will be scaled to based on opposite team player count in plr_.");
 	g_hCvarRaceTimeOvertime = CreateConVar("tank_race_time_overtime", "4.0", "Time (minutes) after the final wave that overtime will begin and the cart will no longer move backwards.");
 
-	g_hCvarReanimatorReviveMult = CreateConVar("tank_reanimator_revive_multiplier", "10", "The health added for each successful revive of a player.");
+	g_hCvarReanimatorReviveMult = CreateConVar("tank_reanimator_revive_multiplier", "5", "The health added for each successful revive of a player.");
 	g_hCvarReanimatorMaxHealthMult = CreateConVar("tank_reanimator_maxhealth_multiplier", "0.5", "The max health multiplier of the player's max health.");
 	g_hCvarReanimatorVacUber = CreateConVar("tank_reanimator_vac_uber", "0.75", "Percent of max health to instantly heal when the player pops a vaccinator uber while healing a revive marker.");
 
@@ -7281,6 +7280,54 @@ void SDK_Init()
 		}
 	}
 
+	// This patch lets arrow projectiles pass through entity_revive_marker's of another team.
+	Address addrReviveArrow = GameConfGetAddress(hGamedata, "Patch_ReviveArrow");
+	if(addrReviveArrow == Address_Null)
+	{
+		LogMessage("Failed to find address: Patch_ReviveArrow!");
+	}else{
+		int patchOffset = GameConfGetOffset(hGamedata, "Patch_ReviveArrow");
+		if(patchOffset <= -1)
+		{
+			LogMessage("Failed to find offset: Patch_ReviveArrow!");
+		}else{
+			int patchPayload = GameConfGetOffset(hGamedata, "Payload_ReviveArrow");
+			if(patchPayload <= -1)
+			{
+				LogMessage("Failed to find payload: Payload_ReviveArrow!");
+			}else{
+				int payload[1];
+				payload[0] = patchPayload;
+
+				g_patchReviveArrow = new MemoryPatch(addrReviveArrow+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+			}
+		}
+	}	
+
+	// This patch lets rocket projectiles pass through entity_revive_marker's of another team.
+	Address addrReviveRocket = GameConfGetAddress(hGamedata, "Patch_ReviveRocket");
+	if(addrReviveRocket == Address_Null)
+	{
+		LogMessage("Failed to find address: Patch_ReviveRocket!");
+	}else{
+		int patchOffset = GameConfGetOffset(hGamedata, "Patch_ReviveRocket");
+		if(patchOffset <= -1)
+		{
+			LogMessage("Failed to find offset: Patch_ReviveRocket!");
+		}else{
+			int patchPayload = GameConfGetOffset(hGamedata, "Payload_ReviveRocket");
+			if(patchPayload <= -1)
+			{
+				LogMessage("Failed to find payload: Payload_ReviveRocket!");
+			}else{
+				int payload[1];
+				payload[0] = patchPayload;
+
+				g_patchReviveRocket = new MemoryPatch(addrReviveRocket+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+			}
+		}
+	}	
+
 	delete hGamedata;
 }
 
@@ -10822,6 +10869,14 @@ public Action Command_Test2(int client, int args)
 {
 	//
 	if(args == 1) SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 1.0);
+	if(args == 2)
+	{
+		GameRules_SetProp("m_bPlayingMannVsMachine", true);
+	}
+	if(args == 3)
+	{
+		GameRules_SetProp("m_bPlayingMannVsMachine", false);
+	}
 
 	return Plugin_Handled;
 }
@@ -10984,10 +11039,8 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "Feb-1: Rebalances for Payload Race.");
-	//DrawPanelText(hPanel, "Dec-18: Added support for pl_snowycoast.");
-	//DrawPanelText(hPanel, "Nov-28: Added transparent Tanks on Setup.");
-	//DrawPanelText(hPanel, "Nov-1: Added Hellstone support!");
+	DrawPanelText(hPanel, "May-5: Multiple bug fixes.");
+
 	if(GetConVarBool(g_hCvarOfficialServer))
 	{
 		DrawPanelText(hPanel, "Type !invite to join our Steam Group!");
@@ -11314,8 +11367,6 @@ void Reanimator_Create(int client, bool bFeignMarker=false, int disguisedClass=0
 			SetEntProp(iMarker, Prop_Send, "m_nBody", bodyGroup);
 
 			SDKHook(iMarker, SDKHook_SetTransmit, Reanimator_MarkerSetTransmit);
-			//SDKHook(iMarker, SDKHook_ShouldCollide, Reanimator_ShouldCollide);
-			//SDKHook(iMarker, SDKHook_TouchPost, Reanimator_OnTouch);
 
 			DispatchSpawn(iMarker);
 #if defined DEBUG
@@ -11332,8 +11383,6 @@ void Reanimator_Create(int client, bool bFeignMarker=false, int disguisedClass=0
 			// Their formula for m_iMaxHealth is as follows: (player max health)/2 + 10*(revive count)
 			int iMaxHealth = RoundToFloor(float(SDK_GetMaxHealth(client))*config.LookupFloat(g_hCvarReanimatorMaxHealthMult)) + config.LookupInt(g_hCvarReanimatorReviveMult)*g_iReanimatorNumRevives[client];
 			SetEntProp(iMarker, Prop_Send, "m_iMaxHealth", iMaxHealth);
-
-			//g_entitiesOfInterest[iMarker] = Interest_ReviveMarker;
 
 			//SetEntProp(iMarker, Prop_Send, "m_nSolidType", 2); 
 			//SetEntProp(iMarker, Prop_Send, "m_usSolidFlags", 4|8); 
@@ -11398,16 +11447,20 @@ void Reanimator_Create(int client, bool bFeignMarker=false, int disguisedClass=0
 	}
 }
 
-public bool TraceFilter_Reanimator(int entity, int mask, int iMarker)
+public bool TraceFilter_Reanimator(int entity, int mask, int marker)
 {
-	if(entity == iMarker) return false;
+	if(entity == 0) return true; // Hit world.
+	if(entity == marker) return false;
 
-	char strClass[24];
-	GetEdictClassname(entity, strClass, sizeof(strClass));
-	//PrintToServer("Hit entity %d \"%s\" mask: %d", entity, strClass, mask);
-	if(strncmp(strClass, "tf_ammo_pack", 12) == 0) return false;
+	char classname[24];
+	GetEdictClassname(entity, classname, sizeof(classname));
+	//PrintToServer("Hit entity %d \"%s\" mask: %d", entity, classname, mask);
+	if(strncmp(classname, "tf_ammo_pack", 12) == 0) return false;
+	if(strncmp(classname, "tf_dropped_weapon", 17) == 0) return false;
+	if(strncmp(classname, "entity_revive_marker", 20) == 0) return false;
+	if(strncmp(classname, "tf_projectile_arrow", 19) == 0) return false;
 
-	return entity > MaxClients || entity == 0;
+	return entity > MaxClients;
 }
 
 public Action Reanimator_MarkerSetTransmit(int iMarker, int client)
@@ -14359,21 +14412,6 @@ public Action Tank_PassFilter(int ent1, int ent2, bool &result)
 				return Plugin_Handled;
 			}
 		}
-		/*
-		// Fixes projectiles from colliding with revive markers.
-		case Interest_ReviveMarker:
-		{
-			if(ent1 > MaxClients && ent2 > MaxClients)
-			{
-				char className[32];
-				GetEdictClassname(ent2, className, sizeof(className));
-				PrintToServer("ReviveMarker collision: ent1 = %d, ent2 = %d \"%s\"", ent1, ent2, className);
-
-				result = false;
-				return Plugin_Handled;
-			}
-		}
-		*/
 	}
 
 	return Plugin_Continue;
@@ -14780,6 +14818,16 @@ void Mod_Toggle(bool enable)
 			LogMessage("Patching FlagDropBonk at 0x%X..", g_patchDropBonk.Get(MemoryIndex_Address));
 			g_patchDropBonk.enable();
 		}
+		if(g_patchReviveArrow != null && !g_patchReviveArrow.isEnabled())
+		{
+			LogMessage("Patching ReviveArrow at 0x%X..", g_patchReviveArrow.Get(MemoryIndex_Address));
+			g_patchReviveArrow.enable();
+		}
+		if(g_patchReviveRocket != null && !g_patchReviveRocket.isEnabled())
+		{
+			LogMessage("Patching ReviveRocket at 0x%X..", g_patchReviveRocket.Get(MemoryIndex_Address));
+			g_patchReviveRocket.enable();
+		}
 
 		LogMessage("Stop that Tank!: Ready");
 	}else{
@@ -14825,6 +14873,16 @@ void Mod_Toggle(bool enable)
 		{
 			LogMessage("Un-patching FlagDropBonk at 0x%X..", g_patchDropBonk.Get(MemoryIndex_Address));
 			g_patchDropBonk.disable();
+		}
+		if(g_patchReviveArrow != null && g_patchReviveArrow.isEnabled())
+		{
+			LogMessage("Un-patching ReviveArrow at 0x%X..", g_patchReviveArrow.Get(MemoryIndex_Address));
+			g_patchReviveArrow.disable();
+		}
+		if(g_patchReviveRocket != null && g_patchReviveRocket.isEnabled())
+		{
+			LogMessage("Un-patching ReviveRocket at 0x%X..", g_patchReviveRocket.Get(MemoryIndex_Address));
+			g_patchReviveRocket.disable();
 		}
 
 		// User should reset cvars in server.cfg.
