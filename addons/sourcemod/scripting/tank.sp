@@ -7129,9 +7129,9 @@ void SDK_Init()
 			for(int i=0; i<patchLength; i++) payload[i] = OpCode_NOP;
 
 			g_patchPhysics = new MemoryPatch(addrPhysics, payload, patchLength, NumberType_Int8);
+			if(g_patchPhysics == null) LogMessage("Failed to create patch: Patch_PhysicsSimulate!");
 		}
 	}
-	if(g_patchPhysics == null) LogMessage("Failed to create patch: Patch_PhysicsSimulate!");
 
 	// This patch prevents a windows crash on spawn due to player upgrade history.
 	Address addrUpgrade = GameConfGetAddress(hGamedata, "Patch_UpgradeHistory");
@@ -7157,6 +7157,7 @@ void SDK_Init()
 			for(int i=0; i<sizeof(payload); i++) payload[i] = OpCode_NOP;
 
 			g_patchUpgrade = new MemoryPatch(addrUpgrade+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+			if(g_patchUpgrade == null) LogMessage("Failed to create patch: Patch_UpgradeHistory!");
 		}
 	}
 	
@@ -7181,10 +7182,10 @@ void SDK_Init()
 				payload[0] = patchPayload;
 
 				g_patchKnockback = new MemoryPatch(addrKnockback+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+				if(g_patchKnockback == null) LogMessage("Failed to create patch: Patch_Knockback!");
 			}
 		}
 	}
-	if(g_patchKnockback == null) LogMessage("Failed to create patch: Patch_Knockback!");
 
 	// This patch allows bonked players to pick up the bomb.
 	Address addrTouchBonk = GameConfGetAddress(hGamedata, "Patch_FlagTouchBonk");
@@ -7206,10 +7207,10 @@ void SDK_Init()
 				payload[0] = patchPayload;
 
 				g_patchTouchBonk = new MemoryPatch(addrTouchBonk+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+				if(g_patchTouchBonk == null) LogMessage("Failed to create patch: Patch_FlagTouchBonk!");
 			}
 		}
 	}
-	if(g_patchTouchBonk == null) LogMessage("Failed to create patch: Patch_FlagTouchBonk!");
 
 	// This patch allows ubered players to pick up the bomb.
 	Address addrTouchUber = GameConfGetAddress(hGamedata, "Patch_FlagTouchUber");
@@ -7231,10 +7232,10 @@ void SDK_Init()
 				payload[0] = patchPayload;
 
 				g_patchTouchUber = new MemoryPatch(addrTouchUber+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+				if(g_patchTouchUber == null) LogMessage("Failed to create patch: Patch_FlagTouchUber!");
 			}
 		}
 	}
-	if(g_patchTouchUber == null) LogMessage("Failed to create patch: Patch_FlagTouchUber!");
 
 	// This patch allows players to activate bonk while carrying the bomb.
 	Address addrTauntBonk = GameConfGetAddress(hGamedata, "Patch_FlagTauntBonk");
@@ -7256,10 +7257,10 @@ void SDK_Init()
 				payload[0] = patchPayload;
 
 				g_patchTauntBonk = new MemoryPatch(addrTauntBonk+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+				if(g_patchTauntBonk == null) LogMessage("Failed to create patch: Patch_FlagTauntBonk!");
 			}
 		}
 	}
-	if(g_patchTauntBonk == null) LogMessage("Failed to create patch: Patch_FlagTauntBonk!");
 
 	// This patch prevents the bomb from being dropped when the player activates bonk while carrying the bomb.
 	Address addrDropBonk = GameConfGetAddress(hGamedata, "Patch_FlagDropBonk");
@@ -7281,60 +7282,10 @@ void SDK_Init()
 				payload[0] = patchPayload;
 
 				g_patchDropBonk = new MemoryPatch(addrDropBonk+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
+				if(g_patchDropBonk == null) LogMessage("Failed to create patch: Patch_FlagDropBonk!");
 			}
 		}
 	}
-	if(g_patchDropBonk == null) LogMessage("Failed to create patch: Patch_FlagDropBonk!");
-
-	// This patch lets arrow projectiles pass through entity_revive_marker's of another team.
-	Address addrReviveArrow = GameConfGetAddress(hGamedata, "Patch_ReviveArrow");
-	if(addrReviveArrow == Address_Null)
-	{
-		LogMessage("Failed to find address: Patch_ReviveArrow!");
-	}else{
-		int patchOffset = GameConfGetOffset(hGamedata, "Patch_ReviveArrow");
-		if(patchOffset <= -1)
-		{
-			LogMessage("Failed to find offset: Patch_ReviveArrow!");
-		}else{
-			int patchPayload = GameConfGetOffset(hGamedata, "Payload_ReviveArrow");
-			if(patchPayload <= -1)
-			{
-				LogMessage("Failed to find payload: Payload_ReviveArrow!");
-			}else{
-				int payload[1];
-				payload[0] = patchPayload;
-
-				g_patchReviveArrow = new MemoryPatch(addrReviveArrow+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
-			}
-		}
-	}
-	if(g_patchReviveArrow == null) LogMessage("Failed to create patch: Patch_ReviveArrow!");
-
-	// This patch lets rocket projectiles pass through entity_revive_marker's of another team.
-	Address addrReviveRocket = GameConfGetAddress(hGamedata, "Patch_ReviveRocket");
-	if(addrReviveRocket == Address_Null)
-	{
-		LogMessage("Failed to find address: Patch_ReviveRocket!");
-	}else{
-		int patchOffset = GameConfGetOffset(hGamedata, "Patch_ReviveRocket");
-		if(patchOffset <= -1)
-		{
-			LogMessage("Failed to find offset: Patch_ReviveRocket!");
-		}else{
-			int patchPayload = GameConfGetOffset(hGamedata, "Payload_ReviveRocket");
-			if(patchPayload <= -1)
-			{
-				LogMessage("Failed to find payload: Payload_ReviveRocket!");
-			}else{
-				int payload[1];
-				payload[0] = patchPayload;
-
-				g_patchReviveRocket = new MemoryPatch(addrReviveRocket+view_as<Address>(patchOffset), payload, sizeof(payload), NumberType_Int8);
-			}
-		}
-	}
-	if(g_patchReviveRocket == null) LogMessage("Failed to create patch: Patch_ReviveRocket!");
 
 	delete hGamedata;
 }
@@ -9409,6 +9360,10 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 	{
 		// Fixes for the arrow penetration attribute
 		SDKHook(iEntity, SDKHook_Touch, Arrow_OnTouch);
+	}else if(strcmp(classname, "tf_projectile_healing_bolt") == 0 || strcmp(classname, "tf_projectile_rocket") == 0)
+	{
+		// Fix these projectiles from colliding with revive markers.
+		SDKHook(iEntity, SDKHook_Touch, Projectile_OnTouch);
 	}else if(g_timeSentryBusterDied > 0.0 && strcmp(classname, "tf_ammo_pack") == 0 && GetEngineTime() - g_timeSentryBusterDied < 0.05)
 	{
 		// Block the sentry buster from dropping an ammo pack.
@@ -9463,33 +9418,57 @@ public Action SandmanBall_OnTouch(int iBall, int client)
 	return Plugin_Continue;
 }
 
-public Action Arrow_OnTouch(int iProjectileArrow, int client)
+public Action Projectile_OnTouch(int arrow, int entity)
 {
-	// The "projectile penetration" attribute causes some problems
+	if(entity > MaxClients)
+	{
+		char classname[24];
+		GetEdictClassname(entity, classname, sizeof(classname));
+		if(strncmp(classname, "entity_revive_marker", 20) == 0)
+		{
+			return Plugin_Handled;
+		}
+	}
 
+	return Plugin_Continue;
+}
+
+public Action Arrow_OnTouch(int arrow, int entity)
+{
+	char classname[24];
+	GetEdictClassname(entity, classname, sizeof(classname));
+	if(entity > MaxClients)
+	{
+		if(strncmp(classname, "entity_revive_marker", 20) == 0)
+		{
+			return Plugin_Handled;
+		}
+	}
+
+	// The "projectile penetration" attribute causes some problems.
 	// Get the arrow's owner
-	int iOwner = GetEntPropEnt(iProjectileArrow, Prop_Send, "m_hOwnerEntity");
-	if(iOwner >= 1 && iOwner <= MaxClients && IsClientInGame(iOwner) && GetEntProp(iOwner, Prop_Send, "m_bIsMiniBoss"))
+	int owner = GetEntPropEnt(arrow, Prop_Send, "m_hOwnerEntity");
+	if(owner >= 1 && owner <= MaxClients && IsClientInGame(owner) && GetEntProp(owner, Prop_Send, "m_bIsMiniBoss"))
 	{
 		// The launcher's uber will break arrows
-		if(client >= 1 && client <= MaxClients)
+		if(entity >= 1 && entity <= MaxClients)
 		{
-			//PrintToChatAll("m_hOwnerEntity = %d | team = %d", iOwner, GetEntProp(iProjectileArrow, Prop_Send, "m_iTeamNum"));
-			if(iOwner >= 1 && iOwner <= MaxClients)
+			//PrintToChatAll("m_hOwnerEntity = %d | team = %d", owner, GetEntProp(iProjectileArrow, Prop_Send, "m_iTeamNum"));
+			if(owner >= 1 && owner <= MaxClients)
 			{
-				if(iOwner == client)
+				if(owner == entity)
 				{
 					return Plugin_Handled;
 				}
 			}
 		}
 
-		char strClass[24];
-		GetEdictClassname(client, strClass, sizeof(strClass));
-		//PrintToServer("Arrow touched: %s", strClass);
-		if(strncmp(strClass, "prop_dynamic", 12) == 0) return Plugin_Handled;
-		//if(strcmp(strClass, "func_door_rotating") == 0) return Plugin_Handled; // Causes crashes
-		//if(strncmp(strClass, "func_brush", 10) == 0) return Plugin_Handled; // Causes crashes
+		if(entity > MaxClients)
+		{
+			if(strncmp(classname, "prop_dynamic", 12) == 0) return Plugin_Handled;
+			//if(strcmp(classname, "func_door_rotating") == 0) return Plugin_Handled; // Causes crashes
+			//if(strncmp(classname, "func_brush", 10) == 0) return Plugin_Handled; // Causes crashes
+		}
 	}
 
 	return Plugin_Continue;
@@ -14818,16 +14797,6 @@ void Mod_Toggle(bool enable)
 			LogMessage("Patching FlagDropBonk at 0x%X..", g_patchDropBonk.Get(MemoryIndex_Address));
 			g_patchDropBonk.enable();
 		}
-		if(g_patchReviveArrow != null && !g_patchReviveArrow.isEnabled())
-		{
-			LogMessage("Patching ReviveArrow at 0x%X..", g_patchReviveArrow.Get(MemoryIndex_Address));
-			g_patchReviveArrow.enable();
-		}
-		if(g_patchReviveRocket != null && !g_patchReviveRocket.isEnabled())
-		{
-			LogMessage("Patching ReviveRocket at 0x%X..", g_patchReviveRocket.Get(MemoryIndex_Address));
-			g_patchReviveRocket.enable();
-		}
 
 		LogMessage("Stop that Tank!: Ready");
 	}else{
@@ -14873,16 +14842,6 @@ void Mod_Toggle(bool enable)
 		{
 			LogMessage("Un-patching FlagDropBonk at 0x%X..", g_patchDropBonk.Get(MemoryIndex_Address));
 			g_patchDropBonk.disable();
-		}
-		if(g_patchReviveArrow != null && g_patchReviveArrow.isEnabled())
-		{
-			LogMessage("Un-patching ReviveArrow at 0x%X..", g_patchReviveArrow.Get(MemoryIndex_Address));
-			g_patchReviveArrow.disable();
-		}
-		if(g_patchReviveRocket != null && g_patchReviveRocket.isEnabled())
-		{
-			LogMessage("Un-patching ReviveRocket at 0x%X..", g_patchReviveRocket.Get(MemoryIndex_Address));
-			g_patchReviveRocket.disable();
 		}
 
 		// User should reset cvars in server.cfg.

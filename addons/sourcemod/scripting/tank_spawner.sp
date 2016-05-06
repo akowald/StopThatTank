@@ -656,9 +656,6 @@ public Action Spawner_Timer_Spawn(Handle hTimer, int client)
 				}
 			}
 
-			// Give giant robots the ability to see team glows.
-			TF2_AddCondition(client, view_as<TFCond>(TF_COND_TEAM_GLOWS), -1.0);
-
 			if(g_nMapHack == MapHack_HightowerEvent && g_hellTeamWinner > 0)
 			{
 				// Roll a common spell on the giant

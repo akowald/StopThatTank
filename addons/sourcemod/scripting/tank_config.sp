@@ -1034,5 +1034,3 @@ MemoryPatch g_patchTouchBonk = null;
 MemoryPatch g_patchTouchUber = null;
 MemoryPatch g_patchTauntBonk = null;
 MemoryPatch g_patchDropBonk = null;
-MemoryPatch g_patchReviveArrow = null;
-MemoryPatch g_patchReviveRocket = null;
