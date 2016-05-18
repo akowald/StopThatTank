@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5.3"
+#define PLUGIN_VERSION 				"1.5.4"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -2874,20 +2874,23 @@ void Train_ReplaceDispenser(int team)
 
 void Player_FixVaccinator(int client)
 {
+	if(!config.LookupBool(g_hCvarRobot)) return; // Robot player models are switched off.
 	if(GetClientTeam(client) == TFTeam_Red && g_nGameMode != GameMode_Race) return;
 
 	// Makes the backpack part of the vaccinator invisible to prevent stretching when bonemerged with the robot models
-	int iMedigun = GetPlayerWeaponSlot(client, WeaponSlot_Secondary);
-	if(iMedigun > MaxClients && GetEntProp(iMedigun, Prop_Send, "m_iItemDefinitionIndex") == ITEM_VACCINATOR)
+	int medigun = GetPlayerWeaponSlot(client, WeaponSlot_Secondary);
+	if(medigun > MaxClients && GetEntProp(medigun, Prop_Send, "m_iItemDefinitionIndex") == ITEM_VACCINATOR)
 	{
-		int iBackpack = GetEntPropEnt(iMedigun, Prop_Send, "m_hExtraWearable");
-		if(iBackpack > MaxClients)
+		int backpack = GetEntPropEnt(medigun, Prop_Send, "m_hExtraWearable");
+		if(backpack > MaxClients)
 		{
 #if defined DEBUG
-			PrintToServer("(Player_FixVaccinator) %N, %d..", client, iBackpack);
+			PrintToServer("(Player_FixVaccinator) %N, %d..", client, backpack);
 #endif
-			SetEntityRenderMode(iBackpack, RENDER_NONE);
-			//SetEntityRenderColor(iBackpack, _, _, _, 0);
+			AcceptEntityInput(backpack, "Kill");
+
+			//SetEntityRenderMode(backpack, RENDER_NONE);
+			//SetEntityRenderColor(backpack, _, _, _, 0);
 		}
 	}	
 }
@@ -9360,7 +9363,7 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 	{
 		// Fixes for the arrow penetration attribute
 		SDKHook(iEntity, SDKHook_Touch, Arrow_OnTouch);
-	}else if(strcmp(classname, "tf_projectile_healing_bolt") == 0 || strcmp(classname, "tf_projectile_rocket") == 0)
+	}else if(strcmp(classname, "tf_projectile_healing_bolt") == 0 || strcmp(classname, "tf_projectile_rocket") == 0 || strcmp(classname, "tf_projectile_syringe") == 0 || strcmp(classname, "tf_projectile_flare") == 0)
 	{
 		// Fix these projectiles from colliding with revive markers.
 		SDKHook(iEntity, SDKHook_Touch, Projectile_OnTouch);
@@ -10196,12 +10199,33 @@ void Bomb_Think(int iBomb)
 					
 					g_iBombPlayerPlanting = GetClientUserId(client);
 					g_flBombPlantStart = GetEngineTime();
+
+					PrintCenterText(client, " "); // Clear out the "You cannot deploy while INVULNERABLE!" message.
+
+					if(Spawner_HasGiantTag(client, GIANTTAG_MEDIC_AOE) && bIsGiantCarrying)
+					{
+						// Deplete ubercharge in order to not allow medic AOE effects while the giant is deploying.
+						int medigun = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
+						if(medigun > MaxClients)
+						{
+							char classname[24];
+							GetEdictClassname(medigun, classname, sizeof(classname));
+							if(strcmp(classname, "tf_weapon_medigun") == 0)
+							{
+								if(GetEntProp(medigun, Prop_Send, "m_bChargeRelease"))
+								{
+									SetEntPropFloat(medigun, Prop_Send, "m_flChargeLevel", 0.0001);
+									EmitSoundToClient(client, SOUND_FIZZLE);
+								}
+							}
+						}
+					}
 				}else{
 					// Reset the planter
 					g_iBombPlayerPlanting = 0;
 					g_flBombPlantStart = 0.0;
 
-					if(!Bomb_CanPlayerDeploy(client) && (g_timeBombWarning[client] == 0.0 || GetEngineTime() - g_timeBombWarning[client] > 1.0))
+					if(!Bomb_CanPlayerDeploy(client) && (g_timeBombWarning[client] == 0.0 || GetEngineTime() - g_timeBombWarning[client] > 0.3))
 					{
 						g_timeBombWarning[client] = GetEngineTime();
 

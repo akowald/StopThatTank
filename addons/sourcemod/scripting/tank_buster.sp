@@ -144,7 +144,7 @@ void Buster_QueuePlayer(int team, int client)
 	g_nBuster[team][g_flBusterTimeWarned] = 0.0;	
 }
 
-bool Buster_IsMedicexempt(int client)
+bool Buster_IsMedicExempt(int client)
 {
 	if(TF2_GetPlayerClass(client) != TFClass_Medic) return false;
 
@@ -166,14 +166,14 @@ bool Buster_IsMedicexempt(int client)
 	return false;
 }
 
-bool Buster_IsUberexempt(int client)
+bool Buster_IsUberExempt(int client)
 {
 	// The player is under any kind of uber effects.
 	return (TF2_IsPlayerInCondition(client, TFCond_Ubercharged) || TF2_IsPlayerInCondition(client, TFCond_Kritzkrieged) || TF2_IsPlayerInCondition(client, TFCond_MegaHeal)
 			|| TF2_IsPlayerInCondition(client, TFCond_UberBulletResist) || TF2_IsPlayerInCondition(client, TFCond_UberBlastResist) || TF2_IsPlayerInCondition(client, TFCond_UberFireResist));
 }
 
-bool Buster_IsDemoexempt(int client)
+bool Buster_IsDemoExempt(int client)
 {
 	if(TF2_GetPlayerClass(client) != TFClass_DemoMan) return false;
 
@@ -181,7 +181,7 @@ bool Buster_IsDemoexempt(int client)
 	return (TF2_IsPlayerInCondition(client, TFCond_DemoBuff) && GetEntProp(client, Prop_Send, "m_iDecapitations") >= 3);
 }
 
-bool Buster_IsEngieexempt(int client)
+bool Buster_IsEngieExempt(int client)
 {
 	if(TF2_GetPlayerClass(client) != TFClass_Engineer) return false;
 
@@ -322,7 +322,7 @@ void Buster_Think(int team)
 			}
 
 			// Check if an engineer has both teles built OR at least one level 3 building.
-			if(!exempt && Buster_IsEngieexempt(client))
+			if(!exempt && Buster_IsEngieExempt(client))
 			{
 #if defined DEBUG
 				PrintToServer("(Buster_Think) %N is exempt: Engie!", client);
@@ -332,7 +332,7 @@ void Buster_Think(int team)
 			}
 
 			// Check if a medic has built up a certain amount of uber charge.
-			if(!exempt && Buster_IsMedicexempt(client))
+			if(!exempt && Buster_IsMedicExempt(client))
 			{
 #if defined DEBUG
 				PrintToServer("(Buster_Think) %N is exempt: Medic!", client);
@@ -342,7 +342,7 @@ void Buster_Think(int team)
 			}
 
 			// Check if the player is currently ubered.
-			if(!exempt && Buster_IsUberexempt(client))
+			if(!exempt && Buster_IsUberExempt(client))
 			{
 #if defined DEBUG
 				PrintToServer("(Buster_Think) %N is exempt: Ubered!", client);
@@ -352,7 +352,7 @@ void Buster_Think(int team)
 			}
 
 			// Check if the player has eyelander heads.
-			if(!exempt && Buster_IsDemoexempt(client))
+			if(!exempt && Buster_IsDemoExempt(client))
 			{
 #if defined DEBUG
 				PrintToServer("(Buster_Think) %N is exempt: Demo!", client);
@@ -458,15 +458,15 @@ void Buster_IncrementStat(int stat, int team, int value)
 		g_nBuster[team][g_bBusterTimerStarted] = true;
 
 		int oppositeTeam = (team == TFTeam_Red) ? TFTeam_Blue : TFTeam_Red;
-		int iNumSentires = Buster_GetNumActiveSentries(oppositeTeam);
+		int numSentries = Buster_GetNumActiveSentries(oppositeTeam);
 		// Formula: Buster timer = base - (sentry_multiplier * num_active_sentries)
 		if(g_nBuster[team][g_iBusterNumSentOut] == 0)
 		{
 			// First buster of the round
-			g_nBuster[team][g_flBusterTriggerTimer] = config.LookupFloat(g_hCvarBusterFormulaBaseFirst) - (config.LookupFloat(g_hCvarBusterFormulaSentryMult) * float(iNumSentires));
+			g_nBuster[team][g_flBusterTriggerTimer] = config.LookupFloat(g_hCvarBusterFormulaBaseFirst) - (config.LookupFloat(g_hCvarBusterFormulaSentryMult) * float(numSentries));
 		}else{
 			// Every buster afterward
-			g_nBuster[team][g_flBusterTriggerTimer] = config.LookupFloat(g_hCvarBusterFormulaBaseSecond) - (config.LookupFloat(g_hCvarBusterFormulaSentryMult) * float(iNumSentires));
+			g_nBuster[team][g_flBusterTriggerTimer] = config.LookupFloat(g_hCvarBusterFormulaBaseSecond) - (config.LookupFloat(g_hCvarBusterFormulaSentryMult) * float(numSentries));
 		}
 	}
 }
