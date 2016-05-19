@@ -652,14 +652,14 @@ char g_strSoundTankDestroyedPyro[][] = {"vo/pyro_autocappedcontrolpoint01.mp3", 
 char g_strSoundTankDestroyedSpy[][] = {"vo/spy_sf12_goodmagic05.mp3", "vo/spy_sf12_goodmagic08.mp3", "vo/taunts/spy_highfive_success01.mp3"};
 char g_strSoundTankDestroyedEngineer[][] = {"vo/engineer_mvm_tank_dead01.mp3", "vo/engineer_mvm_wave_end07.mp3", "vo/engineer_cheers01.mp3", "vo/engineer_cheers02.mp3", "vo/engineer_mvm_collect_credits03.mp3", "vo/engineer_specialcompleted01.mp3"};
 
-char g_strSoundCashScout[][] = {"vo/scout_award01.mp3", "vo/scout_award09.mp3", "vo/scout_specialcompleted12.mp3", "vo/taunts/scout_taunts02.mp3", "vo/taunts/scout_taunts17.mp3"};
-char g_strSoundCashSniper[][] = {"vo/sniper_mvm_loot_common01.mp3", "vo/taunts/sniper_taunts12.mp3", "vo/taunts/sniper_taunts14.mp3", "vo/taunts/sniper_taunts18.mp3", "vo/sniper_award09.mp3"};
-char g_strSoundCashSoldier[][] = {"vo/soldier_mvm_taunt01.mp3", "vo/soldier_mvm_taunt02.mp3", "vo/taunts/soldier_taunts03.mp3", "vo/taunts/soldier_taunts21.mp3", "vo/taunts/soldier_taunts05.mp3"};
-char g_strSoundCashDemoman[][] = {"vo/taunts/demoman_taunts11.mp3", "vo/taunts/demoman_taunts01.mp3", "vo/taunts/demoman_taunts06.mp3"};
-char g_strSoundCashHeavy[][] = {"vo/heavy_mvm_get_upgrade03.mp3", "vo/heavy_specialcompleted05.mp3", "vo/heavy_mvm_taunt02.mp3"};
-char g_strSoundCashPyro[][] = {"vo/pyro_specialcompleted01.mp3"};
-char g_strSoundCashSpy[][] = {"vo/taunts/spy_taunts11.mp3", "vo/taunts/spy_taunts10.mp3", "vo/spy_sf13_influx_small06.mp3"};
-char g_strSoundCashEngineer[][] = {"vo/engineer_mvm_taunt01.mp3", "vo/engineer_mvm_taunt02.mp3"};
+char g_strSoundCashScout[][] = {"vo/scout_award01.mp3", "vo/scout_award09.mp3", "vo/scout_specialcompleted12.mp3", "vo/taunts/scout_taunts02.mp3", "vo/taunts/scout_taunts06.mp3", "vo/taunts/scout_taunts17.mp3"};
+char g_strSoundCashSniper[][] = {"vo/sniper_mvm_loot_common01.mp3", "vo/taunts/sniper_taunts11.mp3", "vo/taunts/sniper_taunts12.mp3", "vo/taunts/sniper_taunts14.mp3", "vo/taunts/sniper_taunts18.mp3", "vo/sniper_award09.mp3"};
+char g_strSoundCashSoldier[][] = {"vo/soldier_mvm_taunt01.mp3", "vo/soldier_mvm_taunt02.mp3", "vo/soldier_mvm_taunt03.mp3", "vo/taunts/soldier_taunts03.mp3", "vo/taunts/soldier_taunts05.mp3", "vo/taunts/soldier_taunts21.mp3", "vo/taunts/soldier_taunts12.mp3", "vo/taunts/soldier_taunts05.mp3"};
+char g_strSoundCashDemoman[][] = {"vo/taunts/demoman_taunts11.mp3", "vo/taunts/demoman_taunts07.mp3", "vo/taunts/demoman_taunts01.mp3", "vo/taunts/demoman_taunts06.mp3"};
+char g_strSoundCashHeavy[][] = {"vo/heavy_mvm_get_upgrade03.mp3", "vo/heavy_specialcompleted05.mp3", "vo/heavy_award10.mp3", "vo/taunts/heavy_taunts03.mp3", "vo/heavy_mvm_taunt02.mp3"};
+char g_strSoundCashPyro[][] = {"vo/pyro_specialcompleted01.mp3", "vo/pyro_laughevil01.mp3"};
+char g_strSoundCashSpy[][] = {"vo/taunts/spy_taunts11.mp3", "vo/taunts/spy_taunts10.mp3", "vo/taunts/spy_taunts13.mp3", "vo/taunts/spy_taunts12.mp3", "vo/spy_sf13_influx_small06.mp3"};
+char g_strSoundCashEngineer[][] = {"vo/engineer_mvm_taunt01.mp3", "vo/engineer_mvm_taunt02.mp3", "vo/taunts/engineer_taunts05.mp3", "vo/taunts/engineer_taunts09.mp3", "vo/taunts/engineer_taunts11.mp3"};
 
 char g_strSoundBombDeployedScout[][] = {"vo/scout_jeers04.mp3", "vo/scout_jeers05.mp3", "vo/scout_jeers08.mp3", "vo/scout_jeers11.mp3", "vo/scout_sf13_magic_reac03.mp3", "vo/scout_autodejectedtie01.mp3", "vo/scout_autodejectedtie02.mp3", "vo/scout_negativevocalization05.mp3"};
 char g_strSoundBombDeployedSniper[][] = {"vo/sniper_negativevocalization03.mp3", "vo/sniper_jeers01.mp3", "vo/sniper_jeers06.mp3", "vo/sniper_autodejectedtie03.mp3"};
@@ -696,9 +696,9 @@ char g_strSoundGiantKillSniper[][] = {"vo/sniper_autocappedcontrolpoint02.mp3", 
 char g_strSoundGiantKillSoldier[][] = {"vo/soldier_autocappedcontrolpoint01.mp3", "vo/soldier_autocappedintelligence02.mp3", "vo/soldier_dominationmedic03.mp3", "vo/soldier_laughhappy03.mp3", "vo/soldier_mvm_taunt05.mp3", "vo/soldier_mvm_wave_end04.mp3", "vo/taunts/soldier_taunts07.mp3"};
 char g_strSoundGiantKillDemoman[][] = {"vo/demoman_autocappedintelligence01.mp3", "vo/demoman_laughlong01.mp3", "vo/taunts/demoman_taunts08.mp3", "vo/demoman_laughevil03.mp3"};
 char g_strSoundGiantKillMedic[][] = {"vo/medic_autocappedcontrolpoint03.mp3", "vo/medic_laughlong01.mp3", "vo/medic_laughlong02.mp3", "vo/medic_laughhappy03.mp3", "vo/medic_mvm_giant_robot02.mp3", "vo/medic_sf13_influx_big03.mp3"};
-char g_strSoundGiantKillHeavy[][] = {"vo/heavy_award09.mp3", "vo/heavy_laughlong01.mp3", "vo/heavy_laughterbig04.mp3", "vo/heavy_mvm_giant_robot02.mp3", "vo/heavy_revenge08.mp3", "vo/heavy_specialcompleted11.mp3", "vo/taunts/heavy_taunts02.mp3", "vo/taunts/heavy_taunts12.mp3", "vo/heavy_award08.mp3"};
+char g_strSoundGiantKillHeavy[][] = {"vo/heavy_award09.mp3", "vo/heavy_laughlong01.mp3", "vo/heavy_laughterbig04.mp3", "vo/heavy_mvm_giant_robot02.mp3", "vo/heavy_revenge08.mp3", "vo/heavy_specialcompleted11.mp3", "vo/taunts/heavy_taunts02.mp3", "vo/taunts/heavy_taunts12.mp3", "vo/heavy_specialcompleted08.mp3", "vo/heavy_award08.mp3"};
 char g_strSoundGiantKillPyro[][] = {"vo/pyro_autocappedcontrolpoint01.mp3", "vo/taunts/pyro/pyro_taunt_ballon_11.mp3"};
-char g_strSoundGiantKillSpy[][] = {"vo/spy_laughevil01.mp3", "vo/spy_laughevil02.mp3", "vo/taunts/spy_taunts15.mp3", "vo/taunts/spy/spy_taunt_rps_win_11.mp3", "vo/spy_revenge03.mp3"};
+char g_strSoundGiantKillSpy[][] = {"vo/spy_laughevil01.mp3", "vo/spy_laughevil02.mp3", "vo/taunts/spy_taunts15.mp3", "vo/taunts/spy/spy_taunt_rps_win_11.mp3", "vo/taunts/spy/spy_taunt_flip_end_14.mp3", "vo/spy_revenge03.mp3"};
 char g_strSoundGiantKillEngineer[][] = {"vo/engineer_dominationspy10.mp3", "vo/engineer_dominationheavy12.mp3", "vo/engineer_dominationheavy10.mp3", "vo/engineer_revenge01.mp3", "vo/engineer_revenge02.mp3", "vo/engineer_laughlong02.mp3"};
 
 char g_strSoundRobotFallDamage[][] = {"mvm/mvm_fallpain01.wav", "mvm/mvm_fallpain02.wav"};
