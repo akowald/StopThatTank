@@ -1106,8 +1106,8 @@ public void OnPluginStart()
 	g_hCvarTankCooldown = CreateConVar("tank_cooldown", "28.0", "Seconds after the tank is killed that a Giant Robot will spawn into the game.");
 	g_hCvarDistanceMove = CreateConVar("tank_distance_move", "4600.0", "Distance the control point must be from the goal for tanks to spawn on it.");
 	g_hCvarCurrencyCrit = CreateConVar("tank_currency_crit", "5.0", "(Seconds) Crit duration after a RED team member touches a currencypack.");
-	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.2", "Tank health percentage earned when a checkpoint is reached.");
-	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "20.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
+	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.18", "Tank health percentage earned when a checkpoint is reached.");
+	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "5.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.2", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
 	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "2.2", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
@@ -1218,14 +1218,14 @@ public void OnPluginStart()
 
 	g_hCvarBusterExplodeMagnitude = CreateConVar("tank_buster_explode_damage", "2500", "Damage dealt inside explosion radius.");
 	g_hCvarBusterExplodeRadius = CreateConVar("tank_buster_explode_radius", "300", "Explosion radius.");
-	g_hCvarBusterTriggerTank = CreateConVar("tank_buster_trigger_tank", "2500", "A sentry buster can spawn when this damage is dealt to the tank by a sentry.");
-	g_hCvarBusterTriggerGiant = CreateConVar("tank_buster_trigger_giant", "1800", "A sentry buster can spawn when this damage is dealt to the giant by a sentry.");
-	g_hCvarBusterTriggerRobots = CreateConVar("tank_buster_trigger_robot", "6", "A sentry buster can spawn after the specified robot kills.");
+	g_hCvarBusterTriggerTank = CreateConVar("tank_buster_trigger_tank", "2300", "A sentry buster can spawn when this damage is dealt to the tank by a sentry.");
+	g_hCvarBusterTriggerGiant = CreateConVar("tank_buster_trigger_giant", "1500", "A sentry buster can spawn when this damage is dealt to the giant by a sentry.");
+	g_hCvarBusterTriggerRobots = CreateConVar("tank_buster_trigger_robot", "5", "A sentry buster can spawn after the specified robot kills.");
 	g_hCvarBusterTimeWarn = CreateConVar("tank_buster_time_warn", "3.0", "Time (seconds) duration where a player will be warned that he will become a sentry buster and have a chance to pass.");
 	g_hCvarBusterTriggerTankPlr = CreateConVar("tank_buster_trigger_tank_plr", "3250", "A sentry buster can spawn when this damage is dealt to the tank by a sentry in plr_ maps.");
 	g_hCvarBusterTriggerGiantPlr = CreateConVar("tank_buster_trigger_giant_plr", "1500", "A sentry buster can spawn when this damage is dealt to the giant by a sentry in plr_ maps.");
 	g_hCvarBusterTriggerRobotsPlr = CreateConVar("tank_buster_trigger_robot_plr", "5", "A sentry buster can spawn after the specified robot kills in plr_ maps.");
-	g_hCvarBusterTimePause = CreateConVar("tank_buster_time_pause", "10.0", "Minimum time (in seconds) enforced on the buster timer when it becomes unpaused.");
+	g_hCvarBusterTimePause = CreateConVar("tank_buster_time_pause", "30.0", "Minimum time (in seconds) enforced on the buster timer when it becomes unpaused.");
 	g_hCvarBusterFormulaBaseFirst = CreateConVar("tank_buster_formula_base_first", "100.0", "Base part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterFormulaBaseSecond = CreateConVar("tank_buster_formula_base_second", "60.0", "Base part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterFormulaSentryMult = CreateConVar("tank_buster_formula_sentry_mult", "5.0", "Sentry multiplier part for: base - (sentry_mult * active_sentries)");
@@ -8951,13 +8951,24 @@ public void Event_PlayerHurt(Handle hEvent, const char[] strEventName, bool bDon
 			// Apply the effects of the giant tag: jarate_on_hit.
 			if(Spawner_HasGiantTag(iAttacker, GIANTTAG_JARATE_ON_HIT) && GetEntProp(iAttacker, Prop_Send, "m_bIsMiniBoss") && GetClientTeam(iAttacker) != teamVictim)
 			{
-				if(IsPlayerAlive(iVictim))
+				if(IsPlayerAlive(iVictim) && !Player_IsUberCharged(iVictim))
 				{
 					TF2_AddCondition(iVictim, TFCond_Jarated, config.LookupFloat(g_hCvarJarateOnHitTime), iAttacker);
 				}
 			}
 		}
 	}
+}
+
+bool Player_IsUberCharged(int client)
+{
+	if(TF2_IsPlayerInCondition(client, TFCond_Ubercharged)) return true;
+	if(TF2_IsPlayerInCondition(client, TFCond_UberchargeFading)) return true;
+	if(TF2_IsPlayerInCondition(client, TFCond_UberchargedHidden)) return true;
+	if(TF2_IsPlayerInCondition(client, TFCond_UberchargedOnTakeDamage)) return true;
+	if(TF2_IsPlayerInCondition(client, TFCond_UberchargedCanteen)) return true;
+
+	return false;
 }
 
 public Action Listener_DropBomb(int client, const char[] command, int argc)
@@ -9725,11 +9736,10 @@ void Bomb_Think(int iBomb)
 	// Sound an alert sound ONCE when the robots get near the hatch with the bomb carried
 	if(flDistanceToGoal < config.LookupFloat(g_hCvarBombDistanceWarn))
 	{
-		// Just for the cactus canyon special deploy, cancel out the medigun and quick fix uber effects on the bomb carrier.
-		// The uber effect only needs to be zapped if the carrier is a medic.
-		if(bIsGoal && g_nMapHack == MapHack_CactusCanyon && g_bIsFinale)
+		if(bIsGoal)
 		{
-			// Cancel out the uber charge on the bomb carrier.
+			// Cancel out certain uber effects when the player is near the final hatch to prevent players sitting on the point until they are able to deploy.
+			// The uber effect needs to be zapped ONLY IF the carrier is a medic.
 			if(TF2_IsPlayerInCondition(client, TFCond_Ubercharged))
 			{
 				int medigun = GetPlayerWeaponSlot(client, WeaponSlot_Secondary);
@@ -9775,22 +9785,26 @@ void Bomb_Think(int iBomb)
 				}
 			}
 
-			if(TF2_IsPlayerInCondition(client, TFCond_Bonked))
+			if(g_nMapHack == MapHack_CactusCanyon && g_bIsFinale)
 			{
+				// Block the bonk scout effect near the train finale.
+				if(TF2_IsPlayerInCondition(client, TFCond_Bonked))
+				{
 #if defined DEBUG
-				PrintToServer("(Bomb_Think) Removing condition %d on %N..", TFCond_Bonked, client);
+					PrintToServer("(Bomb_Think) Removing condition %d on %N..", TFCond_Bonked, client);
 #endif
-				TF2_RemoveCondition(client, TFCond_Bonked);
-				EmitSoundToClient(client, SOUND_FIZZLE);
-			}
-
-			if(TF2_IsPlayerInCondition(client, TFCond_UberchargedCanteen))
-			{
+					TF2_RemoveCondition(client, TFCond_Bonked);
+					EmitSoundToClient(client, SOUND_FIZZLE);
+				}
+				// Block the phlog pyro uber effect near the train finale.
+				if(TF2_IsPlayerInCondition(client, TFCond_UberchargedCanteen))
+				{
 #if defined DEBUG
-				PrintToServer("(Bomb_Think) Removing condition %d on %N..", TFCond_UberchargedCanteen, client);
+					PrintToServer("(Bomb_Think) Removing condition %d on %N..", TFCond_UberchargedCanteen, client);
 #endif
-				TF2_RemoveCondition(client, TFCond_UberchargedCanteen);
-				EmitSoundToClient(client, SOUND_FIZZLE);
+					TF2_RemoveCondition(client, TFCond_UberchargedCanteen);
+					EmitSoundToClient(client, SOUND_FIZZLE);
+				}
 			}
 		}
 
@@ -11405,7 +11419,7 @@ void Reanimator_Create(int client, bool bFeignMarker=false, int disguisedClass=0
 		float flPos[3];
 		GetClientEyePosition(client, flPos);
 
-		TR_TraceRayFilter(flPos, flAng, MASK_SHOT, RayType_Infinite, TraceFilter_Reanimator, iMarker);
+		TR_TraceRayFilter(flPos, flAng, MASK_SOLID, RayType_Infinite, TraceFilter_Reanimator, iMarker);
 		if(TR_DidHit())
 		{
 			TR_GetEndPosition(flPos);
@@ -11457,11 +11471,15 @@ public bool TraceFilter_Reanimator(int entity, int mask, int marker)
 
 	char classname[24];
 	GetEdictClassname(entity, classname, sizeof(classname));
-	//PrintToServer("Hit entity %d \"%s\" mask: %d", entity, classname, mask);
+	
 	if(strncmp(classname, "tf_ammo_pack", 12) == 0) return false;
 	if(strncmp(classname, "tf_dropped_weapon", 17) == 0) return false;
 	if(strncmp(classname, "entity_revive_marker", 20) == 0) return false;
 	if(strncmp(classname, "tf_projectile_arrow", 19) == 0) return false;
+
+	//char model[128];
+	//GetEntPropString(entity, Prop_Data, "m_ModelName", model, sizeof(model));
+	//PrintToServer("(TraceFilter_Reanimator) Hit \"%s\" (%d) mask: %d \"%s\"", classname, entity, mask, model);
 
 	return entity > MaxClients;
 }
@@ -15031,21 +15049,47 @@ public Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunCharge
 	{
 		// Check if the player is the bomb carrier.
 		int bomb = EntRefToEntIndex(g_iRefBombFlag);
-		if(bomb > MaxClients && GetEntPropEnt(bomb, Prop_Send, "moveparent") == client)
+		if(bomb > MaxClients)
 		{
-			// Allow uber effect on the bomb carrier.
-			result = true;
-
-			if(g_nMapHack == MapHack_CactusCanyon && g_bIsFinale && g_bombAtFinalCheckpoint)
+			int carrier = GetEntPropEnt(bomb, Prop_Send, "moveparent");
+			if(carrier == client)
 			{
-				if(medigunChargeType == -1 || medigunChargeType == MedigunChargeEffect_Uber || medigunChargeType == MedigunChargeEffect_Quickfix)
+				// This player is the bomb carrier.
+				// Allow uber effect on the bomb carrier.
+				result = true;
+
+				if(g_bombAtFinalCheckpoint)
 				{
-					// Block uber effect for the special deploy in the cactus canyon finale.
-					result = false;
+					if(medigunChargeType == -1 || medigunChargeType == MedigunChargeEffect_Uber || medigunChargeType == MedigunChargeEffect_Quickfix)
+					{
+						// Block uber effect for the special deploy in the cactus canyon finale.
+						result = false;
+
+						if(medigunChargeType == MedigunChargeEffect_Uber || medigunChargeType == MedigunChargeEffect_Quickfix)
+						{
+							PrintCenterText(client, "%t", "Tank_Center_CantPopUber");
+						}
+					}
+				}
+
+				return Plugin_Handled;
+			}else if(g_bombAtFinalCheckpoint && medigunChargeType == MedigunChargeEffect_Quickfix)
+			{
+				// Do not let the medic pop quick fix uber charge if they are healing the bomb carrier near the final deploy.
+				if(carrier >= 1 && carrier <= MaxClients && IsClientInGame(carrier) && GetClientTeam(carrier) == TFTeam_Blue)
+				{
+					int medigun = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
+					if(medigun > MaxClients && GetEntProp(medigun, Prop_Send, "m_iItemDefinitionIndex") == ITEM_QUICK_FIX && GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget") == carrier)
+					{
+						// Block quick fix uber pop.
+						result = false;
+
+						PrintCenterText(client, "%t", "Tank_Center_CantMegaHealCarrier");
+
+						return Plugin_Handled;
+					}
 				}
 			}
-
-			return Plugin_Handled;
 		}
 	}
 

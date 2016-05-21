@@ -337,4 +337,16 @@
 	{
 		"en"			"You cannot deploy while INVULNERABLE!"
 	}
+	"Tank_Center_CantMegaHeal"
+	{
+		"en"			"You cannot MEGAHEAL bomb carriers in alarm zone!"
+	}
+	"Tank_Center_CantMegaHealCarrier"
+	{
+		"en"			"You cannot MEGAHEAL bomb carriers in alarm zone!"
+	}
+	"Tank_Center_CantPopUber"
+	{
+		"en"			"You cannot pop UBERCHARGE in alarm zone!"
+	}
 }
