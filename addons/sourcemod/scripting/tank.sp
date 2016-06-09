@@ -124,120 +124,27 @@
 #define ENTITY_LIMIT_BUFFER 	20
 #define MAD_MILK_HEALTH 		8
 
-#define ITEM_PHLOG 594
-#define ITEM_TRIAD_TRINKET 814
-#define ITEM_MERCS_MUFFLER 987
-#define ITEM_BORSCHT_BELT 30108
-#define ITEM_GRENADE_LAUNCHER 19
-#define ITEM_MINIGUN 15
-#define ITEM_TOSS_PROOF_TOWEL 757
-#define ITEM_SILVER_BOTKILLER_ROCKET_LAUNCHER_MK_II 965
-#define ITEM_HUNTSMAN 56
-#define ITEM_SILVER_BOTKILLER_FLAME_THROWER_MK_II 963
-#define ITEM_ROCKET_LAUNCHER 18
-#define ITEM_FLAMETHROWER 21
-#define ITEM_SANDMAN 44
-#define ITEM_JARATE 58
-#define ITEM_WEE_BOOTIES 405
-#define ITEM_CHARGIN_TARGE 131
-#define ITEM_HEADTAKER 266
-#define ITEM_FISTS 5
-#define ITEM_SHOVEL 6
-#define ITEM_SCORCH_SHOT 740
 #define ITEM_BAZOOKA 730
-#define ITEM_BUSINESS_CASUAL 782
-#define ITEM_HORNBLOWER 30129
-#define ITEM_GAELIC_GARB 30124
-#define ITEM_KRINGLE_COLLECTION 650
-#define ITEM_FLYING_GUILLOTINE 812
-#define ITEM_FESTIVE_GRENADE_LAUNCHER 1007
-#define ITEM_FESTIVE_ROCKET_LAUNCHER 658
-#define ITEM_FESTIVE_MINIGUN 654
-#define ITEM_FESTIVE_FLAMETHROWER 659
-#define ITEM_FESTIVE_HUNTSMAN 1005
-#define ITEM_FESTIVE_JARATE 1083
-#define ITEM_FESTIVE_EYELANDER 1082
-#define ITEM_ANGEL_OF_DEATH 30312
-#define ITEM_BRAWLING_BUCCANEER 30131
-#define ITEM_BEAR_NECESSITIES 30122
-#define ITEM_LOOSE_CANNON 996
-#define ITEM_WARD 30190
-#define ITEM_MEDICAL_MYSTERY 30171
-#define ITEM_CUT_THROAT_CONCIERGE 977
-#define ITEM_ANTARCTIC_PARKA 30331
-#define ITEM_FOUNDING_FATHER 30142
-#define ITEM_FOPPISH_PHYSICIAN 878
-#define ITEM_DISTINGUISHED_ROGUE 879
-#define ITEM_NUNHOOD 30311
-#define ITEM_EYELANDER 132
-#define ITEM_BOTTLE 1
-#define ITEM_FIREAXE 2
-#define ITEM_CARIBBEAN_CONQUEROR 30116
-#define ITEM_VOODOO_SCOUT 5617
-#define ITEM_VOODOO_SOLDIER 5618
-#define ITEM_VOODOO_HEAVY 5619
-#define ITEM_VOODOO_DEMO 5620
-#define ITEM_VOODOO_ENGINEER 5621
-#define ITEM_VOODOO_MEDIC 5622
-#define ITEM_VOODOO_SPY 5623
-#define ITEM_VOODOO_PYRO 5624
-#define ITEM_VOODOO_SNIPER 5625
-#define ITEM_SHOTGUN_HWG 11
-#define ITEM_KGB 43
-#define ITEM_FAN 45
-#define ITEM_QUICK_FIX 411
-#define ITEM_HEAT_OF_WINTER 30356
-#define ITEM_FRONTIER_JUSTICE 141
-#define ITEM_ENGIE_PISTOL 22
-#define ITEM_GUNSLINGER 142
-#define ITEM_AFTER_DARK 30133
-#define ITEM_DAS_HAZMATTENHATTEN 30095
-#define ITEM_KILLERS_KIT 30339
-#define ITEM_BLOOD_BANKER 30132
-#define ITEM_EXORCIZOR 936
-#define ITEM_DIE_REGIME 1088
-#define ITEM_CABER 307
-#define ITEM_THIRD_DEGREE 593
-#define ITEM_BUSHWACKA 232
-#define ITEM_PAIN_TRAIN 154
-#define ITEM_HARDY_LAUREL 30065
-#define ITEM_CROSSBOW 305
-#define ITEM_KRITZKRIEG 35
-#define ITEM_AMPUTATOR 304
-#define ITEM_COLD_SNAP_COAT 30601
-#define ITEM_LADY_KILLER 30476
-#define ITEM_DASHIN_HASHSHASHIN 637
-#define ITEM_COLDFRONT_CURBSTOMPERS 30558
-#define ITEM_BACKSTABBERS_BOOMSLANG 30353
-#define ITEM_CLASSIFIED_COIF 30388
-#define ITEM_CHARRED_CHAINMAIL 30584
-#define ITEM_BUSHI_DOU 30348
-#define ITEM_BOUNTIFUL_BOW 30260
-#define ITEM_VACCINATOR 998
-#define ITEM_PUFFY_PROVOCATEUR 30602
-#define ITEM_SANGU_SLEEVES 30366
-#define ITEM_IMMOBILE_SUIT 30534
-#define ITEM_DEAD_OF_NIGHT 30309
-#define ITEM_SMOCK_SURGEON 30365
-#define ITEM_SKY_CAPTAIN 30405
-#define ITEM_EXECUTIONER 921
-#define ITEM_MAGICAL_MERCENARY 30297
 #define ITEM_DEAD_RINGER 59
+#define ITEM_VACCINATOR 998
+#define ITEM_PHLOG 594
+#define ITEM_LOOSE_CANNON 996
+#define ITEM_SCORCH_SHOT 740
+#define ITEM_PDA_DESTROY 26
+#define ITEM_QUICK_FIX 411
+#define ITEM_KRITZKRIEG 35
 #define ITEM_CONGA 1118
 #define ITEM_KAZOTSKY_KICK 1157
 #define ITEM_BOX_TROT 30615
 #define ITEM_ZOOMIN_BROOM 30672
 #define ITEM_MANNROBICS 1162
-#define ITEM_PDA_DESTROY 26
 
 #define ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED 140
 #define ATTRIB_MAXAMMO_PRIMARY_INCREASED 76
 #define ATTRIB_MAXAMMO_SECONDARY_INCREASED 78
-#define ATTRIB_FLAME_LIFE_BONUS 164
 #define ATTRIB_MOVE_SPEED_BONUS 107
 #define ATTRIB_SELF_DMG_PUSH_FORCE_DECREASE 59
 #define ATTRIB_BUILDING_HEALTH_BONUS 286
-#define ATTRIB_ARMOR_PIERCING 399
 #define ATTRIB_MAJOR_MOVE_SPEED_BONUS 442
 #define ATTRIB_VISION_OPT_IN_FLAGS 406
 #define ATTRIB_MAXAMMO_METAL_INCREASED 80
@@ -371,8 +278,6 @@ const float PI = 3.1415926535897932384626433832795;
 #define MASK_BLUE 33638411
 
 #define HELL_GATES_TARGETNAME "underworld_play_timer_relay"
-
-#define Address_MinimumValid 0x10000
 
 int g_iRefTrackTrain[MAX_TEAMS];
 int g_iRefTrackTrain2[MAX_TEAMS]; // for the flatbed in pl_frontier
@@ -3885,22 +3790,6 @@ void Train_AddProp(int entity)
 	}
 }
 
-void LoadStringFromAddress(char[] buffer, int maxlength, Address address)
-{
-	bool terminated = false;
-	for(int i=0; i<maxlength; i++)
-	{
-		buffer[i] = LoadFromAddress(address+view_as<Address>(i), NumberType_Int8);
-
-		if(buffer[i] == '\0')
-		{
-			terminated = true;
-			break;
-		}
-	}
-	if(!terminated) buffer[maxlength-1] = '\0';	
-}
-
 void Train_FindPropsByParenting(int team)
 {
 	// Finds all props that are parented to the func_tracktrain and makes them transparent.
@@ -3934,22 +3823,12 @@ void Train_FindPropsByPhysConstraint(int team)
 			int constraint = MaxClients+1;
 			while((constraint = FindEntityByClassname(constraint, "phys_constraint")) != -1)
 			{
-				// I will get rid of this monstrosity when SM 1.8 becomes the stable branch.
-				int offset = FindDataMapInfo(constraint, "m_nameAttach1");
-				if(offset <= 0) continue;
-				Address pointer = view_as<Address>(LoadFromAddress(GetEntityAddress(constraint)+view_as<Address>(offset), NumberType_Int32));
-				if(!IsValidAddress(pointer)) continue;
 				char name1[64];
-				LoadStringFromAddress(name1, sizeof(name1), pointer);
-				//PrintToServer("GetEntPropString: m_nameAttach1 = \"%s\"", GetEntPropString(constraint, Prop_Data, "m_nameAttach1", temp, sizeof(temp)));
-				//PrintToServer("LoadStringFromAddress: m_nameAttach1 = \"%s\"", name1);			
-
-				offset = FindDataMapInfo(constraint, "m_nameAttach2");
-				if(offset <= 0) continue;
-				pointer = view_as<Address>(LoadFromAddress(GetEntityAddress(constraint)+view_as<Address>(offset), NumberType_Int32));
-				if(!IsValidAddress(pointer)) continue;
+				GetEntPropString(constraint, Prop_Data, "m_nameAttach1", name1, sizeof(name1));
 				char name2[64];
-				LoadStringFromAddress(name2, sizeof(name2), pointer);
+				GetEntPropString(constraint, Prop_Data, "m_nameAttach2", name2, sizeof(name2));
+
+				//PrintToServer("(Train_FindPropsByPhysConstraint) m_nameAttach1 = \"%s\" m_nameAttach2 = \"%s\"", name1, name2);
 
 				if(strlen(name1) <= 0 || strlen(name2) <= 0) continue;
 
@@ -7470,34 +7349,34 @@ int Tank_FindPathStart(int team)
 	return -1;
 }
 
-int Offset_GetNextOffset(int iEntity)
+int Offset_GetNextOffset(int entity)
 {
 	// CPathTrack path_track (CPathTrack	*m_pnext)
 	if(g_iOffset_m_pnext <= 0)
 	{
-		g_iOffset_m_pnext = FindDataMapOffs(iEntity, "m_pnext");
+		g_iOffset_m_pnext = FindDataMapInfo(entity, "m_pnext");
 	}
 	
 	return g_iOffset_m_pnext;
 }
 
-int Offset_GetPreviousOffset(int iEntity)
+int Offset_GetPreviousOffset(int entity)
 {
 	// CPathTrack path_track (CPathTrack	*m_pprevious)
 	if(g_iOffset_m_pprevious <= 0)
 	{
-		g_iOffset_m_pprevious = FindDataMapOffs(iEntity, "m_pprevious");
+		g_iOffset_m_pprevious = FindDataMapInfo(entity, "m_pprevious");
 	}
 	
 	return g_iOffset_m_pprevious;
 }
 
-int Offset_GetPathOffset(int iEntity)
+int Offset_GetPathOffset(int entity)
 {
 	// CFuncTrackTrain func_tracktrain (CPathTrack	*m_ppath)
 	if(g_iOffset_m_ppath <= 0)
 	{
-		g_iOffset_m_ppath = FindDataMapOffs(iEntity, "m_ppath");
+		g_iOffset_m_ppath = FindDataMapInfo(entity, "m_ppath");
 	}
 	
 	return g_iOffset_m_ppath;
@@ -7671,7 +7550,7 @@ void Train_KillSparks(int iTrackTrain)
 	}
 }
 
-public Action NormalSoundHook(int clients[64], int &numClients, char sample[PLATFORM_MAX_PATH], int &entity, int &channel, float &volume, int &level, int &pitch, int &flags)
+public Action NormalSoundHook(int clients[MAXPLAYERS], int &numClients, char sample[PLATFORM_MAX_PATH], int &entity, int &channel, float &volume, int &level, int &pitch, int &flags, char soundEntry[PLATFORM_MAX_PATH], int &seed)
 {
 	/*
 	char strClass[32];
@@ -14322,13 +14201,6 @@ public Action Tank_OnWeaponDropped(int itemDefinitionIndex, int accountId, int i
 	return Plugin_Continue;
 }
 
-bool IsValidAddress(Address pAddress)
-{
-	if(pAddress == Address_Null) return false;
-
-	return ((pAddress & view_as<Address>(0x7FFFFFFF)) >= view_as<Address>(Address_MinimumValid));
-}
-
 void Player_RemoveBuildings(int client)
 {
 	Player_RemoveBuilding(client, "obj_sentrygun");
@@ -15565,4 +15437,11 @@ public Action TF2_CalcIsAttackCritical(int client, int weapon, char[] weaponname
 	}
 
 	return Plugin_Continue;
+}
+
+bool IsValidAddress(Address addr)
+{
+	if(addr <= Address_Null) return false;
+
+	return true;
 }
