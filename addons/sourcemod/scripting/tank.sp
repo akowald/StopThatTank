@@ -628,6 +628,9 @@ char g_engyBossGibs[][] = {"models/bots/gibs/pyrobot_gib_boss_pelvis.mdl"}; // N
 
 char g_soundBombFinalWarning[][] = {"vo/announcer_cart_attacker_finalwarning1.mp3", "vo/announcer_cart_attacker_finalwarning2.mp3", "vo/announcer_cart_attacker_finalwarning5.mp3", "vo/mvm_bomb_alerts03.mp3", "vo/mvm_bomb_alerts05.mp3"};
 
+char g_soundFlareExplode[][] = {"weapons/airstrike_small_explosion_01.wav", "weapons/airstrike_small_explosion_02.wav", "weapons/airstrike_small_explosion_03.wav"};
+//char g_soundFlareExplode[][] = {"items/pumpkin_explode1.wav", "items/pumpkin_explode2.wav", "items/pumpkin_explode3.wav"};
+
 enum
 {
 	Rank_Normal=0,
@@ -813,6 +816,11 @@ int g_iSpriteHalo = -1;
 int g_iParticleBotDeath = -1;
 int g_iParticleJumpRed = -1;
 int g_iParticleJumpBlue = -1;
+int g_iParticleFlareTrail = -1;
+int g_iParticleBigFirework = -1;
+int g_iParticleTankEmbers = -1;
+int g_iParticleFlareMidAir = -1;
+int g_iParticleFlareFlyingEmbers = -1;
 
 int g_modelRomevisionTank = -1;
 int g_modelRomevisionTrackL = -1;
@@ -868,6 +876,14 @@ float g_timePlayedDestructionSound; // Timestamp when the giant destruction soun
 
 float g_timeNextMeleeAttack[MAXPLAYERS+1];
 int g_numSuccessiveHits[MAXPLAYERS+1];
+
+enum
+{
+	FlareExplode_Unknown=0,
+	FlareExplode_Collision,
+	FlareExplode_Detonated,
+}
+int g_flareExplodeReason = FlareExplode_Unknown;
 
 enum
 {
@@ -1305,6 +1321,8 @@ public void OnPluginStart()
 	AddTempEntHook("EffectDispatch", TempEntHook_Bleed); // Hook bleed effects on robots
 	AddTempEntHook("World Decal", TempEntHook_Decal); // Hook blood stain decals on walls
 	AddTempEntHook("Entity Decal", TempEntHook_Decal); // Hook blood stain decals on entities
+	AddTempEntHook("TFParticleEffect", TempEntHook_ParticleEffect); // Hook blood stain decals on entities
+
 
 	Giant_InitTemplates();
 
@@ -1591,6 +1609,7 @@ public void OnMapStart()
 	for(int i=0; i<sizeof(g_strSoundGiantKillEngineer); i++) PrecacheSound(g_strSoundGiantKillEngineer[i]);
 
 	for(int i=0; i<sizeof(g_strSoundRobotFallDamage); i++) PrecacheSound(g_strSoundRobotFallDamage[i]);
+	for(int i=0; i<sizeof(g_soundFlareExplode); i++) PrecacheSound(g_soundFlareExplode[i]);
 
 	for(int i=1; i<sizeof(g_strSoundNo); i++)
 	{
@@ -1664,6 +1683,11 @@ public void OnMapStart()
 	g_iParticleBotDeath = Particle_GetTableIndex("bot_death");
 	g_iParticleJumpRed = Particle_GetTableIndex("spell_cast_wheel_red");
 	g_iParticleJumpBlue = Particle_GetTableIndex("spell_cast_wheel_blue");
+	g_iParticleFlareTrail = Particle_GetTableIndex("taunt_pyro_balloon_vision");
+	g_iParticleBigFirework = Particle_GetTableIndex("mvm_pow_gold_seq_firework_mid");
+	g_iParticleTankEmbers = Particle_GetTableIndex("mvm_tank_destroy_embers");
+	g_iParticleFlareMidAir = Particle_GetTableIndex("ExplosionCore_MidAir_Flare");
+	g_iParticleFlareFlyingEmbers = Particle_GetTableIndex("Explosions_MA_FlyingEmbers");
 
 	g_iSpriteBeam = Tank_PrecacheModel("materials/sprites/laser.vmt");
 	g_iSpriteHalo = Tank_PrecacheModel("materials/sprites/halo01.vmt");
@@ -8067,6 +8091,7 @@ public void OnEntityDestroyed(int entity)
 	//char strClassname[40];
 	//GetEdictClassname(entity, strClassname, sizeof(strClassname));
 	//PrintToServer("(OnEntityDestroyed) %d %s!", entity, strClassname);
+	
 	if(entity > 0) g_entitiesOfInterest[entity] = Interest_None;
 
 	if(!g_bEnabled) return;
@@ -8266,7 +8291,7 @@ public void OnEntityDestroyed(int entity)
 		}
 	}
 
-	if(g_bIsRoundStarted && IsValidEdict(entity))
+	if(g_bIsRoundStarted && entity > MaxClients)
 	{
 		// Detect when Sir Nukesalot's cannon balls explode and add an explosion sound
 		char strClassname[25];
@@ -8299,8 +8324,39 @@ public void OnEntityDestroyed(int entity)
 
 				g_iUserIdLastZapper = 0;
 			}
+		}else if(strcmp(strClassname, "tf_projectile_flare") == 0 && g_iParticleBigFirework != -1 && g_iParticleTankEmbers != -1)
+		{
+			// Neato firework effects for the Giant Detonator Pyro.
+			int client = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+			if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_JULY4) && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+			{
+				float pos[3];
+				GetEntPropVector(entity, Prop_Send, "m_vecOrigin", pos);
+
+				int reason = g_flareExplodeReason;
+				if(reason == FlareExplode_Detonated || reason == FlareExplode_Unknown)
+				{
+					// The flare either detonated, hit a target, or was cleaned up by the game for some reason (hit skybox, was alive for too long, etc).
+					EmitGameSoundToAll("Summer.Fireworks");
+					EmitGameSoundToAll("Game.HappyBirthdayNoiseMaker", entity);
+
+					TE_Particle(g_iParticleBigFirework, pos);
+					TE_SendToAll();
+					TE_Particle(Particle_GetTableIndex("mvm_soldier_shockwave2c"), pos);
+					TE_SendToAll();
+				}else if(reason == FlareExplode_Collision)
+				{
+					EmitGameSoundToAll("Game.HappyBirthdayNoiseMaker", entity);
+					EmitSoundToAll(g_soundFlareExplode[GetRandomInt(0, sizeof(g_soundFlareExplode)-1)]);
+
+					TE_Particle(g_iParticleTankEmbers, pos);
+					TE_SendToAll();
+				}
+			}
 		}
 	}
+
+	g_flareExplodeReason = FlareExplode_Unknown;
 }
 
 public Action Timer_TankTeleportFinale(Handle hTimer, int team)
@@ -9253,7 +9309,7 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 	{
 		// Fixes for the arrow penetration attribute
 		SDKHook(iEntity, SDKHook_Touch, Arrow_OnTouch);
-	}else if(strcmp(classname, "tf_projectile_healing_bolt") == 0 || strcmp(classname, "tf_projectile_rocket") == 0 || strcmp(classname, "tf_projectile_syringe") == 0 || strcmp(classname, "tf_projectile_flare") == 0)
+	}else if(strcmp(classname, "tf_projectile_healing_bolt") == 0 || strcmp(classname, "tf_projectile_rocket") == 0 || strcmp(classname, "tf_projectile_syringe") == 0)
 	{
 		// Fix these projectiles from colliding with revive markers.
 		SDKHook(iEntity, SDKHook_Touch, Projectile_OnTouch);
@@ -9266,6 +9322,10 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 		g_timeSentryBusterDied = 0.0;
 		
 		AcceptEntityInput(iEntity, "Kill");
+	}else if(strcmp(classname, "tf_projectile_flare") == 0)
+	{
+		RequestFrame(NextFrame_AttachToFlare, EntIndexToEntRef(iEntity));
+		SDKHook(iEntity, SDKHook_Touch, Projectile_OnTouch); // Fix revive marker collision.
 	}
 }
 
@@ -10772,9 +10832,27 @@ int Teleporter_BuildEntrance(int iBuilder, float flPos[3], int iMaxHealth)
 public Action Command_Test2(int client, int args)
 {
 	//
-	if(args == 1) SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 1.0);
+	//if(args == 1) SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 1.0);
+
+	char particle[128];
+	GetCmdArgString(particle, sizeof(particle));
+	Debug_TestParticle(client, particle);
 
 	return Plugin_Handled;
+}
+
+stock void Debug_TestParticle(int client, const char[] effectName)
+{
+	int particle = Particle_GetTableIndex(effectName);
+	PrintToServer("particle = %d", particle);
+	if(particle == -1) return;
+
+	float pos[3];
+	GetClientAbsOrigin(client, pos);
+
+	//TE_Particle(int iParticleIndex, float origin[3]=NULL_VECTOR, float start[3]=NULL_VECTOR, float angles[3]=NULL_VECTOR, int entindex=-1, int attachtype=-1, int attachpoint=-1, bool resetParticles=true)
+	TE_Particle(particle, pos, NULL_VECTOR, NULL_VECTOR, client, 1, 0, false);
+	TE_SendToAll();
 }
 
 public void Event_PlayerTeam(Handle event, const char[] name, bool dontBroadcast)
@@ -12298,7 +12376,7 @@ int Particle_GetTableIndex(const char[] strName)
 {
     // find string table
     int tblidx = FindStringTable("ParticleEffectNames");
-    if(tblidx==INVALID_STRING_TABLE) 
+    if(tblidx == INVALID_STRING_TABLE) 
     {
         LogMessage("Could not find string table: ParticleEffectNames!");
         return -1;
@@ -12319,7 +12397,7 @@ int Particle_GetTableIndex(const char[] strName)
         }
     }
 
-    if(stridx==INVALID_STRING_INDEX)
+    if(stridx == INVALID_STRING_INDEX)
     {
         LogMessage("Could not find particle: %s", strName);
         return -1;
@@ -15444,4 +15522,44 @@ bool IsValidAddress(Address addr)
 	if(addr <= Address_Null) return false;
 
 	return true;
+}
+
+public void NextFrame_AttachToFlare(int ref)
+{
+	if(g_iParticleFlareTrail == -1) return;
+
+	int flare = EntRefToEntIndex(ref);
+	if(flare <= MaxClients) return;
+
+	int client = GetEntPropEnt(flare, Prop_Send, "m_hOwnerEntity");
+	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_JULY4) && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+	{
+		// Attach a trail particle to the flare projectile.
+		float pos[3];
+		GetEntPropVector(flare, Prop_Send, "m_vecOrigin", pos);
+
+		TE_Particle(g_iParticleFlareTrail, pos, NULL_VECTOR, NULL_VECTOR, flare, 1, 0, false);
+		TE_SendToAll();
+	}
+}
+
+public Action TempEntHook_ParticleEffect(const char[] te_name, int[] players, int numPlayers, float delay)
+{
+	if(!g_bEnabled) return Plugin_Continue;
+
+	// Track the two cases when a detonator flare expires.
+	g_flareExplodeReason = FlareExplode_Unknown;
+	int particleIndex = TE_ReadNum("m_iParticleSystemIndex");
+	if(particleIndex != -1)
+	{
+		if(particleIndex == g_iParticleFlareMidAir)
+		{
+			g_flareExplodeReason = FlareExplode_Detonated;
+		}else if(particleIndex == g_iParticleFlareFlyingEmbers)
+		{
+			g_flareExplodeReason = FlareExplode_Collision;
+		}
+	}
+
+	return Plugin_Continue;
 }
