@@ -629,7 +629,6 @@ char g_engyBossGibs[][] = {"models/bots/gibs/pyrobot_gib_boss_pelvis.mdl"}; // N
 char g_soundBombFinalWarning[][] = {"vo/announcer_cart_attacker_finalwarning1.mp3", "vo/announcer_cart_attacker_finalwarning2.mp3", "vo/announcer_cart_attacker_finalwarning5.mp3", "vo/mvm_bomb_alerts03.mp3", "vo/mvm_bomb_alerts05.mp3"};
 
 char g_soundFlareExplode[][] = {"weapons/airstrike_small_explosion_01.wav", "weapons/airstrike_small_explosion_02.wav", "weapons/airstrike_small_explosion_03.wav"};
-//char g_soundFlareExplode[][] = {"items/pumpkin_explode1.wav", "items/pumpkin_explode2.wav", "items/pumpkin_explode3.wav"};
 
 enum
 {
@@ -821,6 +820,7 @@ int g_iParticleBigFirework = -1;
 int g_iParticleTankEmbers = -1;
 int g_iParticleFlareMidAir = -1;
 int g_iParticleFlareFlyingEmbers = -1;
+int g_iParticleFireworkShockwave = -1;
 
 int g_modelRomevisionTank = -1;
 int g_modelRomevisionTrackL = -1;
@@ -1688,6 +1688,7 @@ public void OnMapStart()
 	g_iParticleTankEmbers = Particle_GetTableIndex("mvm_tank_destroy_embers");
 	g_iParticleFlareMidAir = Particle_GetTableIndex("ExplosionCore_MidAir_Flare");
 	g_iParticleFlareFlyingEmbers = Particle_GetTableIndex("Explosions_MA_FlyingEmbers");
+	g_iParticleFireworkShockwave = Particle_GetTableIndex("mvm_soldier_shockwave2c");
 
 	g_iSpriteBeam = Tank_PrecacheModel("materials/sprites/laser.vmt");
 	g_iSpriteHalo = Tank_PrecacheModel("materials/sprites/halo01.vmt");
@@ -8337,21 +8338,22 @@ public void OnEntityDestroyed(int entity)
 				if(reason == FlareExplode_Detonated || reason == FlareExplode_Unknown)
 				{
 					// The flare either detonated, hit a target, or was cleaned up by the game for some reason (hit skybox, was alive for too long, etc).
-					EmitGameSoundToAll("Summer.Fireworks");
-					EmitGameSoundToAll("Game.HappyBirthdayNoiseMaker", entity);
+					EmitGameSoundToAll("Summer.Fireworks", entity);
 
 					TE_Particle(g_iParticleBigFirework, pos);
 					TE_SendToAll();
-					TE_Particle(Particle_GetTableIndex("mvm_soldier_shockwave2c"), pos);
+					if(g_iParticleFireworkShockwave != -1) TE_Particle(g_iParticleFireworkShockwave, pos);
 					TE_SendToAll();
 				}else if(reason == FlareExplode_Collision)
 				{
-					EmitGameSoundToAll("Game.HappyBirthdayNoiseMaker", entity);
-					EmitSoundToAll(g_soundFlareExplode[GetRandomInt(0, sizeof(g_soundFlareExplode)-1)]);
+					// The flare collidied with something..
+					EmitSoundToAll(g_soundFlareExplode[GetRandomInt(0, sizeof(g_soundFlareExplode)-1)], entity);
 
 					TE_Particle(g_iParticleTankEmbers, pos);
 					TE_SendToAll();
 				}
+
+				EmitGameSoundToAll("Game.HappyBirthdayNoiseMaker", entity);
 			}
 		}
 	}
