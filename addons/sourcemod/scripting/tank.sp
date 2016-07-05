@@ -817,10 +817,10 @@ int g_iParticleJumpRed = -1;
 int g_iParticleJumpBlue = -1;
 int g_iParticleFlareTrail = -1;
 int g_iParticleBigFirework = -1;
-int g_iParticleTankEmbers = -1;
 int g_iParticleFlareMidAir = -1;
 int g_iParticleFlareFlyingEmbers = -1;
 int g_iParticleFireworkShockwave = -1;
+int g_iParticleFireworkMissed = -1;
 
 int g_modelRomevisionTank = -1;
 int g_modelRomevisionTrackL = -1;
@@ -1685,10 +1685,10 @@ public void OnMapStart()
 	g_iParticleJumpBlue = Particle_GetTableIndex("spell_cast_wheel_blue");
 	g_iParticleFlareTrail = Particle_GetTableIndex("taunt_pyro_balloon_vision");
 	g_iParticleBigFirework = Particle_GetTableIndex("mvm_pow_gold_seq_firework_mid");
-	g_iParticleTankEmbers = Particle_GetTableIndex("mvm_tank_destroy_embers");
 	g_iParticleFlareMidAir = Particle_GetTableIndex("ExplosionCore_MidAir_Flare");
 	g_iParticleFlareFlyingEmbers = Particle_GetTableIndex("Explosions_MA_FlyingEmbers");
 	g_iParticleFireworkShockwave = Particle_GetTableIndex("mvm_soldier_shockwave2c");
+	g_iParticleFireworkMissed = Particle_GetTableIndex("taunt_conga_fireworks02");
 
 	g_iSpriteBeam = Tank_PrecacheModel("materials/sprites/laser.vmt");
 	g_iSpriteHalo = Tank_PrecacheModel("materials/sprites/halo01.vmt");
@@ -8325,7 +8325,7 @@ public void OnEntityDestroyed(int entity)
 
 				g_iUserIdLastZapper = 0;
 			}
-		}else if(strcmp(strClassname, "tf_projectile_flare") == 0 && g_iParticleBigFirework != -1 && g_iParticleTankEmbers != -1)
+		}else if(strcmp(strClassname, "tf_projectile_flare") == 0 && g_iParticleBigFirework != -1)
 		{
 			// Neato firework effects for the Giant Detonator Pyro.
 			int client = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
@@ -8339,6 +8339,7 @@ public void OnEntityDestroyed(int entity)
 				{
 					// The flare either detonated, hit a target, or was cleaned up by the game for some reason (hit skybox, was alive for too long, etc).
 					EmitGameSoundToAll("Summer.Fireworks", entity);
+					EmitGameSoundToAll("Game.HappyBirthdayNoiseMaker", entity);
 
 					TE_Particle(g_iParticleBigFirework, pos);
 					TE_SendToAll();
@@ -8349,11 +8350,9 @@ public void OnEntityDestroyed(int entity)
 					// The flare collidied with something..
 					EmitSoundToAll(g_soundFlareExplode[GetRandomInt(0, sizeof(g_soundFlareExplode)-1)], entity);
 
-					TE_Particle(g_iParticleTankEmbers, pos);
+					if(g_iParticleFireworkMissed != -1) TE_Particle(g_iParticleFireworkMissed, pos);
 					TE_SendToAll();
 				}
-
-				EmitGameSoundToAll("Game.HappyBirthdayNoiseMaker", entity);
 			}
 		}
 	}
@@ -10853,7 +10852,8 @@ stock void Debug_TestParticle(int client, const char[] effectName)
 	GetClientAbsOrigin(client, pos);
 
 	//TE_Particle(int iParticleIndex, float origin[3]=NULL_VECTOR, float start[3]=NULL_VECTOR, float angles[3]=NULL_VECTOR, int entindex=-1, int attachtype=-1, int attachpoint=-1, bool resetParticles=true)
-	TE_Particle(particle, pos, NULL_VECTOR, NULL_VECTOR, client, 1, 0, false);
+	//TE_Particle(particle, pos, NULL_VECTOR, NULL_VECTOR, client, 1, 0, false);
+	TE_Particle(particle, pos);
 	TE_SendToAll();
 }
 
