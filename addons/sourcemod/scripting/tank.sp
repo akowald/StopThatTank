@@ -15521,7 +15521,7 @@ public Action TF2_CalcIsAttackCritical(int client, int weapon, char[] weaponname
 
 bool IsValidAddress(Address addr)
 {
-	if(addr <= Address_Null) return false;
+	if(addr == Address_Null) return false;
 
 	return true;
 }
