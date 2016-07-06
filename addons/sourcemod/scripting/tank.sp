@@ -12340,22 +12340,7 @@ void Attributes_Clear(int client)
 void Attributes_Set(int client)
 {
 	TFClassType class = TF2_GetPlayerClass(client);
-	int team = GetClientTeam(client);
-
-	// BLU team in payload, ALL players in payload race.
-	if(team == TFTeam_Blue || g_nGameMode == GameMode_Race)
-	{
-		switch(class)
-		{
-			case TFClass_Engineer:
-			{
-				// Increases engineer teleporter build speed.
-				float mult = config.LookupFloat(g_hCvarTeleBuildMult);
-				if(mult > 0.0) Tank_SetAttributeValue(client, ATTRIB_TELEPORTER_BUILD_RATE_MULTIPLIER, mult);
-			}
-		}
-	}
-
+	
 	switch(class)
 	{
 		case TFClass_Medic:
@@ -12370,6 +12355,10 @@ void Attributes_Set(int client)
 			// Experiment with giving Engineers increased metal capacity.
 			Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_METAL_INCREASED, config.LookupFloat(g_hCvarAttribMetalMult));
 			SetEntProp(client, Prop_Send, "m_iAmmo", MaxMetal_Get(client), 4, 3);
+
+			// Increases engineer teleporter build speed.
+			float mult = config.LookupFloat(g_hCvarTeleBuildMult);
+			if(mult > 0.0) Tank_SetAttributeValue(client, ATTRIB_TELEPORTER_BUILD_RATE_MULTIPLIER, mult);
 		}
 	}
 }
