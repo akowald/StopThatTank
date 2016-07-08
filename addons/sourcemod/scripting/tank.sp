@@ -454,6 +454,7 @@ Handle g_hCvarGiantDeathpitBoost;
 Handle g_hCvarTeleBuildMult;
 Handle g_hCvarRespawnTank;
 Handle g_hCvarGiantHandScale;
+Handle g_hCvarRespawnGiantTag;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -1043,6 +1044,7 @@ public void OnPluginStart()
 	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "3.0", "Respawn time multiplier per each Giant Robot advantage.");
 	g_hCvarRespawnAdvCap = CreateConVar("tank_respawn_advantage_cap", "3", "Maximum Giant Robot advantage amount that can be factored into respawn time. Set to 0 to disable.");
 	g_hCvarRespawnAdvRunaway = CreateConVar("tank_respawn_advantage_runaway", "2", "When the Giant Robot advantage is equal to or greater than this, the opposite team's respawn is reduced. Set to a really high number like 100 to disable.");
+	g_hCvarRespawnGiantTag = CreateConVar("tank_respawn_giant_tag", "2.0", "Respawn time for BLU in pl when a Giant with the 'dont_change_respawn' tag is out.");
 
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
 	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.03", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
@@ -10679,7 +10681,7 @@ public void Bomb_OnRobotPickup(const char[] output, int caller, int activator, f
 		{
 			// As a balance, there will be no bomb carrier buffs if the player count is below x amount
 			int iPlayerCount;
-			for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) >= 2) iPlayerCount++;
+			for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) >= 2) iPlayerCount++; // todo only count red team
 			if(iPlayerCount >= config.LookupInt(g_hCvarBombBuffsCuttoff))
 			{
 #if defined DEBUG
@@ -12339,9 +12341,7 @@ void Attributes_Clear(int client)
 
 void Attributes_Set(int client)
 {
-	TFClassType class = TF2_GetPlayerClass(client);
-	
-	switch(class)
+	switch(TF2_GetPlayerClass(client))
 	{
 		case TFClass_Medic:
 		{
