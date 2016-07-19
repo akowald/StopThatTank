@@ -68,10 +68,11 @@
 #define GIANTTAG_THE_DONALD					(1 << 19)
 #define GIANTTAG_GUNSLINGER_COMBO			(1 << 20)
 #define GIANTTAG_JULY4 						(1 << 21)
+#define GIANTTAG_NO_HEALING_BOOST			(1 << 22)
 
 char g_strGiantTags[][] =
 {
-	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit", "dont_spawn_in_hell", "the_donald", "gunslinger_combo", "july4",
+	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit", "dont_spawn_in_hell", "the_donald", "gunslinger_combo", "july4", "no_healing_boost",
 };
 
 enum

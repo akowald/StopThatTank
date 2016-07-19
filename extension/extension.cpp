@@ -30,6 +30,7 @@ CDetour *dropCreateDetour;
 CDetour *dropPickupDetour;
 CDetour *entityFilterDetour;
 CDetour *uberEffectsDetour;
+CDetour *calcSpeedDetour;
 
 IGameConfig *g_pGameConf = NULL;
 IBinTools *g_pBinTools = NULL;
@@ -41,6 +42,8 @@ IForward *g_pForwardOnWeaponPickup = NULL;
 IForward *g_pForwardOnWeaponCreate = NULL;
 IForward *g_pForwardPassFilter = NULL;
 IForward *g_pForwardUberEffects = NULL;
+IForward *g_pForwardCalcSpeedPre = NULL;
+IForward *g_pForwardCalcSpeedPost = NULL;
 
 void *g_addr_GetItemSchema = NULL;
 void *g_addr_GetAttributeDefinition = NULL;
@@ -238,6 +241,29 @@ DETOUR_DECL_MEMBER1(CanRecieveMedigunChargeEffect, bool, int, medigunChargeType)
 	}
 
 	return DETOUR_MEMBER_CALL(CanRecieveMedigunChargeEffect)(medigunChargeType);
+}
+
+// Detour for double CTFPlayer::TeamFortress_CalculateMaxSpeed(void)
+DETOUR_DECL_MEMBER0(TeamFortress_CalculateMaxSpeed, double)
+{
+	double result;
+
+	if(g_pForwardCalcSpeedPre != NULL && g_pForwardCalcSpeedPost != NULL)
+	{
+		int client = gamehelpers->EntityToBCompatRef(reinterpret_cast<CBaseEntity*>(this));
+
+		g_pForwardCalcSpeedPre->PushCell(client);
+		g_pForwardCalcSpeedPre->Execute(NULL);
+
+		result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)();
+
+		g_pForwardCalcSpeedPost->PushCell(client);
+		g_pForwardCalcSpeedPost->Execute(NULL);
+	}else{
+		result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)();
+	}
+	
+	return result;
 }
 
 bool LookupSignature(char const *key, void **addr)
@@ -978,6 +1004,14 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		uberEffectsDetour->EnableDetour();
 	}
 
+	calcSpeedDetour = DETOUR_CREATE_MEMBER(TeamFortress_CalculateMaxSpeed, "CTFPlayer::TeamFortress_CalculateMaxSpeed");
+	if(calcSpeedDetour == NULL)
+	{
+		g_pSM->LogMessage(myself, "Could not initalize TeamFortress_CalculateMaxSpeed detour. Will continue to run!");
+	}else{
+		calcSpeedDetour->EnableDetour();
+	}
+
 	LookupSignature("GetItemSchema", &g_addr_GetItemSchema);
 	LookupSignature("CEconItemSchema::GetAttributeDefinition", &g_addr_GetAttributeDefinition);
 	LookupSignature("CEconItemSchema::GetAttributeDefinitionByName", &g_addr_GetAttributeDefinitionByName);
@@ -997,6 +1031,8 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	g_pForwardOnWeaponCreate = forwards->CreateForward("Tank_OnWeaponDropped", ET_Event, 5, NULL, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
 	g_pForwardPassFilter = forwards->CreateForward("Tank_PassFilter", ET_Hook, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
 	g_pForwardUberEffects = forwards->CreateForward("Tank_OnCanRecieveMedigunChargeEffect", ET_Event, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
+	g_pForwardCalcSpeedPre = forwards->CreateForward("Tank_OnCalcSpeedPre", ET_Ignore, 1, NULL, Param_Cell);
+	g_pForwardCalcSpeedPost = forwards->CreateForward("Tank_OnCalcSpeedPost", ET_Ignore, 1, NULL, Param_Cell);
 
 	int iOffset;
 	if(!g_pGameConf->GetOffset("CBaseEntity::ShouldTransmit", &iOffset))
@@ -1086,6 +1122,10 @@ void Tank::SDK_OnUnload()
 	{
 		uberEffectsDetour->Destroy();
 	}
+	if(calcSpeedDetour != NULL)
+	{
+		calcSpeedDetour->Destroy();
+	}
 
 	forwards->ReleaseForward(g_pForwardUpgrades);
 	forwards->ReleaseForward(g_pForwardShouldTransmit);
@@ -1093,7 +1133,9 @@ void Tank::SDK_OnUnload()
 	forwards->ReleaseForward(g_pForwardOnWeaponCreate);
 	forwards->ReleaseForward(g_pForwardPassFilter);
 	forwards->ReleaseForward(g_pForwardUberEffects);
-	
+	forwards->ReleaseForward(g_pForwardCalcSpeedPre);
+	forwards->ReleaseForward(g_pForwardCalcSpeedPost);
+
 	if(g_pSDKHooks != NULL)
 	{
 		g_pSDKHooks->RemoveEntityListener(this);

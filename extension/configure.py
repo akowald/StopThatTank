@@ -10,7 +10,7 @@ builder.options.add_option('--hl2sdk-root', type=str, dest='hl2sdk_root', defaul
 		                   help='Root search folder for HL2SDKs')
 builder.options.add_option('--mms-path', type=str, dest='mms_path', default='../../../metamod-source-1.10',
                        help='Path to Metamod:Source')
-builder.options.add_option('--sm-path', type=str, dest='sm_path', default='../../../sourcemod-1.7',
+builder.options.add_option('--sm-path', type=str, dest='sm_path', default='../../../sourcemod-1.8',
                        help='Path to SourceMod')
 builder.options.add_option('--enable-debug', action='store_const', const='1', dest='debug',
                        help='Enable debugging symbols')

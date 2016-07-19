@@ -886,6 +886,9 @@ enum
 }
 int g_flareExplodeReason = FlareExplode_Unknown;
 
+bool g_inCalcSpeed[MAXPLAYERS+1];
+int g_tempHealingTarget[MAXPLAYERS+1];
+
 enum
 {
 	Interest_None=0,
@@ -1028,11 +1031,11 @@ public void OnPluginStart()
 	g_hCvarTankCooldown = CreateConVar("tank_cooldown", "28.0", "Seconds after the tank is killed that a Giant Robot will spawn into the game.");
 	g_hCvarDistanceMove = CreateConVar("tank_distance_move", "4600.0", "Distance the control point must be from the goal for tanks to spawn on it.");
 	g_hCvarCurrencyCrit = CreateConVar("tank_currency_crit", "5.0", "(Seconds) Crit duration after a RED team member touches a currencypack.");
-	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.18", "Tank health percentage earned when a checkpoint is reached.");
-	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "5.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
-	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.2", "Seconds that must pass before the tank is healed.");
+	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.17", "Tank health percentage earned when a checkpoint is reached.");
+	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "1.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
+	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.1", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
-	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "2.2", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
+	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.8", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
 	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "2.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: x/24*this = final respawn time.");
@@ -15553,4 +15556,62 @@ public Action TempEntHook_ParticleEffect(const char[] te_name, int[] players, in
 	}
 
 	return Plugin_Continue;
+}
+
+public void Tank_OnCalcSpeedPre(int client)
+{
+	if(!g_bEnabled) return;
+
+	g_inCalcSpeed[client] = false;
+	// Apply the effects for the giant tag: "no_healing_boost".
+	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_NO_HEALING_BOOST) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+	{
+		// Temporarily remove the medigun's healing target to take it out of the equation.
+		int medigun = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+		if(medigun > MaxClients)
+		{
+			char className[24];
+			GetEdictClassname(medigun, className, sizeof(className));
+			if(strcmp(className, "tf_weapon_medigun") == 0)
+			{
+				int healingTarget = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
+				if(healingTarget >= 1 && healingTarget <= MaxClients && IsClientInGame(healingTarget))
+				{
+					g_inCalcSpeed[client] = true;
+					g_tempHealingTarget[client] = EntIndexToEntRef(healingTarget);
+					SetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget", -1);
+				}
+			}
+		}
+	}
+}
+
+public void Tank_OnCalcSpeedPost(int client)
+{
+	if(!g_bEnabled) return;
+
+	if(g_inCalcSpeed[client] && client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_NO_HEALING_BOOST) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+	{
+		int healingTarget = EntRefToEntIndex(g_tempHealingTarget[client]);
+		if(healingTarget >= 1 && healingTarget <= MaxClients && IsClientInGame(healingTarget))
+		{
+			// Restore the healing target on the giant's medigun.
+			int medigun = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
+			if(medigun > MaxClients)
+			{
+				char className[24];
+				GetEdictClassname(medigun, className, sizeof(className));
+				if(strcmp(className, "tf_weapon_medigun") == 0)
+				{
+					int target = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
+					if(target == -1)
+					{
+						SetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget", healingTarget);
+					}
+				}
+			}
+		}
+	}
+	
+	g_inCalcSpeed[client] = false;
 }

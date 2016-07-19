@@ -203,6 +203,20 @@ enum
 forward Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunChargeType, bool &result);
 
 /**
+ * Called before player speed calculation begins.
+ *
+ * @param client 				Client index.
+ */
+forward void Tank_OnCalcSpeedPre(int client);
+
+/**
+ * Called after player speed calculation concludes.
+ *
+ * @param client 				Client index.
+ */
+forward void Tank_OnCalcSpeedPost(int client);
+
+/**
  * Do not edit below this line!
  */
 public Extension __ext_tank = 
