@@ -11249,6 +11249,19 @@ public void Event_BuildObject(Handle hEvent, const char[] strEventName, bool bDo
 								SetEntProp(iObject, Prop_Send, "m_iHealth", GetEntProp(iObject, Prop_Send, "m_iMaxHealth"));
 							}
 						}
+						case TFObject_Teleporter:
+						{
+							// Find and upgrade the linked teleporter.
+							int tele = MaxClients+1;
+							while((tele = FindEntityByClassname(tele, "obj_teleporter")) > MaxClients)
+							{
+								if(tele != iObject && GetEntPropEnt(tele, Prop_Send, "m_hBuilder") == iBuilder)
+								{
+									SDK_DoQuickBuild(tele);
+									break;
+								}
+							}
+						}
 					}
 				}
 			}
