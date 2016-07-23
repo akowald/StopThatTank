@@ -455,6 +455,7 @@ Handle g_hCvarTeleBuildMult;
 Handle g_hCvarRespawnTank;
 Handle g_hCvarGiantHandScale;
 Handle g_hCvarRespawnGiantTag;
+Handle g_hCvarBombDroppedMaxTime;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -889,6 +890,8 @@ int g_flareExplodeReason = FlareExplode_Unknown;
 bool g_inCalcSpeed[MAXPLAYERS+1];
 int g_tempHealingTarget[MAXPLAYERS+1];
 
+float g_timeCaptureOutline[MAX_TEAMS];
+
 enum
 {
 	Interest_None=0,
@@ -1086,8 +1089,9 @@ public void OnPluginStart()
 	g_hCvarTeleportUber = CreateConVar("tank_teleport_uber", "1.0", "Seconds of uber when a player uses a giant engineer's teleporter.");
 	g_hCvarTimeTip = CreateConVar("tank_time_tip", "220", "Seconds in between chat tips. Anything less than 0 disables chat tips.");
 
-	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "50", "Time (in seconds) that it takes for a dropped bomb to expire.");
+	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "20", "Time (in seconds) that it takes for a dropped bomb to expire.");
 	g_hCvarBombRoundTime = CreateConVar("tank_bomb_round_time", "2.5", "Timelimit (in minutes) that the robots are under to deliever the bomb.");
+	g_hCvarBombDroppedMaxTime = CreateConVar("tank_bomb_dropped_maxtime", "1.2", "Maximum round time (in minutes) when the bomb is dropped in payload. (Set to -1.0 to disable.)");
 	g_hCvarBombDistanceWarn = CreateConVar("tank_bomb_distance_warn", "650.0", "Distance the bomb must be from the goal for warnings to sound.");
 	g_hCvarBombTimeDeploy = CreateConVar("tank_bomb_time_deploy", "1.9", "Seconds that it takes for a robot to deploy a bomb.");
 	g_hCvarBombMoveSpeed = CreateConVar("tank_bomb_move_speed", "0.8", "Move speed bonus for normal bomb carriers. (percentage)");
@@ -3370,17 +3374,7 @@ public void Event_BroadcastAudio(Handle hEvent, char[] strEventName, bool bDontB
 
 void Tank_BombDeployHud(bool enable)
 {
-	// This will crash if changeState is true (more so on linux). I think SourceMod makes the incorrect assumption that the SendTables are identical in the real and proxy gamerules entity. I could be wrong.
 	GameRules_SetProp("m_bPlayingHybrid_CTF_CP", enable);
-
-	if(g_offset_m_bPlayingHybrid_CTF_CP > 0)
-	{
-		int gamerules = FindEntityByClassname(MaxClients+1, "tf_gamerules");
-		if(gamerules > MaxClients)
-		{
-			ChangeEdictState(gamerules, g_offset_m_bPlayingHybrid_CTF_CP);
-		}
-	}
 }
 
 public void Event_RoundWin(Handle hEvent, char[] strEventName, bool bDontBroadcast)
@@ -3942,8 +3936,6 @@ int Tank_HookCaptureTrigger(int team)
 	{
 		return -1;
 	}
-
-
 
 	g_iRefTrigger[team] = 0;
 
@@ -4568,6 +4560,7 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 				g_flBombLastMessage = 0.0;
 				g_finalBombDeployer = 0;
 				g_timeControlPointSkipped = 0.0;
+				g_timeCaptureOutline[TFTeam_Blue] = 0.0;
 				
 				DispatchKeyValue(iBomb, "GameType", "2");
 				char strTemp[50];
@@ -9672,7 +9665,7 @@ void Bomb_Think(int iBomb)
 	GetEntPropVector(client, Prop_Send, "m_vecOrigin", flPosPlayer);
 	bool bIsGiantCarrying = view_as<bool>(GetEntProp(client, Prop_Send, "m_bIsMiniBoss"));
 
-	// Get the distance of the player to the control point
+	// Get the distance of the player to the next control point.
 	float flPosPath[3];
 	GetEntPropVector(iPathTrack, Prop_Send, "m_vecOrigin", flPosPath);
 	float flDistanceToGoal = GetVectorDistance(flPosPlayer, flPosPath);
@@ -9831,15 +9824,6 @@ void Bomb_Think(int iBomb)
 			return;
 		}
 
-		// Send an annotation to the bomb carrier every 30s or so to let them know where to take the bomb
-		if(g_flBombLastMessage == 0.0 || GetEngineTime() - g_flBombLastMessage > 20.0)
-		{
-			g_flBombLastMessage = GetEngineTime();
-
-			// Send the player an annotation guiding them to the next control point
-			Giant_ShowGuidingAnnotation(client, team, iIndexCP);
-		}
-
 		// Warn the bomb carrier if they skip a control point.
 		if(g_timeControlPointSkipped == 0.0 && g_flBombLastMessage != 0.0 && GetEngineTime() - g_flBombLastMessage > 5.0)
 		{
@@ -9865,11 +9849,22 @@ void Bomb_Think(int iBomb)
 					Bomb_ShowSkippedAnnotation(client, team, iIndexCP);
 
 					break;
-				}				
+				}
 			}
+		}
+
+		// Send an annotation to the bomb carrier every 30s or so to let them know where to take the bomb
+		if(g_flBombLastMessage == 0.0 || GetEngineTime() - g_flBombLastMessage > 20.0)
+		{
+			g_flBombLastMessage = GetEngineTime();
+
+			// Send the player an annotation guiding them to the next control point
+			Giant_ShowGuidingAnnotation(client, team, iIndexCP);
 		}
 	}
 	
+	float minPlantDistance = config.LookupFloat(g_hCvarMinPlantDistance);
+
 	// Handle the trigger_capture_area logic for all the control points EXCEPT for the final one in which the robot will have to deploy in
 	if(!bIsGoal)
 	{
@@ -9911,7 +9906,7 @@ void Bomb_Think(int iBomb)
 				if(!Float_AlmostEqual(flCaptureTime, GetEntPropFloat(iObjective, Prop_Send, "m_flTeamCapTime", iMapperIndex + 8 * team)))
 				{
 #if defined DEBUG
-					PrintToServer("(Bomb_Think) m_flTeamCapTime set to %0.2f, expected %0.2f!", GetEntPropFloat(iObjective, Prop_Send, "m_flTeamCapTime", iMapperIndex + 8 * team), flCaptureTime);
+					PrintToServer("(Bomb_Think) m_flTeamCapTime set to %1.2f, expected %1.2f!", GetEntPropFloat(iObjective, Prop_Send, "m_flTeamCapTime", iMapperIndex + 8 * team), flCaptureTime);
 #endif
 					// You need to do this in order for client's HUDs to predict the capture rate
 					// Mappers have a little control given by the property "Number of RED/BLUE players to cap" on trigger_capture_area
@@ -9923,13 +9918,17 @@ void Bomb_Think(int iBomb)
 					SetEntProp(iObjective, Prop_Send, "m_iUpdateCapHudParity", iHudParity);
 				}
 			}
+
+			// Highlight the boundaries of the control point capture area.
+			CaptureTriggers_Outline(client, iTriggerArea, team);
 		}
+	}else{
+		// Highlight the boundaries of the bomb deploy area.
+		BombPlant_Outline(client, minPlantDistance, flPosPath, team);
 	}
 
 	// Make sure the func_capturezone is created for each control point.
 	CaptureZones_Get(team, iIndexCP);
-
-	float minPlantDistance = config.LookupFloat(g_hCvarMinPlantDistance);
 
 	// Are we close enough the goal that we can plant?
 	if(flDistanceToGoal < minPlantDistance && !(g_nMapHack == MapHack_CactusCanyon && g_bIsFinale && bIsGoal))
@@ -10457,11 +10456,30 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 	if(!g_bEnabled) return;
 	Bomb_ClearMoveBonus();
 	
-	if(!g_bIsRoundStarted || g_nGameMode != GameMode_BombDeploy) return;
 	if(g_bBombGone)
 	{
 		g_blockLogAction = true;
 		return; // Don't detect the drop when the bomb is removed
+	}
+	if(!g_bIsRoundStarted || g_nGameMode != GameMode_BombDeploy) return;
+
+	Giant_Think(TFTeam_Blue); // Update the state of the team giant to deactivate if necessary.
+	if(!g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive])
+	{
+		// Set a maximum round time when the team giant is killed.
+		int maxTime = RoundToNearest(config.LookupFloat(g_hCvarBombDroppedMaxTime) * 60.0);
+		if(maxTime > 0)
+		{
+			int timer = EntRefToEntIndex(g_iRefBombTimer);
+			if(timer > MaxClients)
+			{
+#if defined DEBUG
+				PrintToServer("(Bomb_OnDropped) Setting maximum round time of %ds on timer %d..", maxTime, timer);
+#endif
+				SetVariantInt(maxTime);
+				AcceptEntityInput(timer, "SetMaxTime");
+			}
+		}
 	}
 
 	float bombPos[3];
@@ -10555,7 +10573,7 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 
 	if(g_bBombSentDropNotice) return; // Only send this notification once!
 	if(g_flBombGameEnd != 0.0) return; // Don't show this message close to the game ending
-	
+
 	// Don't show the notification if the giant is still alive because the robots aren't able to pick up the bomb at this time
 	if(g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive])
 	{
@@ -10840,9 +10858,26 @@ public Action Command_Test2(int client, int args)
 	//
 	//if(args == 1) SetEntPropFloat(GetPlayerWeaponSlot(client, WeaponSlot_Secondary), Prop_Send, "m_flChargeLevel", 1.0);
 
-	char particle[128];
-	GetCmdArgString(particle, sizeof(particle));
-	Debug_TestParticle(client, particle);
+	//char particle[128];
+	//GetCmdArgString(particle, sizeof(particle));
+	//Debug_TestParticle(client, particle);
+
+	//void TE_SetupBeamRingPoint(const float center[3], float Start_Radius, float End_Radius, int ModelIndex, int HaloIndex, int StartFrame, int FrameRate, float Life, float Width, float Amplitude, const int Color[4], int Speed, int Flags)
+
+	/*
+	float pos[3];
+	GetClientAbsOrigin(client, pos);
+	pos[2] += 25.0;
+
+	static const int color[4] = {255, 62, 150, 240};
+	TE_SetupBeamRingPoint(pos, 0.0, 100.0, g_iSpriteBeam, 0, 0, 15, 4.0, 3.0, 0.1, color, 5, 0);
+	if(client == 0)
+	{
+		TE_SendToAll();
+	}else{
+		TE_SendToClient(client);
+	}
+	*/
 
 	return Plugin_Handled;
 }
@@ -15627,4 +15662,101 @@ public void Tank_OnCalcSpeedPost(int client)
 	}
 	
 	g_inCalcSpeed[client] = false;
+}
+
+void Outline_DrawBoundaries(int client=0, const float mins[3], const float maxs[3], const float origin[3])
+{
+	float corners[4][2];
+	corners[0][0] = mins[0]; corners[0][1] = mins[1];
+	corners[1][0] = mins[0]; corners[1][1] = maxs[1];
+	corners[3][0] = maxs[0]; corners[3][1] = mins[1];
+	corners[2][0] = maxs[0]; corners[2][1] = maxs[1];
+
+	static const int color[4] = {255, 62, 150, 240};
+
+	// Draw the upper corners.
+	for(int i=0; i<sizeof(corners); i++)
+	{
+		float start[3], end[3];
+		for(int j=0; j<2; j++)
+		{
+			start[j] = corners[i][j] + origin[j];
+			end[j] = corners[(i+1)%sizeof(corners)][j] + origin[j];
+		}
+		start[2] = end[2] = maxs[2] + origin[2];
+
+		//TE_SetupBeamPoints(const Float:start[3], const Float:end[3], ModelIndex, HaloIndex, StartFrame, FrameRate, Float:Life, Float:Width, Float:EndWidth, FadeLength, Float:Amplitude, const Color[4], Speed)
+		TE_SetupBeamPoints(start, end, g_iSpriteBeam, 0, 0, 15, 1.5, 5.0, 5.0, 5, 0.1, color, 1);
+		if(client == 0)
+		{
+			TE_SendToAll();
+		}else{
+			TE_SendToClient(client);
+		}
+	}
+
+	// Draw the walls.
+	for(int i=0; i<sizeof(corners); i++)
+	{
+		float start[3], end[3];
+		for(int j=0; j<2; j++)
+		{
+			start[j] = end[j] = corners[i][j] + origin[j];
+		}
+		start[2] = maxs[2] + origin[2];
+		end[2] = mins[2] + origin[2];
+
+		TE_SetupBeamPoints(start, end, g_iSpriteBeam, 0, 0, 15, 1.5, 5.0, 5.0, 5, 0.1, color, 1);
+		if(client == 0)
+		{
+			TE_SendToAll();
+		}else{
+			TE_SendToClient(client);
+		}
+	}	
+}
+
+void CaptureTriggers_Outline(int client=0, int captureArea, int team)
+{
+	float et = GetEngineTime();
+	if(g_timeCaptureOutline[team] == 0.0) g_timeCaptureOutline[team] = et;
+
+	if(et - g_timeCaptureOutline[team] < 1.0) return;
+
+	// Draw a beam around the boundaries of the trigger_capture_area.
+	float mins[3];
+	float maxs[3];
+	GetEntPropVector(captureArea, Prop_Send, "m_vecMins", mins);
+	GetEntPropVector(captureArea, Prop_Send, "m_vecMaxs", maxs);
+
+	float pos[3];
+	GetEntPropVector(captureArea, Prop_Data, "m_vecAbsOrigin", pos);
+
+	Outline_DrawBoundaries(client, mins, maxs, pos);
+
+	g_timeCaptureOutline[team] = et;
+}
+
+void BombPlant_Outline(int client=0, const float minPlantDistance, const float goalPos[3], int team)
+{
+	float et = GetEngineTime();
+	if(g_timeCaptureOutline[team] == 0.0) g_timeCaptureOutline[team] = et;
+
+	if(et - g_timeCaptureOutline[team] < 1.0) return;
+
+	float pos[3];
+	for(int i=0; i<3; i++) pos[i] = goalPos[i];
+	pos[2] -= 35.0;
+
+	static const int color[4] = {255, 62, 150, 240};
+
+	TE_SetupBeamRingPoint(pos, 0.0, minPlantDistance, g_iSpriteBeam, 0, 0, 15, 4.0, 5.0, 0.1, color, 5, 0);
+	if(client == 0)
+	{
+		TE_SendToAll();
+	}else{
+		TE_SendToClient(client);
+	}
+
+	g_timeCaptureOutline[team] = et;
 }

@@ -221,7 +221,7 @@
 	}
 	"Tank_Annotation_Bomb_PickupHint"
 	{
-		"en"			"Pick up the bomb before it expires!"
+		"en"			"Pick up the bomb before it resets!"
 	}
 	"Tank_Annotation_Borneo_Detour"
 	{
