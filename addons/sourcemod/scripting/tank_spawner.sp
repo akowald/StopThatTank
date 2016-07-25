@@ -35,6 +35,7 @@ enum
 {
 	SpawnerReminder_SuperSpyLowHealth=0,
 	SpawnerReminder_BusterSwat,
+	SpawnerReminder_BorneoDetour,
 };
 
 int g_iNumGiantSpawns[MAX_TEAMS][MAX_NUM_TEMPLATES];

@@ -773,7 +773,8 @@ enum
 	Annotation_GiantSpawnedBlue,
 	Annotation_BombCaptureSkipped,
 	Annotation_GiantBusterSwat, // 16-55
-	Annotation_HellHint=56,
+	Annotation_BorneoDetour, // 56-95
+	Annotation_HellHint=96,
 };
 
 enum eTeleporterState
@@ -893,6 +894,7 @@ bool g_inCalcSpeed[MAXPLAYERS+1];
 int g_tempHealingTarget[MAXPLAYERS+1];
 
 float g_timeCaptureOutline[MAX_TEAMS];
+bool g_playedRoundIntroMusic;
 
 enum
 {
@@ -916,7 +918,7 @@ enum eSpawnerType
 #define SPAWNERFLAG_NOPUSHAWAY 		(1 << 1)
 
 #define SPAWNER_SIZE 				MAXPLAYERS+MAX_TEAMS+1
-#define SPAWNER_MAX_REMINDERS 		2
+#define SPAWNER_MAX_REMINDERS 		3
 // Structure for the giant/tank spawner that supports spawning multiple giants at a time onto the playing field.
 enum eSpawnerStruct
 {
@@ -1107,7 +1109,7 @@ public void OnPluginStart()
 	g_hCvarBombBuffsCutoff = CreateConVar("tank_bomb_buffs_cutoff", "5", "Minimum player count required for bomb carrier buffs to be activated.");
 	g_hCvarBombWinSpeed = CreateConVar("tank_bomb_win_speed", "500.0", "Speed of the payload cart when the robots deploy the bomb, winning the round.");
 	g_hCvarBombSkipDistance = CreateConVar("tank_bomb_skip_distance", "500.0", "Distance you must be to a locked control point to trigger the skipped annotation.");
-	g_hCvarBombRingOffsetZ = CreateConVar("tank_bomb_ring_offset_z", "-35.0", "z position offset for the bomb deploy ring effect.");
+	g_hCvarBombRingOffsetZ = CreateConVar("tank_bomb_ring_offset_z", "-40.0", "z position offset for the bomb deploy ring effect.");
 
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
 	g_hCvarGiantForce = CreateConVar("tank_giant_force", "-1", "Index of giant template to pick. (-1 = random)");
@@ -1931,41 +1933,67 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 					}
 
 					// Show a hint to Giants if a Sentry Buster gets too close letting them know they can swat them away.
-					float busterPos[3];
-					GetClientAbsOrigin(client, busterPos);
-					for(int i=1; i<=MaxClients; i++)
+					if(g_nGameMode == GameMode_Race)
 					{
-						if(i != client && g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) && g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_MELEE_KNOCKBACK && !g_nSpawner[i][g_bSpawnerShownReminder][SpawnerReminder_BusterSwat]
-							&& IsClientInGame(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss") && IsPlayerAlive(i) && GetClientTeam(i) != team)
+						float busterPos[3];
+						GetClientAbsOrigin(client, busterPos);
+						for(int i=1; i<=MaxClients; i++)
 						{
-							float giantPos[3];
-							GetClientAbsOrigin(i, giantPos);
-							if(GetVectorDistance(busterPos, giantPos) < 350.0)
+							if(i != client && g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) && g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_MELEE_KNOCKBACK && !g_nSpawner[i][g_bSpawnerShownReminder][SpawnerReminder_BusterSwat]
+								&& IsClientInGame(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss") && IsPlayerAlive(i) && GetClientTeam(i) != team)
 							{
-								// Sentry Buster is invading the Giant's personal space.
-								g_nSpawner[i][g_bSpawnerShownReminder][SpawnerReminder_BusterSwat] = true;
-
-								Handle event = CreateEvent("show_annotation");
-								if(event != INVALID_HANDLE)
+								float giantPos[3];
+								GetClientAbsOrigin(i, giantPos);
+								if(GetVectorDistance(busterPos, giantPos) < 350.0)
 								{
-									SetEventInt(event, "id", Annotation_GiantBusterSwat+i-1);
-									SetEventInt(event, "follow_entindex", client);
-									SetEventInt(event, "visibilityBitfield", (1 << i)); // Only show to the one Giant.
+									// Sentry Buster is invading the Giant's personal space.
+									g_nSpawner[i][g_bSpawnerShownReminder][SpawnerReminder_BusterSwat] = true;
 
-									char text[256];
-									Format(text, sizeof(text), "%T", "Tank_Annotation_Giant_SwatBuster", i);
-									SetEventString(event, "text", text);
+									Handle event = CreateEvent("show_annotation");
+									if(event != INVALID_HANDLE)
+									{
+										SetEventInt(event, "id", Annotation_GiantBusterSwat+i-1);
+										SetEventInt(event, "follow_entindex", client);
+										SetEventInt(event, "visibilityBitfield", (1 << i)); // Only show to the one Giant.
 
-									SetEventFloat(event, "lifetime", 5.0);
-									SetEventString(event, "play_sound", "misc/null.wav");
-									
-									FireEvent(event); // Frees the handle.
+										char text[256];
+										Format(text, sizeof(text), "%T", "Tank_Annotation_Giant_SwatBuster", i);
+										SetEventString(event, "text", text);
+
+										SetEventFloat(event, "lifetime", 5.0);
+										SetEventString(event, "play_sound", "misc/null.wav");
+										
+										FireEvent(event); // Frees the handle.
+									}
 								}
 							}
 						}
 					}
 				}
 				
+				if(g_nMapHack == MapHack_Borneo && g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !g_nSpawner[client][g_bSpawnerShownReminder][SpawnerReminder_BorneoDetour])
+				{
+					// Remind any Giant or Sentry Buster to take the detour when they get near the third control point in Borneo.
+					int controlPoint = EntRefToEntIndex(g_iRefLinkedCPs[TFTeam_Blue][2]);
+					if(controlPoint > MaxClients)
+					{
+						if(GetEntProp(controlPoint, Prop_Send, "m_iTeamNum") == TFTeam_Blue && GetEntPropFloat(client, Prop_Send, "m_flModelScale") >= 1.6)
+						{
+							float controlPos[3];
+							GetEntPropVector(controlPoint, Prop_Data, "m_vecAbsOrigin", controlPos);
+							controlPos[2] -= 60.0;
+							float playerPos[3];
+							GetClientAbsOrigin(client, playerPos);
+							if(GetVectorDistance(controlPos, playerPos, true) < 62500.0) // 250.0^2
+							{
+								g_nSpawner[client][g_bSpawnerShownReminder][SpawnerReminder_BorneoDetour] = true;
+
+								Borneo_ShowAlternativeRoute(client);
+							}
+						}
+					}
+				}
+
 				if(Spawner_HasGiantTag(client, GIANTTAG_CAN_DROP_BOMB) && g_nGameMode == GameMode_BombDeploy && class == TFClass_Spy)
 				{
 					// Drop the bomb automatically so the player can cloak easily.
@@ -2167,6 +2195,7 @@ public void Event_RoundStart(Handle hEvent, char[] strEventName, bool bDontBroad
 	g_bCactusTrainOnce = false;
 	g_hellTeamWinner = 0;
 	g_finalBombDeployer = 0;
+	g_playedRoundIntroMusic = false;
 	for(int i=0; i<MAXPLAYERS+1; i++)
 	{
 		g_iReanimatorNumRevives[i] = 0;
@@ -4471,7 +4500,7 @@ void GameLogic_DoNext()
 		g_nTeamGiant[TFTeam_Blue][g_flTeamGiantTimeRoundStarts] = GetEngineTime()+flTimeCooldown-5.0; // time when the spawn process should begin
 
 		Timer_KillStart();
-		g_hTimerStart = CreateTimer(flTimeCooldown-5.0, Timer_Spawn_Part1, _, TIMER_REPEAT); // spawns the bomb on the ground
+		g_hTimerStart = CreateTimer(flTimeCooldown-3.0, Timer_SpawnBomb_Part1, _, TIMER_REPEAT); // spawns the bomb on the ground
 		
 		g_countdownTime = 5;
 		Timer_KillCountdown();
@@ -4531,33 +4560,10 @@ void Tank_PickMVP(int team)
 	}
 }
 
-public Action Timer_Spawn_Part1(Handle hTimer)
-{
-	// Start spawning the objects into the playing field
-	switch(g_nGameMode)
-	{
-		case GameMode_Tank:
-		{
-			Spawner_Spawn(0, Spawn_Tank);
-		}
-		case GameMode_BombDeploy:
-		{
-			// Nothing to do here
-		}
-	}
-	
-	g_hTimerStart = CreateTimer(2.0, Timer_Spawn_Part2, _, TIMER_REPEAT);
-	return Plugin_Stop;
-}
-
-public Action Timer_Spawn_Part2(Handle hTimer)
+public Action Timer_SpawnBomb_Part1(Handle hTimer)
 {
 	switch(g_nGameMode)
 	{
-		case GameMode_Tank:
-		{
-			//
-		}
 		case GameMode_BombDeploy:
 		{	
 			// Spawn a bomb that the giant will carry to the goal in the next round
@@ -4643,29 +4649,14 @@ public Action Timer_Spawn_Part2(Handle hTimer)
 		}
 	}
 	
-	g_hTimerStart = CreateTimer(3.0, Timer_Spawn_Part3, _, TIMER_REPEAT);
+	g_hTimerStart = CreateTimer(3.0, Timer_SpawnBomb_Part2, _, TIMER_REPEAT);
 	return Plugin_Stop;
 }
 
-public Action Timer_Spawn_Part3(Handle hTimer)
+public Action Timer_SpawnBomb_Part2(Handle hTimer)
 {
 	switch(g_nGameMode)
 	{
-		case GameMode_Tank:
-		{
-			// Set the tank able to take damage and start moving the cart forward
-			g_bIsRoundStarted = true;
-
-			// Disable the hybird ctf/cp HUD
-			Tank_BombDeployHud(false);
-
-			Tank_SetDefaultHealth(TFTeam_Blue);
-			
-			Train_Move(TFTeam_Blue, 1.0);
-			BroadcastSoundToTeam(TFTeam_Spectator, "MVM.TankStart");
-			BroadcastSoundToTeam(TFTeam_Red, "Announcer.MVM_Tank_Alert_Another");
-			Tank_SetNoTarget(TFTeam_Blue, false);
-		}
 		case GameMode_BombDeploy:
 		{
 			g_bIsRoundStarted = true;
@@ -7707,6 +7698,11 @@ public Action NormalSoundHook(int clients[MAXPLAYERS], int &numClients, char sam
 		volume = 0.5;
 		return Plugin_Changed;
 	}
+	// We play this sound anyway.
+	if(strcmp(sample, "*#mvm/mvm_tank_start.wav") == 0)
+	{
+		return Plugin_Stop;
+	}
 
 	// Catch when a projectile is zapped by the short circuit to detect when sir nukesalot's ball is zapped
 	if(strcmp(sample, ")weapons\\barret_arm_shot.wav") == 0)
@@ -9144,8 +9140,10 @@ public void Output_On10SecRemaining(const char[] output, int caller, int activat
 #endif
 
 	// Play a mvm wave start sound when setup finishes
-	if(Tank_IsInSetup())
+	if(!g_playedRoundIntroMusic && Tank_IsInSetup())
 	{
+		g_playedRoundIntroMusic = true;
+
 		EmitSoundToAll(SOUND_ROUND_START);
 	}
 }
@@ -13382,16 +13380,8 @@ public void Event_PointCaptured(Handle hEvent, const char[] strEventName, bool b
 	int iIndexNext = iIndexCP+1;
 	if(iIndexNext >= 0 && iIndexNext < MAX_LINKS && g_iRefLinkedCPs[team][iIndexNext] != 0 && g_iRefLinkedPaths[team][iIndexNext] != 0)
 	{
-		if(g_nMapHack == MapHack_Borneo && iIndexNext == 3 && GetEntProp(client, Prop_Send, "m_bIsMiniBoss") && GetEntPropFloat(client, Prop_Send, "m_flModelScale") >= 1.6)
-		{
-			// It is not obvious that the giant can fit through the doorway on the penultimate control point.
-			// Let the giant know to take the alternative path.
-			Borneo_ShowAlternativeRoute(client);
-		}else{
-			Giant_ShowGuidingAnnotation(client, team, iIndexNext);
-		}
-
 		g_flBombLastMessage = GetEngineTime();
+		Giant_ShowGuidingAnnotation(client, team, iIndexNext);
 	}
 
 	// Add time to the bomb round timer
@@ -14665,13 +14655,14 @@ void Borneo_ShowAlternativeRoute(int client)
 {
 	if(IsFakeClient(client)) return;
 
-	// Show the player the alternative route after capturing the penultimate control point.
+	// It is not obvious that the giant can fit through the doorway on the penultimate control point.
+	// This shows any giant/buster the alternative route.
 	Handle hEvent = CreateEvent("show_annotation");
 	if(hEvent != INVALID_HANDLE)
 	{
 		float flPos[3] = {-498.18, 4.53, 132.03};
 
-		SetEventInt(hEvent, "id", Annotation_GuidingHint);
+		SetEventInt(hEvent, "id", Annotation_BorneoDetour+client-1);
 		SetEventFloat(hEvent, "worldPosX", flPos[0]);
 		SetEventFloat(hEvent, "worldPosY", flPos[1]);
 		SetEventFloat(hEvent, "worldPosZ", flPos[2]);
@@ -14683,9 +14674,27 @@ void Borneo_ShowAlternativeRoute(int client)
 		SetEventString(hEvent, "text", text);
 
 		SetEventFloat(hEvent, "lifetime", 13.0);
-		SetEventString(hEvent, "play_sound", "misc/null.wav");
+		SetEventString(hEvent, "play_sound", "coach/coach_attack_here.wav");
 		
 		FireEvent(hEvent); // Frees the handle
+	}
+
+	// If the player is currently carrying the bomb, postpone the next guiding annotation.
+	if(g_nGameMode == GameMode_BombDeploy)
+	{
+		int bomb = EntRefToEntIndex(g_iRefBombFlag);
+		if(bomb > MaxClients && client == GetEntPropEnt(bomb, Prop_Send, "moveparent"))
+		{
+			g_flBombLastMessage = GetEngineTime();
+
+			Handle event = CreateEvent("hide_annotation");
+			if(event != null)
+			{
+				SetEventInt(event, "id", Annotation_GuidingHint);
+
+				FireEvent(event); // Frees the handle.
+			}
+		}
 	}
 }
 
