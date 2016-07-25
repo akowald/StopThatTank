@@ -364,7 +364,7 @@ Handle g_hCvarPointsForGiantPlr;
 Handle g_hCvarPointsDamageTank;
 Handle g_hCvarPointsDamageGiant;
 Handle g_hCvarGiantKnifeDamage;
-Handle g_hCvarBombBuffsCuttoff;
+Handle g_hCvarBombBuffsCutoff;
 Handle g_hCvarRaceLvls[MAX_RACE_LEVELS];
 Handle g_hCvarRaceInterval;
 Handle g_hCvarRaceDamageBase;
@@ -456,6 +456,7 @@ Handle g_hCvarRespawnTank;
 Handle g_hCvarGiantHandScale;
 Handle g_hCvarRespawnGiantTag;
 Handle g_hCvarBombDroppedMaxTime;
+Handle g_hCvarBombRingOffsetZ;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -506,6 +507,7 @@ enum eMapHack
 	MapHack_MillstoneEvent,
 	MapHack_Barnblitz,
 	MapHack_SnowyCoast,
+	MapHack_SwiftWater,
 };
 eMapHack g_nMapHack = MapHack_None;
 bool g_bEnableMapHack[MAX_TEAMS];
@@ -1041,16 +1043,16 @@ public void OnPluginStart()
 	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.8", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
-	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "2.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: x/24*this = final respawn time.");
-	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: x/24*this = final respawn time."); // 4.0 default
-	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: x/24*this = final respawn time.");
-	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: x/24*this = final respawn time.");
+	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "2.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
+	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
+	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: et/12*this = final respawn time.");
+	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.5", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
 	g_hCvarRespawnCartBehind = CreateConVar("tank_respawn_cart_behind", "0.25", "A team's tank is considered behind if the difference is greater than this percentage of total track length. Set to over 1.0 to disable.");
 	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "3.0", "Respawn time multiplier per each Giant Robot advantage.");
 	g_hCvarRespawnAdvCap = CreateConVar("tank_respawn_advantage_cap", "3", "Maximum Giant Robot advantage amount that can be factored into respawn time. Set to 0 to disable.");
 	g_hCvarRespawnAdvRunaway = CreateConVar("tank_respawn_advantage_runaway", "2", "When the Giant Robot advantage is equal to or greater than this, the opposite team's respawn is reduced. Set to a really high number like 100 to disable.");
-	g_hCvarRespawnGiantTag = CreateConVar("tank_respawn_giant_tag", "2.0", "Respawn time for BLU in pl when a Giant with the 'dont_change_respawn' tag is out.");
+	g_hCvarRespawnGiantTag = CreateConVar("tank_respawn_giant_tag", "0.1", "Respawn time for BLU in pl when a Giant with the \"dont_change_respawn\" tag is out.");
 
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
 	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.03", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
@@ -1102,9 +1104,10 @@ public void OnPluginStart()
 	g_hCvarBombHealDuration = CreateConVar("tank_bomb_heal_duration", "3.0", "Time (seconds) duration of heal effect when a normal robot picks up the bomb.");
 	g_hCvarBombMiniCritsDuration = CreateConVar("tank_bomb_minicrits_duration", "-1.0", "Time (seconds) duration of minicrits when a normal robot picks up the bomb.");
 	g_hCvarBombHealCooldown = CreateConVar("tank_bomb_heal_cooldown", "10.0", "Time (seconds) between dropping the bomb and picking it up that heal effects are granted.");
-	g_hCvarBombBuffsCuttoff = CreateConVar("tank_bomb_buffs_cutoff", "10", "Minimum player count required for bomb carrier buffs to be activated.");
+	g_hCvarBombBuffsCutoff = CreateConVar("tank_bomb_buffs_cutoff", "5", "Minimum player count required for bomb carrier buffs to be activated.");
 	g_hCvarBombWinSpeed = CreateConVar("tank_bomb_win_speed", "500.0", "Speed of the payload cart when the robots deploy the bomb, winning the round.");
 	g_hCvarBombSkipDistance = CreateConVar("tank_bomb_skip_distance", "500.0", "Distance you must be to a locked control point to trigger the skipped annotation.");
+	g_hCvarBombRingOffsetZ = CreateConVar("tank_bomb_ring_offset_z", "-35.0", "z position offset for the bomb deploy ring effect.");
 
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
 	g_hCvarGiantForce = CreateConVar("tank_giant_force", "-1", "Index of giant template to pick. (-1 = random)");
@@ -1455,6 +1458,9 @@ public void OnMapStart()
 	}else if(strcmp(strMap, "pl_snowycoast", false) == 0)
 	{
 		g_nMapHack = MapHack_SnowyCoast;
+	}else if(strcmp(strMap, "pl_swiftwater_final1", false) == 0)
+	{
+		g_nMapHack = MapHack_SwiftWater;
 	}
 
 	g_nGameMode = GameMode_Unknown;
@@ -4400,6 +4406,23 @@ public void Tank_OnKilled(char[] output, int caller, int activator, float delay)
 
 	MapLogic_OnIntermission();
 
+	// Close the hatch death pit when the Tank is killed.
+	if(g_nMapHack == MapHack_SwiftWater)
+	{
+		static const char doors[][] = {"hinge_bomb_door_1", "hinge_bomb_door_2"};
+		for(int i=0; i<sizeof(doors); i++)
+		{
+			int door = Entity_FindEntityByName(doors[i], "func_door_rotating");
+			if(door > MaxClients)
+			{
+#if defined DEBUG
+				PrintToServer("(Tank_OnKilled) Closing door \"%s\" %d..", doors[i], door);
+#endif
+				AcceptEntityInput(door, "Close");
+			}
+		}
+	}
+
 	// Delay the action of moving the cart back after the tank is destroyed.
 	// Doing this fixes a rare bug where the cart is moved back at the instant it is waiting to drop in maps like pl_badwater.
 	// This occurs when the tank is killed right at the end in a small window of time.
@@ -5143,7 +5166,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 						int owner = GetEntPropEnt(origLauncher, Prop_Send, "m_hOwner");
 						if(owner >= 1 && owner <= MaxClients && victim == owner)
 						{
-							// Valve introduced a bug in Touch Break. The "damage bonus" attribute isn't being applied on cannon ball impacts.
+							// Valve introduced a bug in Tough Break. The "damage bonus" attribute isn't being applied on cannon ball impacts.
 							float value;
 							if(Spawner_HasGiantTag(victim, GIANTTAG_PIPE_EXPLODE_SOUND) && Tank_GetAttributeValue(origLauncher, ATTRIB_DAMAGE_BONUS, value))
 							{
@@ -10701,9 +10724,9 @@ public void Bomb_OnRobotPickup(const char[] output, int caller, int activator, f
 		if(GetEntProp(client, Prop_Send, "m_bIsMiniBoss") == 0)
 		{
 			// As a balance, there will be no bomb carrier buffs if the player count is below x amount
-			int iPlayerCount;
-			for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) >= 2) iPlayerCount++; // todo only count red team
-			if(iPlayerCount >= config.LookupInt(g_hCvarBombBuffsCuttoff))
+			int playerCount;
+			for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) == TFTeam_Red) playerCount++;
+			if(playerCount >= config.LookupInt(g_hCvarBombBuffsCutoff))
 			{
 #if defined DEBUG
 				PrintToServer("(Bomb_OnRobotPickup) %N picked up the bomb, applying slow-down/defense buff!", client);
@@ -15299,74 +15322,109 @@ public Action Command_Explode(int client, int args)
 
 void Tank_EnforceRespawnTimes()
 {
-	// Scale respawn times with player count.
-	int iPlayerCount = 0;
-	for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) >= 2) iPlayerCount++;
-	if(iPlayerCount < 1) iPlayerCount = 1;
-
-	// Get the base respawn time.
-	float flRespawnGiant = config.LookupFloat(g_hCvarRespawnGiant);
-	float flRespawnBombRed = config.LookupFloat(g_hCvarRespawnBombRed);
-	float flRespawnRace = config.LookupFloat(g_hCvarRespawnRace);
-	float flRespawnTank = config.LookupFloat(g_hCvarRespawnTank);
-
-	// Get the minimum respawn time when scaling for player count.
-	float respawnScaleMin = config.LookupFloat(g_hCvarRespawnScaleMin);
-	float respawnGiantMin = flRespawnGiant * respawnScaleMin;
-	float respawnBombRedMin = flRespawnBombRed * respawnScaleMin;
-	float respawnRaceMin = flRespawnRace * respawnScaleMin;
-	float respawnTankMin = flRespawnTank * respawnScaleMin;
-
-	// Get the respawn times scaled for player count.
-	flRespawnGiant = float(iPlayerCount) / 24.0 * flRespawnGiant;
-	flRespawnBombRed = float(iPlayerCount) / 24.0 * flRespawnBombRed;
-	flRespawnRace = float(iPlayerCount) / 24.0 * flRespawnRace;
-	flRespawnTank = float(iPlayerCount) / 24.0 * flRespawnTank;
-
-	// Enforce a minimum respawn time for the scaled respawn times.
-	if(flRespawnGiant < respawnGiantMin) flRespawnGiant = respawnGiantMin;
-	if(flRespawnBombRed < respawnBombRedMin) flRespawnBombRed = respawnBombRedMin;
-	if(flRespawnRace < respawnRaceMin) flRespawnRace = respawnRaceMin;
-	if(flRespawnTank < respawnTankMin) flRespawnTank = respawnTankMin;
-
-	// Scaled respawn times can never go lower than the base respawn time.
-	float flRespawnBase = config.LookupFloat(g_hCvarRespawnBase);
-	if(flRespawnGiant < flRespawnBase) flRespawnGiant = flRespawnBase;
-	if(flRespawnBombRed < flRespawnBase) flRespawnBombRed = flRespawnBase;
-	if(flRespawnRace < flRespawnBase) flRespawnRace = flRespawnBase;
-	if(flRespawnTank < flRespawnBase) flRespawnTank = flRespawnBase;
-
 	// Periodically update the respawn times in case the map tries to change the values (such as when a point is capped).
-	TF2_SetRespawnTime(TFTeam_Blue, flRespawnBase);
-	TF2_SetRespawnTime(TFTeam_Red, flRespawnBase);
+
+	// Scale respawn times with player count.
+	int playerCount[MAX_TEAMS];
+	for(int i=1; i<=MaxClients; i++)
+	{
+		if(IsClientInGame(i))
+		{
+			int team = GetClientTeam(i);
+			if(team == TFTeam_Red || team == TFTeam_Blue)
+			{
+				playerCount[team]++;
+			}else{
+				playerCount[TFTeam_Spectator]++;
+			}
+		}
+	}
+	for(int i=0; i<sizeof(playerCount); i++) if(playerCount[i] < 1) playerCount[i] = 1;
+
+	float respawnScaleMin = config.LookupFloat(g_hCvarRespawnScaleMin);
+	float respawnBase = config.LookupFloat(g_hCvarRespawnBase);
+
+	float respawnGiant[MAX_TEAMS], respawnBombRed[MAX_TEAMS], respawnRace[MAX_TEAMS], respawnTank[MAX_TEAMS], respawnGiantTag[MAX_TEAMS];
+	for(int team=2; team<=3; team++)
+	{
+		// Get the base respawn time.
+		respawnGiant[team] = config.LookupFloat(g_hCvarRespawnGiant);
+		respawnBombRed[team] = config.LookupFloat(g_hCvarRespawnBombRed);
+		respawnRace[team] = config.LookupFloat(g_hCvarRespawnRace);
+		respawnTank[team] = config.LookupFloat(g_hCvarRespawnTank);
+		respawnGiantTag[team] = config.LookupFloat(g_hCvarRespawnGiantTag);
+
+		// Get the minimum respawn time when scaling for player count.
+		float respawnGiantMin = respawnGiant[team] * respawnScaleMin;
+		float respawnBombRedMin = respawnBombRed[team] * respawnScaleMin;
+		float respawnRaceMin = respawnRace[team] * respawnScaleMin;
+		float respawnTankMin = respawnTank[team] * respawnScaleMin;
+		float respawnGiantTagMin = respawnGiantTag[team] * respawnScaleMin;
+
+		// Get the respawn times scaled for player count.
+		respawnGiant[team] = float(playerCount[team]) / 12.0 * respawnGiant[team];
+		respawnBombRed[team] = float(playerCount[team]) / 12.0 * respawnBombRed[team];
+		respawnRace[team] = float(playerCount[team]) / 12.0 * respawnRace[team];
+		respawnTank[team] = float(playerCount[team]) / 12.0 * respawnTank[team];
+		respawnGiantTag[team] = float(playerCount[team]) / 12.0 * respawnGiantTag[team];
+
+		// Enforce a minimum respawn time for the scaled respawn times.
+		if(respawnGiant[team] < respawnGiantMin) respawnGiant[team] = respawnGiantMin;
+		if(respawnBombRed[team] < respawnBombRedMin) respawnBombRed[team] = respawnBombRedMin;
+		if(respawnRace[team] < respawnRaceMin) respawnRace[team] = respawnRaceMin;
+		if(respawnTank[team] < respawnTankMin) respawnTank[team] = respawnTankMin;
+		if(respawnGiantTag[team] < respawnGiantTagMin) respawnGiantTag[team] = respawnGiantTagMin;
+
+		// Scaled respawn times can never go lower than the base respawn time.
+		if(respawnGiant[team] < respawnBase) respawnGiant[team] = respawnBase;
+		if(respawnBombRed[team] < respawnBase) respawnBombRed[team] = respawnBase;
+		if(respawnRace[team] < respawnBase) respawnRace[team] = respawnBase;
+		if(respawnTank[team] < respawnBase) respawnTank[team] = respawnBase;
+		if(respawnGiantTag[team] < respawnBase) respawnGiantTag[team] = respawnBase;		
+	}
+	
+	TF2_SetRespawnTime(TFTeam_Blue, respawnBase);
+	TF2_SetRespawnTime(TFTeam_Red, respawnBase);
 
 	if(g_nGameMode == GameMode_Tank && g_bIsRoundStarted)
 	{
-		TF2_SetRespawnTime(TFTeam_Blue, flRespawnTank);
+		TF2_SetRespawnTime(TFTeam_Blue, respawnTank[TFTeam_Blue]);
 	}
 
 	if(g_nGameMode == GameMode_BombDeploy && g_bIsRoundStarted)
 	{
-		// RED needs a slightly higher respawn time during the bomb round since the hatch is usually right by RED spawn
-		TF2_SetRespawnTime(TFTeam_Red, flRespawnBombRed);
+		// RED needs a slightly higher respawn time during the bomb round since the hatch is usually right by RED spawn.
+		TF2_SetRespawnTime(TFTeam_Red, respawnBombRed[TFTeam_Red]);
 
 		// Give BLU a slightly higher respawn time when they have a Giant Robot out.
+		bool giantOut = false;
 		for(int i=1; i<=MaxClients; i++)
 		{
-			if( IsClientInGame(i) && GetClientTeam(i) == TFTeam_Blue && IsPlayerAlive(i)
-			 && g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
-			 && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_DONT_CHANGE_RESPAWN) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
+			if( g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
+			 && IsClientInGame(i) && GetClientTeam(i) == TFTeam_Blue && IsPlayerAlive(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
 			{
-				TF2_SetRespawnTime(TFTeam_Blue, flRespawnGiant);
-				break;
+				giantOut = true;
+
+				if(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_DONT_CHANGE_RESPAWN)
+				{
+					giantOut = false;
+
+					TF2_SetRespawnTime(TFTeam_Blue, respawnGiantTag[TFTeam_Blue]);
+					break;
+				}
 			}
+		}
+
+		if(giantOut)
+		{
+			TF2_SetRespawnTime(TFTeam_Blue, respawnGiant[TFTeam_Blue]);
 		}
 	}
 
 	if(g_nGameMode == GameMode_Race)
 	{
-		TF2_SetRespawnTime(TFTeam_Blue, flRespawnRace);
-		TF2_SetRespawnTime(TFTeam_Red, flRespawnRace);
+		TF2_SetRespawnTime(TFTeam_Blue, respawnRace[TFTeam_Blue]);
+		TF2_SetRespawnTime(TFTeam_Red, respawnRace[TFTeam_Red]);
 
 		// Calculate if a team's tank has fallen behind.
 		float tankProgress[MAX_TEAMS];
@@ -15422,7 +15480,7 @@ void Tank_EnforceRespawnTimes()
 				{
 					int cap = advantage;
 					if(cap > advantageCap) cap = advantageCap;
-					float advRespawnTime = config.LookupFloat(g_hCvarRespawnAdvMult) * float(cap) + flRespawnRace;
+					float advRespawnTime = config.LookupFloat(g_hCvarRespawnAdvMult) * float(cap) + respawnRace[teamWithAdvantage];
 
 					TF2_SetRespawnTime(teamWithAdvantage, advRespawnTime);
 				}
@@ -15433,7 +15491,7 @@ void Tank_EnforceRespawnTimes()
 			{
 				int oppositeTeam = (teamWithAdvantage == TFTeam_Red) ? TFTeam_Blue : TFTeam_Red;
 
-				TF2_SetRespawnTime(oppositeTeam, flRespawnBase); // Near instant respawn.
+				TF2_SetRespawnTime(oppositeTeam, respawnBase); // Near instant respawn.
 			}
 		}
 
@@ -15443,7 +15501,7 @@ void Tank_EnforceRespawnTimes()
 			if(teamTankBehind != teamWithAdvantage)
 			{
 				// Tank behind, no advantage.
-				TF2_SetRespawnTime(teamTankBehind, flRespawnBase); // Near instant respawn.
+				TF2_SetRespawnTime(teamTankBehind, respawnBase); // Near instant respawn.
 			}
 		}
 	}
@@ -15746,7 +15804,7 @@ void BombPlant_Outline(int client=0, const float minPlantDistance, const float g
 
 	float pos[3];
 	for(int i=0; i<3; i++) pos[i] = goalPos[i];
-	pos[2] -= 35.0;
+	pos[2] += config.LookupFloat(g_hCvarBombRingOffsetZ);
 
 	static const int color[4] = {255, 62, 150, 240};
 
