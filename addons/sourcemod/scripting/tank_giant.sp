@@ -1001,6 +1001,17 @@ void Giant_ApplyConditions(int client, int templateIndex)
 	}	
 }
 
+bool Giant_CanPlayDestructionSound(int soundType)
+{
+	if(g_timePlayedDestructionSound[soundType] == 0.0 || GetEngineTime() - g_timePlayedDestructionSound[soundType] > 0.25)
+	{
+		g_timePlayedDestructionSound[soundType] = GetEngineTime();
+		return true;
+	}
+
+	return false;
+}
+
 void Giant_PlayDestructionSound(int client)
 {
 	int iIndex = g_nSpawner[client][g_iSpawnerGiantIndex];
@@ -1014,21 +1025,16 @@ void Giant_PlayDestructionSound(int client)
 			if(team == i)
 			{
 				// Alert the giant's team that he died
-				BroadcastSoundToTeam(i, "MVM.PlayerDied");
+				if(Giant_CanPlayDestructionSound(DestructionSound_TeamDied)) BroadcastSoundToTeam(i, "MVM.PlayerDied");
 			}else{
 				// Alert the opposite team that the giant has died
-				BroadcastSoundToTeam(i, "MVM.PlayerUsedPowerup");
+				if(Giant_CanPlayDestructionSound(DestructionSound_EnemyDied)) BroadcastSoundToTeam(i, "MVM.PlayerUsedPowerup");
 			}
 		}
 	}
 
 	// Play sounds indicating that a giant has perished.
-	if(g_timePlayedDestructionSound == 0.0 || GetEngineTime() - g_timePlayedDestructionSound > 1.0)
-	{
-		g_timePlayedDestructionSound = GetEngineTime();
-
-		EmitSoundToAll(SOUND_GIANT_EXPLODE);
-	}
+	if(Giant_CanPlayDestructionSound(DestructionSound_Explode)) EmitSoundToAll(SOUND_GIANT_EXPLODE);
 }
 
 void Giant_Clear(int client, int reason=0)

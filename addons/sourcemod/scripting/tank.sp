@@ -877,7 +877,14 @@ float g_timeSentryBusterDied;
 float g_timeGiantEnteredDeathpit[MAXPLAYERS+1];
 
 float g_timeControlPointSkipped; // Timestamp when the bomb carrier skips a control point.
-float g_timePlayedDestructionSound; // Timestamp when the giant destruction sounds are played.
+
+enum
+{
+	DestructionSound_Explode=0,
+	DestructionSound_TeamDied,
+	DestructionSound_EnemyDied,
+};
+float g_timePlayedDestructionSound[3]; // Timestamp when the giant destruction sounds are played.
 
 float g_timeNextMeleeAttack[MAXPLAYERS+1];
 int g_numSuccessiveHits[MAXPLAYERS+1];
@@ -1042,7 +1049,7 @@ public void OnPluginStart()
 	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "1.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.1", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
-	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.8", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
+	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.85", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
 	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "2.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
@@ -1685,7 +1692,7 @@ public void OnMapStart()
 	g_timeLastRobotDamage = 0.0;
 	g_hitWithScorchShot = 0;
 	g_iRefRoundControlPoint = 0;
-	g_timePlayedDestructionSound = 0.0;
+	for(int i=0; i<sizeof(g_timePlayedDestructionSound); i++) g_timePlayedDestructionSound[i] = 0.0;
 
 	Reanimator_Cleanup();
 	Spawner_Cleanup();
