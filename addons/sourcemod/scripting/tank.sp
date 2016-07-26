@@ -456,6 +456,7 @@ Handle g_hCvarRespawnTank;
 Handle g_hCvarGiantHandScale;
 Handle g_hCvarRespawnGiantTag;
 Handle g_hCvarBombDroppedMaxTime;
+Handle g_hCvarBombDeployPosition;
 Handle g_hCvarBombRingOffsetZ;
 
 Handle g_hSDKGetBaseEntity;
@@ -1116,6 +1117,7 @@ public void OnPluginStart()
 	g_hCvarBombBuffsCutoff = CreateConVar("tank_bomb_buffs_cutoff", "5", "Minimum player count required for bomb carrier buffs to be activated.");
 	g_hCvarBombWinSpeed = CreateConVar("tank_bomb_win_speed", "500.0", "Speed of the payload cart when the robots deploy the bomb, winning the round.");
 	g_hCvarBombSkipDistance = CreateConVar("tank_bomb_skip_distance", "500.0", "Distance you must be to a locked control point to trigger the skipped annotation.");
+	g_hCvarBombDeployPosition = CreateConVar("tank_bomb_deploy_position", "", "x y z position of where the the bomb is deploy. This will override the position of the goal path_track. (delimited by spaces) (leave blank to use path_track)");
 	g_hCvarBombRingOffsetZ = CreateConVar("tank_bomb_ring_offset_z", "-40.0", "z position offset for the bomb deploy ring effect.");
 
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
@@ -2406,7 +2408,7 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 		}
 	}
 
-	// Find BLUE's last path_track
+	// Find BLUE's last path_track.
 	if(Tank_FindPathGoal(TFTeam_Blue) <= MaxClients)
 	{
 		LogMessage("(Event_RoundActive) Failed to find BLUE's path_track goal!");
@@ -9694,9 +9696,11 @@ void Bomb_Think(int iBomb)
 	bool bIsGiantCarrying = view_as<bool>(GetEntProp(client, Prop_Send, "m_bIsMiniBoss"));
 
 	// Get the distance of the player to the next control point.
-	float flPosPath[3];
-	GetEntPropVector(iPathTrack, Prop_Send, "m_vecOrigin", flPosPath);
-	float flDistanceToGoal = GetVectorDistance(flPosPlayer, flPosPath);
+	float goalPos[3];
+	GetEntPropVector(iPathTrack, Prop_Send, "m_vecOrigin", goalPos);
+	// Override with "tank_bomb_deploy_position" for the final bomb deploy position.
+	if(bIsGoal && !Tank_BombDeployPosition(goalPos)) goalPos[2] += config.LookupFloat(g_hCvarBombRingOffsetZ);
+	float flDistanceToGoal = GetVectorDistance(flPosPlayer, goalPos);
 
 	//PrintToServer("Distance: %0.2f", flDistanceToGoal);
 	// Sound an alert sound ONCE when the robots get near the hatch with the bomb carried
@@ -9952,7 +9956,7 @@ void Bomb_Think(int iBomb)
 		}
 	}else{
 		// Highlight the boundaries of the bomb deploy area.
-		BombPlant_Outline(client, minPlantDistance, flPosPath, team);
+		BombPlant_Outline(client, minPlantDistance, goalPos, team);
 	}
 
 	// Make sure the func_capturezone is created for each control point.
@@ -15820,7 +15824,6 @@ void BombPlant_Outline(int client=0, const float minPlantDistance, const float g
 
 	float pos[3];
 	for(int i=0; i<3; i++) pos[i] = goalPos[i];
-	pos[2] += config.LookupFloat(g_hCvarBombRingOffsetZ);
 
 	static const int color[4] = {255, 62, 150, 240};
 
@@ -15833,4 +15836,22 @@ void BombPlant_Outline(int client=0, const float minPlantDistance, const float g
 	}
 
 	g_timeCaptureOutline[team] = et;
+}
+
+bool Tank_BombDeployPosition(float pos[3])
+{
+	char override[64];
+	config.LookupString(g_hCvarBombDeployPosition, override, sizeof(override));
+
+	if(strlen(override) <= 4)
+	{
+		return false;
+	}
+
+	char explode[3][32];
+	
+	if(ExplodeString(override, " ", explode, sizeof(explode), sizeof(explode[]), false) != 3) return false;
+	for(int i=0; i<3; i++) pos[i] = StringToFloat(explode[i]);
+
+	return true;
 }
