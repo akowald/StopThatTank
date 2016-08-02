@@ -11086,7 +11086,7 @@ void ShowUpdatePanel(int client)
 	}
 	
 	DrawPanelText(hPanel, "Recent changes:");
-	DrawPanelText(hPanel, "May-5: Carry the bomb while ubered/bonked.");
+	DrawPanelText(hPanel, "Aug-2: Bomb capture & deploy outlines.");
 
 	if(GetConVarBool(g_hCvarOfficialServer))
 	{
