@@ -1046,7 +1046,7 @@ public void OnPluginStart()
 	g_hCvarTankCooldown = CreateConVar("tank_cooldown", "28.0", "Seconds after the tank is killed that a Giant Robot will spawn into the game.");
 	g_hCvarDistanceMove = CreateConVar("tank_distance_move", "4600.0", "Distance the control point must be from the goal for tanks to spawn on it.");
 	g_hCvarCurrencyCrit = CreateConVar("tank_currency_crit", "5.0", "(Seconds) Crit duration after a RED team member touches a currencypack.");
-	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.17", "Tank health percentage earned when a checkpoint is reached.");
+	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.15", "Tank health percentage earned when a checkpoint is reached.");
 	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "1.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.1", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
@@ -1101,9 +1101,9 @@ public void OnPluginStart()
 	g_hCvarTeleportUber = CreateConVar("tank_teleport_uber", "1.0", "Seconds of uber when a player uses a giant engineer's teleporter.");
 	g_hCvarTimeTip = CreateConVar("tank_time_tip", "220", "Seconds in between chat tips. Anything less than 0 disables chat tips.");
 
-	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "20", "Time (in seconds) that it takes for a dropped bomb to expire.");
+	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "35", "Time (in seconds) that it takes for a dropped bomb to expire.");
 	g_hCvarBombRoundTime = CreateConVar("tank_bomb_round_time", "2.5", "Timelimit (in minutes) that the robots are under to deliever the bomb.");
-	g_hCvarBombDroppedMaxTime = CreateConVar("tank_bomb_dropped_maxtime", "1.2", "Maximum round time (in minutes) when the bomb is dropped in payload. (Set to -1.0 to disable.)");
+	g_hCvarBombDroppedMaxTime = CreateConVar("tank_bomb_dropped_maxtime", "-1.0", "Maximum round time (in minutes) when the bomb is dropped in payload. (Set to -1.0 to disable.)");
 	g_hCvarBombDistanceWarn = CreateConVar("tank_bomb_distance_warn", "650.0", "Distance the bomb must be from the goal for warnings to sound.");
 	g_hCvarBombTimeDeploy = CreateConVar("tank_bomb_time_deploy", "1.9", "Seconds that it takes for a robot to deploy a bomb.");
 	g_hCvarBombMoveSpeed = CreateConVar("tank_bomb_move_speed", "0.8", "Move speed bonus for normal bomb carriers. (percentage)");
@@ -7745,9 +7745,8 @@ public Action NormalSoundHook(int clients[MAXPLAYERS], int &numClients, char sam
 				// Detonate deflected stickies
 				if(Spawner_HasGiantTag(deflector, GIANTTAG_AIRBLAST_KILLS_STICKIES) && GetEntProp(deflector, Prop_Send, "m_bIsMiniBoss"))
 				{
-					// Do not destroy the stickies if they belong to a giant.
 					int owner = GetEntPropEnt(entity, Prop_Send, "m_hThrower");
-					if(owner >= 1 && owner <= MaxClients && !GetEntProp(owner, Prop_Send, "m_bIsMiniBoss"))
+					if(owner >= 1 && owner <= MaxClients)
 					{
 						SetEntProp(entity, Prop_Send, "m_bTouched", true); // This bypass the check that the stickies have come to a rest in order to allow them to take damage.
 						SDKHooks_TakeDamage(entity, 0, 0, 100.0, DMG_SLOWBURN|DMG_BUCKSHOT);
