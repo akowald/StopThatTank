@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5.4"
+#define PLUGIN_VERSION 				"1.5.5"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -458,6 +458,8 @@ Handle g_hCvarRespawnGiantTag;
 Handle g_hCvarBombDroppedMaxTime;
 Handle g_hCvarBombDeployPosition;
 Handle g_hCvarBombRingOffsetZ;
+Handle g_hCvarBisonBoostSpeed;
+Handle g_hCvarBisonBoostDamage;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -1051,9 +1053,11 @@ public void OnPluginStart()
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.1", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
 	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.85", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
+	g_hCvarBisonBoostSpeed = CreateConVar("tank_bisonboost_speed", "1.428", "Scale amount for the velocity of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
+	g_hCvarBisonBoostDamage = CreateConVar("tank_bisonboost_damage", "1.3", "Scale amount for the damage of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
-	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "2.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
+	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "3.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
@@ -2662,7 +2666,6 @@ public void Event_RoundActive(Handle hEvent, char[] strEventName, bool bDontBroa
 #if defined DEBUG
 	PrintToServer("(Event_RoundActive) Max CPs: %d, Sim. Tanks: %d!", g_iMaxControlPoints[TFTeam_Blue], g_iNumTankMaxSimulated);
 #endif
-
 
 	// Spawn a 'fake' tank in place of the actual tank before the game begins.
 	// This will keep spawn exits open and make it more difficult to hide stickies around the tank.
@@ -4792,8 +4795,7 @@ public Action Tank_OnTakeDamage(int victim, int &attacker, int &inflictor, float
 
 	if(!g_bIsRoundStarted || g_bRaceIntermission)
 	{
-		damage = 0.0;
-		return Plugin_Changed;
+		return Plugin_Stop;
 	}
 	
 	if(attacker >= 1 && attacker <= MaxClients && IsClientInGame(attacker) && GetClientTeam(attacker) != GetEntProp(victim, Prop_Send, "m_iTeamNum"))
@@ -4834,15 +4836,12 @@ public Action Tank_OnTakeDamage(int victim, int &attacker, int &inflictor, float
 				damage = damage * 0.73;
 				return Plugin_Changed;
  			}
-
-
 		}
 		
 		return Plugin_Continue;
 	}
 	
-	damage = 0.0;
-	return Plugin_Changed;
+	return Plugin_Stop;
 }
 
 public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
@@ -4902,6 +4901,13 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 				damagetype |= DMG_PREVENT_PHYSICS_FORCE;
 				overrideReturn = true;
 			}
+		}
+
+		if(Spawner_HasGiantTag(attacker, GIANTTAG_BISON_BOOST) && damagecustom == TF_CUSTOM_PLASMA && inflictor > MaxClients && strcmp(inflictorClass, "tf_weapon_raygun") == 0)
+		{
+			// Because Valve would rather hard code a value than use existing attributes.
+			damage *= config.LookupFloat(g_hCvarBisonBoostDamage);
+			overrideReturn = true;
 		}
 
 		// Keep track of melee strikes for the "gunslinger_combo" giant template tag.
@@ -4992,8 +4998,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 						EmitSoundToAll(SOUND_BUSTER_SPIN, victim);
 					}
 
-					damage = 0.0;
-					return Plugin_Changed;
+					return Plugin_Stop;
 				}else{
 					// Player's health hasn't reached 1 yet so make sure the prevent death condition stays applied
 					TF2_AddCondition(victim, TFCond_PreventDeath, -1.0);
@@ -5001,8 +5006,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 			}else if(g_flTimeBusterTaunt[victim] != 0.0)
 			{
 				// Buster is armed so we should block all further damage
-				damage = 0.0;
-				return Plugin_Changed;
+				return Plugin_Stop;
 			}
 		}
 
@@ -5223,8 +5227,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 			{
 				if(g_iRefTank[iTeam] != 0 && EntRefToEntIndex(g_iRefTank[iTeam]) == attacker)
 				{
-					damage = 0.0;
-					return Plugin_Changed;
+					return Plugin_Stop;
 				}
 			}
 		}
@@ -9354,18 +9357,30 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 	{
 		RequestFrame(NextFrame_AttachToFlare, EntIndexToEntRef(iEntity));
 		SDKHook(iEntity, SDKHook_Touch, Projectile_OnTouch); // Fix revive marker collision.
+	}else if(strcmp(classname, "tf_projectile_energy_ring") == 0)
+	{
+		// Speed up the projectile for the Giant Mega Bison Soldier.
+		RequestFrame(NextFrame_BisonProj, EntIndexToEntRef(iEntity));
 	}
 }
 
-public void NextFrame_AmmoPack(int ref)
+public void NextFrame_BisonProj(int ref)
 {
-	int ammoPack = EntRefToEntIndex(ref);
-	if(ammoPack > MaxClients)
+	// Speed up the projectile for the Giant Mega Bison Soldier when the 'bison boost' giant tag is set.
+	int proj = EntRefToEntIndex(ref);
+	if(proj > MaxClients)
 	{
-		PrintToServer("tf_ammo_pack: m_hOwnerEntity = %d", GetEntPropEnt(ammoPack, Prop_Send, "m_hOwnerEntity"));
+		int owner = GetEntPropEnt(proj, Prop_Send, "m_hOwnerEntity");
+		if(owner >= 1 && owner <= MaxClients && Spawner_HasGiantTag(owner, GIANTTAG_BISON_BOOST))
+		{
+			float vel[3];
+			GetEntPropVector(proj, Prop_Data, "m_vecAbsVelocity", vel);
 
-		int client = GetEntPropEnt(ammoPack, Prop_Send, "m_hOwnerEntity");
-		if(client >= 1 && client <= MaxClients) PrintToServer("%d %d %d", g_nSpawner[client][g_bSpawnerEnabled], g_nSpawner[client][g_nSpawnerType], GetEntProp(client, Prop_Send, "m_bIsMiniBoss"));
+			ScaleVector(vel, config.LookupFloat(g_hCvarBisonBoostSpeed));
+
+			TeleportEntity(proj, NULL_VECTOR, NULL_VECTOR, vel);
+			//SetEntPropVector(proj, Prop_Send, "m_vInitialVelocity", vel);
+		}
 	}
 }
 
@@ -10909,6 +10924,17 @@ public Action Command_Test2(int client, int args)
 		TE_SendToClient(client);
 	}
 	*/
+
+	int ring = MaxClients+1;
+	while((ring = FindEntityByClassname(ring, "tf_projectile_energy_ring")) > MaxClients)
+	{
+		float vel[3];
+		GetEntPropVector(ring, Prop_Data, "m_vecAbsVelocity", vel);
+
+		ScaleVector(vel, 1.428);
+
+		TeleportEntity(ring, NULL_VECTOR, NULL_VECTOR, vel);
+	}
 
 	return Plugin_Handled;
 }
