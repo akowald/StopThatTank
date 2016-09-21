@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2015 Alex Kowald
+ * Copyright (C) 2014-2016 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -243,8 +243,8 @@ DETOUR_DECL_MEMBER1(CanRecieveMedigunChargeEffect, bool, int, medigunChargeType)
 	return DETOUR_MEMBER_CALL(CanRecieveMedigunChargeEffect)(medigunChargeType);
 }
 
-// Detour for double CTFPlayer::TeamFortress_CalculateMaxSpeed(void)
-DETOUR_DECL_MEMBER0(TeamFortress_CalculateMaxSpeed, double)
+// Detour for double CTFPlayer::TeamFortress_CalculateMaxSpeed(bool)
+DETOUR_DECL_MEMBER1(TeamFortress_CalculateMaxSpeed, double, bool, ignoreCharging)
 {
 	double result;
 
@@ -255,12 +255,12 @@ DETOUR_DECL_MEMBER0(TeamFortress_CalculateMaxSpeed, double)
 		g_pForwardCalcSpeedPre->PushCell(client);
 		g_pForwardCalcSpeedPre->Execute(NULL);
 
-		result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)();
+		result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)(ignoreCharging);
 
 		g_pForwardCalcSpeedPost->PushCell(client);
 		g_pForwardCalcSpeedPost->Execute(NULL);
 	}else{
-		result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)();
+		result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)(ignoreCharging);
 	}
 	
 	return result;

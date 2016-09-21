@@ -40,7 +40,7 @@
 /* Basic information exposed publicly */
 #define SMEXT_CONF_NAME			"Tank Helper"
 #define SMEXT_CONF_DESCRIPTION	"Squares away a few things to make this work."
-#define SMEXT_CONF_VERSION		"1.5.4"
+#define SMEXT_CONF_VERSION		"1.5.5"
 #define SMEXT_CONF_AUTHOR		"linux_lover (abkowald@gmail.com)"
 #define SMEXT_CONF_URL			""
 #define SMEXT_CONF_LOGTAG		"TANK"
