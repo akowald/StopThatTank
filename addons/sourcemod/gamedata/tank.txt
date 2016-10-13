@@ -322,18 +322,18 @@
 			}
 			"CBasePlayer::EquipWearable"
 			{
-				"linux"		"428"
-				"windows"	"427"
-			}
-			"CBasePlayer::RemoveWearable"
-			{
 				"linux"		"429"
 				"windows"	"428"
 			}
+			"CBasePlayer::RemoveWearable"
+			{
+				"linux"		"430"
+				"windows"	"429"
+			}
 			"CObjectTeleporter::TeleporterReceive"
 			{
-				"linux"		"408"
-				"windows"	"394"
+				"linux"		"409"
+				"windows"	"395"
 			}
 			"CTFWeaponBase::GetMaxClip1"
 			{
