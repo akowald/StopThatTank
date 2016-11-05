@@ -47,6 +47,7 @@ class CTakeDamageInfo;
 class CTFDroppedWeapon;
 class ITexture;
 class ITextureCompositor;
+class CHeadlessHatman;
 
 struct inputdata_t
 {

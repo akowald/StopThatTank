@@ -177,12 +177,12 @@
 	"Tank_Chat_Giant_Warning"
 	{
 		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c}"
-		"en"			"{1} You will become a {2}Giant Robot{3} in {4}{5}s{6}.."
+		"en"			"{1} You will become a {2}Giant Robot{3} in {4}{5}s{6}.. Type /pass to opt-out."
 	}
 	"Tank_Annotation_Giant_Warning"
 	{
 		"#format"		"{1:d}"
-		"en"			"You will become a Giant Robot in {1}s.."
+		"en"			"You will become a Giant Robot in {1}s..\nType /pass to opt-out."
 	}
 	"Tank_Chat_Giant_AFK"
 	{

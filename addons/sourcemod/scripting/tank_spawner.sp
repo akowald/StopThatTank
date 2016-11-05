@@ -571,7 +571,7 @@ public Action Spawner_Timer_Spawn(Handle hTimer, int client)
 				CreateTimer(0.2, Timer_GiantThirdperson, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 
 				// Make the player invincible while they can't move
-				TF2_AddCondition(client, TFCond_UberchargedHidden, 5.0);
+				TF2_AddCondition(client, TFCond_UberchargedHidden, 3.0);
 				// Catch death on the sentry buster and have them self-destruct instead
 				TF2_AddCondition(client, TFCond_PreventDeath, -1.0);
 

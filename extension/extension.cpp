@@ -31,6 +31,7 @@ CDetour *dropPickupDetour;
 CDetour *entityFilterDetour;
 CDetour *uberEffectsDetour;
 CDetour *calcSpeedDetour;
+CDetour *isChaseableDetour;
 
 IGameConfig *g_pGameConf = NULL;
 IBinTools *g_pBinTools = NULL;
@@ -44,6 +45,7 @@ IForward *g_pForwardPassFilter = NULL;
 IForward *g_pForwardUberEffects = NULL;
 IForward *g_pForwardCalcSpeedPre = NULL;
 IForward *g_pForwardCalcSpeedPost = NULL;
+IForward *g_pForwardIsChaseable = NULL;
 
 void *g_addr_GetItemSchema = NULL;
 void *g_addr_GetAttributeDefinition = NULL;
@@ -264,6 +266,28 @@ DETOUR_DECL_MEMBER1(TeamFortress_CalculateMaxSpeed, double, bool, ignoreCharging
 	}
 	
 	return result;
+}
+
+// Detour for bool CHeadlessHatmanAttack::IsPotentiallyChaseable(CHeadlessHatman *, CTFPlayer *)
+DETOUR_DECL_MEMBER2(IsPotentiallyChaseable, bool, CHeadlessHatman *, boss, CTFPlayer *, player)
+{
+	if(g_pForwardIsChaseable != NULL && g_pForwardIsChaseable->GetFunctionCount() > 0)
+	{
+		int client = gamehelpers->EntityToBCompatRef((CBaseEntity *)player);
+		int hhh = gamehelpers->EntityToBCompatRef((CBaseEntity *)boss);
+
+		g_pForwardIsChaseable->PushCell(client);
+		g_pForwardIsChaseable->PushCell(hhh);
+		cell_t override = false;
+		g_pForwardIsChaseable->PushCellByRef(&override);
+
+		cell_t result = Pl_Continue;
+		g_pForwardIsChaseable->Execute(&result);
+
+		if(result != Pl_Continue) return (override != 0);
+	}
+
+	return DETOUR_MEMBER_CALL(IsPotentiallyChaseable)(boss, player);
 }
 
 bool LookupSignature(char const *key, void **addr)
@@ -1012,6 +1036,14 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		calcSpeedDetour->EnableDetour();
 	}
 
+	isChaseableDetour = DETOUR_CREATE_MEMBER(IsPotentiallyChaseable, "CHeadlessHatmanAttack::IsPotentiallyChaseable");
+	if(isChaseableDetour == NULL)
+	{
+		g_pSM->LogMessage(myself, "Could not initalize IsPotentiallyChaseable detour. Will continue to run!");
+	}else{
+		isChaseableDetour->EnableDetour();
+	}
+
 	LookupSignature("GetItemSchema", &g_addr_GetItemSchema);
 	LookupSignature("CEconItemSchema::GetAttributeDefinition", &g_addr_GetAttributeDefinition);
 	LookupSignature("CEconItemSchema::GetAttributeDefinitionByName", &g_addr_GetAttributeDefinitionByName);
@@ -1033,6 +1065,7 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	g_pForwardUberEffects = forwards->CreateForward("Tank_OnCanRecieveMedigunChargeEffect", ET_Event, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
 	g_pForwardCalcSpeedPre = forwards->CreateForward("Tank_OnCalcSpeedPre", ET_Ignore, 1, NULL, Param_Cell);
 	g_pForwardCalcSpeedPost = forwards->CreateForward("Tank_OnCalcSpeedPost", ET_Ignore, 1, NULL, Param_Cell);
+	g_pForwardIsChaseable = forwards->CreateForward("Tank_IsChaseable", ET_Event, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
 
 	int iOffset;
 	if(!g_pGameConf->GetOffset("CBaseEntity::ShouldTransmit", &iOffset))
@@ -1126,6 +1159,10 @@ void Tank::SDK_OnUnload()
 	{
 		calcSpeedDetour->Destroy();
 	}
+	if(isChaseableDetour != NULL)
+	{
+		isChaseableDetour->Destroy();
+	}
 
 	forwards->ReleaseForward(g_pForwardUpgrades);
 	forwards->ReleaseForward(g_pForwardShouldTransmit);
@@ -1135,6 +1172,7 @@ void Tank::SDK_OnUnload()
 	forwards->ReleaseForward(g_pForwardUberEffects);
 	forwards->ReleaseForward(g_pForwardCalcSpeedPre);
 	forwards->ReleaseForward(g_pForwardCalcSpeedPost);
+	forwards->ReleaseForward(g_pForwardIsChaseable);
 
 	if(g_pSDKHooks != NULL)
 	{

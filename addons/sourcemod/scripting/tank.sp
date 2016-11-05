@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5.5"
+#define PLUGIN_VERSION 				"1.5.6"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -138,6 +138,7 @@
 #define ITEM_BOX_TROT 30615
 #define ITEM_ZOOMIN_BROOM 30672
 #define ITEM_MANNROBICS 1162
+#define ITEM_VICTORY_LAP 1172
 
 #define ATTRIB_HIDDEN_MAXHEALTH_NON_BUFFED 140
 #define ATTRIB_MAXAMMO_PRIMARY_INCREASED 76
@@ -460,6 +461,12 @@ Handle g_hCvarBombDeployPosition;
 Handle g_hCvarBombRingOffsetZ;
 Handle g_hCvarBisonBoostSpeed;
 Handle g_hCvarBisonBoostDamage;
+Handle g_hCvarBisonBoostScale;
+Handle g_hCvarBossHealthMultHHH;
+Handle g_hCvarBossHealthMultMono;
+Handle g_hCvarBossHealthMultMerasmus;
+Handle g_hCvarGiantHHHCooldown;
+Handle g_hCvarGiantHHHBlockStun;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -917,6 +924,7 @@ Handle g_timerFailsafe;
 bool g_overrideSound = false;
 float g_timeLastRobotDamage = 0.0;
 int g_hitWithScorchShot = 0;
+float g_hhhCooldown[MAXPLAYERS+1];
 
 enum eSpawnerType
 {
@@ -1053,8 +1061,12 @@ public void OnPluginStart()
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.1", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
 	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.85", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
-	g_hCvarBisonBoostSpeed = CreateConVar("tank_bisonboost_speed", "1.428", "Scale amount for the velocity of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
-	g_hCvarBisonBoostDamage = CreateConVar("tank_bisonboost_damage", "1.3", "Scale amount for the damage of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
+	g_hCvarBisonBoostSpeed = CreateConVar("tank_bisonboost_speed", "1.4286", "Scale amount for the velocity of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
+	g_hCvarBisonBoostDamage = CreateConVar("tank_bisonboost_damage", "1.6", "Scale amount for the damage of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
+	g_hCvarBisonBoostScale = CreateConVar("tank_bisonboost_scale", "2.0", "Model scale amount of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
+	g_hCvarBossHealthMultHHH = CreateConVar("tank_boss_health_hhh", "0.65", "Max health modifier for Horseless Headless Horsemann.");
+	g_hCvarBossHealthMultMono = CreateConVar("tank_boss_health_mono", "0.4", "Max health modifier for Monoculus.");
+	g_hCvarBossHealthMultMerasmus = CreateConVar("tank_boss_health_merasmus", "0.2", "Max health modifier for Merasmus.");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
 	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "3.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
@@ -1065,7 +1077,7 @@ public void OnPluginStart()
 	g_hCvarRespawnCartBehind = CreateConVar("tank_respawn_cart_behind", "0.25", "A team's tank is considered behind if the difference is greater than this percentage of total track length. Set to over 1.0 to disable.");
 	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "3.0", "Respawn time multiplier per each Giant Robot advantage.");
 	g_hCvarRespawnAdvCap = CreateConVar("tank_respawn_advantage_cap", "3", "Maximum Giant Robot advantage amount that can be factored into respawn time. Set to 0 to disable.");
-	g_hCvarRespawnAdvRunaway = CreateConVar("tank_respawn_advantage_runaway", "2", "When the Giant Robot advantage is equal to or greater than this, the opposite team's respawn is reduced. Set to a really high number like 100 to disable.");
+	g_hCvarRespawnAdvRunaway = CreateConVar("tank_respawn_advantage_runaway", "1", "When the Giant Robot advantage is equal to or greater than this, the opposite team's respawn is reduced. Set to a really high number like 100 to disable.");
 	g_hCvarRespawnGiantTag = CreateConVar("tank_respawn_giant_tag", "0.1", "Respawn time for BLU in pl when a Giant with the \"dont_change_respawn\" tag is out.");
 
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
@@ -1140,6 +1152,8 @@ public void OnPluginStart()
 	g_hCvarGiantDeathpitMinZ = CreateConVar("tank_giant_deathpit_min_z", "500.0", "Minimum boost scaling in the Z(up) direction.");
 	g_hCvarGiantDeathpitBoost = CreateConVar("tank_giant_deathpit_boost", "1", "0/1 - Enable or disable boosting Giant Robots out of deathpits.");
 	g_hCvarGiantHandScale = CreateConVar("tank_giant_hand_scale", "1.9", "Giant hand scale to use when the special giant tag is set.");
+	g_hCvarGiantHHHCooldown = CreateConVar("tank_giant_hhh_cooldown", "15.0", "Time after taking damage from the HHH before the giant can be chased again.");
+	g_hCvarGiantHHHBlockStun = CreateConVar("tank_giant_hhh_block_stun", "0", "0/1 - Enable or disable ghost scare stun on giants.");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -1180,7 +1194,7 @@ public void OnPluginStart()
 	g_hCvarBusterExemptMedicUber = CreateConVar("tank_buster_excempt_medic_uber", "0.5", "Uber built to excempt the player from becoming a sentry buster. 0.5 = 50%.");
 	g_hCvarBusterCap = CreateConVar("tank_buster_cap", "1000", "Damage cap against giant robots.");
 
-	g_hCvarSuperSpyMoveSpeed = CreateConVar("tank_superspy_move_speed", "1.5", "Super spy move speed percentage while cloaked.");
+	g_hCvarSuperSpyMoveSpeed = CreateConVar("tank_superspy_move_speed", "1.4", "Super spy move speed percentage while cloaked.");
 	g_hCvarSuperSpyJumpHeight = CreateConVar("tank_superspy_jump_height", "2.0", "Super spy jump height percentage while cloaked.");
 
 	g_hCvarTeamRed = CreateConVar("tank_team_red", "HUMANS", "Team name of the RED team.");
@@ -1189,7 +1203,7 @@ public void OnPluginStart()
 	g_hCvarTeamBluePlr = CreateConVar("tank_team_blue_plr", "BLU-BOTS", "Team name of the BLUE team in plr.");
 
 	g_hCvarHellTowerTimeGate = CreateConVar("tank_helltower_time_gates_open", "30.0", "Seconds after hell starts that the gates open in hell. This triggers the relay which will then delay an additional 29 seconds.");
-	g_hCvarGiantHHHCap = CreateConVar("tank_giant_hhh_cap", "250.0", "Damage cap for the HHH Halloween boss against the giant.");
+	g_hCvarGiantHHHCap = CreateConVar("tank_giant_hhh_cap", "310.0", "Damage cap for the HHH Halloween boss against the giant.");
 	g_hCvarJarateOnHitTime = CreateConVar("tank_jarate_on_hit_time", "4.0", "Seconds that jarate is applied for the jarate_on_hit giant tag.");
 
 	g_hCvarClassLimits[TFTeam_Red][1] = CreateConVar("tank_classlimit_red_scout", "2", "Class limit for scout. Set to -1 for no limit.");
@@ -1812,6 +1826,7 @@ public void OnClientDisconnect(int client)
 	g_flHasShield[client] = 0.0;
 	g_lastClientTick[client] = 0.0;
 	g_timeGiantEnteredDeathpit[client] = 0.0;
+	g_hhhCooldown[client] = 0.0;
 
 	g_bBusterPassed[client] = false;
 	g_bBusterUsed[client] = false;
@@ -2094,7 +2109,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				}
 
 				// Block the giant from being spooked by the HHH.
-				if(TF2_IsPlayerInCondition(client, TFCond_Dazed))
+				if(TF2_IsPlayerInCondition(client, TFCond_Dazed) && config.LookupBool(g_hCvarGiantHHHBlockStun))
 				{
 					// The stun flags for the HHH scare: 192 (TF_STUNFLAGS_GHOSTSCARE)
 					// The stun flags for a regular ghost scare: 193 (TF_STUNFLAGS_GHOSTSCARE|TF_STUNFLAG_SLOWDOWN)
@@ -4788,8 +4803,19 @@ public Action Timer_EntityCleanup(Handle hTimer, int iRef)
 	return Plugin_Handled;
 }
 
-public Action Tank_OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3])
+public Action Tank_OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
+	/*
+	PrintToServer("victim: %d attacker: %d inflictor: %d damage: %0.2f damagetype: %d weapon: %d damageForce: (%0.2fx%0.2fy%0.2fz) damageCustom: %d", victim, attacker, inflictor, damage, damagetype, weapon, damageForce[0], damageForce[1], damageForce[2], damagecustom);
+	char debugWeaponClass[32];
+	char debugInflictorClass[32];
+	if(weapon > MaxClients) GetEdictClassname(weapon, debugWeaponClass, sizeof(debugWeaponClass));
+	if(inflictor >= 0) GetEdictClassname(inflictor, debugInflictorClass, sizeof(debugInflictorClass));
+	PrintToServer("weapon = %s, inflictor = %s", debugWeaponClass, debugInflictorClass);
+	for(int i=0; i<30; i++) if(damagetype & (1 << i)) PrintToServer("(1 << %d)", i);
+	int removeMe;
+	*/
+
 	//PrintToServer("(Tank_OnTakeDamage) victim: %d, attacker: %d, inflictor: %d, damage: %.2f, damagetype: %d, weapon: %d", victim, attacker, inflictor, damage, damagetype, weapon);
 	g_bTakingSentryDamage = false;
 
@@ -4838,6 +4864,13 @@ public Action Tank_OnTakeDamage(int victim, int &attacker, int &inflictor, float
  			}
 		}
 		
+		if(damagecustom == TF_CUSTOM_SPELL_FIREBALL || damagecustom == TF_CUSTOM_SPELL_BATS || damagecustom == TF_CUSTOM_SPELL_METEOR)
+		{
+			damage = 100.0;
+			if(damagecustom == TF_CUSTOM_SPELL_METEOR) damage = 40.0;
+			return Plugin_Changed;
+		}
+
 		return Plugin_Continue;
 	}
 	
@@ -4903,7 +4936,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 			}
 		}
 
-		if(Spawner_HasGiantTag(attacker, GIANTTAG_BISON_BOOST) && damagecustom == TF_CUSTOM_PLASMA && inflictor > MaxClients && strcmp(inflictorClass, "tf_weapon_raygun") == 0)
+		if(Spawner_HasGiantTag(attacker, GIANTTAG_BISON_BOOST) && damagecustom == TF_CUSTOM_PLASMA && inflictor > MaxClients && strcmp(inflictorClass, "tf_projectile_energy_ring") == 0)
 		{
 			// Because Valve would rather hard code a value than use existing attributes.
 			damage *= config.LookupFloat(g_hCvarBisonBoostDamage);
@@ -5011,7 +5044,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		}
 
 		// Make death pits a little kinder to Giant Robots.
-		if(config.LookupBool(g_hCvarGiantDeathpitBoost) && damage >= 450.0 && attacker > MaxClients && attacker == inflictor && strcmp(inflictorClass, "trigger_hurt") == 0 && (g_timeGiantEnteredDeathpit[victim] == 0.0 || GetEngineTime() - g_timeGiantEnteredDeathpit[victim] >= config.LookupFloat(g_hCvarGiantDeathpitCooldown)))
+		if(config.LookupBool(g_hCvarGiantDeathpitBoost) && damage >= 250.0 && attacker > MaxClients && attacker == inflictor && strcmp(inflictorClass, "trigger_hurt") == 0 && (g_timeGiantEnteredDeathpit[victim] == 0.0 || GetEngineTime() - g_timeGiantEnteredDeathpit[victim] >= config.LookupFloat(g_hCvarGiantDeathpitCooldown)))
 		{
 #if defined DEBUG
 			PrintToServer("(Player_OnTakeDamage) %N hurt by death pit, boosting him out..", victim);
@@ -5032,6 +5065,8 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		// Cap the damage that the HHH can do against giant robots.
 		if(attacker > MaxClients && attacker == inflictor && damagecustom == TF_CUSTOM_DECAPITATION_BOSS && strcmp(inflictorClass, "headless_hatman") == 0)
 		{
+			g_hhhCooldown[victim] = GetEngineTime() + config.LookupFloat(g_hCvarGiantHHHCooldown);
+
 			float damageCap = GetConVarFloat(g_hCvarGiantHHHCap);
 			if(damage > damageCap)
 			{
@@ -5098,7 +5133,6 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 					// Indicate to the giant that he is getting backstabbed.
 					EmitSoundToClient(victim, SOUND_BACKSTAB);
 					
-
 					g_overrideSound = true;
 					EmitSoundToClient(victim, g_soundBusterStabbed[GetRandomInt(0, sizeof(g_soundBusterStabbed)-1)]);
 					PrintCenterText(victim, "%t", "Tank_Center_Backstabbed");
@@ -8397,29 +8431,6 @@ public Action Timer_TankTeleportFinale(Handle hTimer, int team)
 	}
 }
 
-void CritCash_RemoveEffects()
-{
-	// Remove the crits and medigun shield effects from all players.
-	for(int client=1; client<=MaxClients; client++)
-	{
-		if(IsClientInGame(client) && GetClientTeam(client) >= 2 && IsPlayerAlive(client))
-		{
-			if(TF2_IsPlayerInCondition(client, TFCond_CritOnFlagCapture)) TF2_RemoveCondition(client, TFCond_CritOnFlagCapture);
-
-			if(TF2_GetPlayerClass(client) == TFClass_Medic)
-			{
-				g_flHasShield[client] = 0.0;
-				SetEntPropFloat(client, Prop_Send, "m_flRageMeter", 0.0); // Remove any rage so they can't pop a shield later
-				int shield = MaxClients+1;
-				while((shield = FindEntityByClassname(shield, "entity_medigun_shield")) > MaxClients)
-				{
-					AcceptEntityInput(shield, "Kill");
-				}
-			}
-		}
-	}
-}
-
 public Action CritCash_OnTouch(int entity, int client)
 {
 	if(client >= 1 && client <= MaxClients && IsClientInGame(client) && IsPlayerAlive(client))
@@ -8436,12 +8447,15 @@ public Action CritCash_OnTouch(int entity, int client)
 					return Plugin_Handled;
 				}
 
+				float critDuration = config.LookupFloat(g_hCvarCurrencyCrit);
+
 				// Players can only pick up one piece of cash at a time
-				if(g_flTimeCashPickup[client] != 0.0 && GetEngineTime() - g_flTimeCashPickup[client] < config.LookupFloat(g_hCvarCurrencyCrit)) return Plugin_Handled;
+				if(g_flTimeCashPickup[client] != 0.0 && GetEngineTime() - g_flTimeCashPickup[client] < critDuration) return Plugin_Handled;
 				g_flTimeCashPickup[client] = GetEngineTime();
 
 				// RED receives crits for a short duration
-				TF2_AddCondition(client, TFCond_CritOnFlagCapture, config.LookupFloat(g_hCvarCurrencyCrit));
+				TF2_AddCondition(client, TFCond_CritOnFlagCapture, critDuration);
+				TF2_AddCondition(client, TFCond_Buffed, critDuration);
 				// RED receives healing for a short duration
 				TF2_AddCondition(client, TFCond_HalloweenQuickHeal, config.LookupFloat(g_hCvarBombHealDuration));
 				// RED medics receive medigun shields
@@ -8509,6 +8523,30 @@ public Action CritCash_OnTouch(int entity, int client)
 	}
 	
 	return Plugin_Continue;
+}
+
+void CritCash_RemoveEffects()
+{
+	// Remove the crits and medigun shield effects from all players.
+	for(int client=1; client<=MaxClients; client++)
+	{
+		if(IsClientInGame(client) && GetClientTeam(client) >= 2 && IsPlayerAlive(client))
+		{
+			if(TF2_IsPlayerInCondition(client, TFCond_CritOnFlagCapture)) TF2_RemoveCondition(client, TFCond_CritOnFlagCapture);
+			if(TF2_IsPlayerInCondition(client, TFCond_Buffed)) TF2_RemoveCondition(client, TFCond_Buffed);
+
+			if(TF2_GetPlayerClass(client) == TFClass_Medic)
+			{
+				g_flHasShield[client] = 0.0;
+				SetEntPropFloat(client, Prop_Send, "m_flRageMeter", 0.0); // Remove any rage so they can't pop a shield later
+				int shield = MaxClients+1;
+				while((shield = FindEntityByClassname(shield, "entity_medigun_shield")) > MaxClients)
+				{
+					AcceptEntityInput(shield, "Kill");
+				}
+			}
+		}
+	}
 }
 
 public Action Bomb_OnTouch(int iBomb, int iToucher)
@@ -9361,6 +9399,10 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 	{
 		// Speed up the projectile for the Giant Mega Bison Soldier.
 		RequestFrame(NextFrame_BisonProj, EntIndexToEntRef(iEntity));
+	}else if(strcmp(classname, "headless_hatman") == 0 || strcmp(classname, "eyeball_boss") == 0 || strcmp(classname, "merasmus") == 0)
+	{
+		// Modify the health of Halloween bosses.
+		RequestFrame(NextFrame_HalloweenBoss, EntIndexToEntRef(iEntity));
 	}
 }
 
@@ -9380,6 +9422,14 @@ public void NextFrame_BisonProj(int ref)
 
 			TeleportEntity(proj, NULL_VECTOR, NULL_VECTOR, vel);
 			//SetEntPropVector(proj, Prop_Send, "m_vInitialVelocity", vel);
+
+			char scale[16];
+			config.LookupString(g_hCvarBisonBoostScale, scale, sizeof(scale));
+			if(StringToFloat(scale) > 1.0)
+			{
+				SetVariantString(scale);
+				AcceptEntityInput(proj, "SetModelScale");
+			}
 		}
 	}
 }
@@ -9705,6 +9755,10 @@ void Bomb_Think(int iBomb)
 		return;
 	}
 	
+	// Don't allow players to circumvent slower move speed by taunting.
+	SetEntPropFloat(client, Prop_Send, "m_flCurrentTauntMoveSpeed", 0.0);
+	SetEntProp(client, Prop_Send, "m_bAllowMoveDuringTaunt", false);
+
 	float flPosPlayer[3];
 	GetEntPropVector(client, Prop_Send, "m_vecOrigin", flPosPlayer);
 	bool bIsGiantCarrying = view_as<bool>(GetEntProp(client, Prop_Send, "m_bIsMiniBoss"));
@@ -10925,6 +10979,7 @@ public Action Command_Test2(int client, int args)
 	}
 	*/
 
+	/*
 	int ring = MaxClients+1;
 	while((ring = FindEntityByClassname(ring, "tf_projectile_energy_ring")) > MaxClients)
 	{
@@ -10935,6 +10990,25 @@ public Action Command_Test2(int client, int args)
 
 		TeleportEntity(ring, NULL_VECTOR, NULL_VECTOR, vel);
 	}
+	*/
+
+	int entity = MaxClients+1;
+	while((entity = FindEntityByClassname(entity, "headless_hatman")) > MaxClients)
+	{
+		PrintToServer("headless_hatman %d -> %d", entity, GetEntProp(entity, Prop_Data, "m_iHealth"));
+	}
+
+	entity = MaxClients+1;
+	while((entity = FindEntityByClassname(entity, "eyeball_boss")) > MaxClients)
+	{
+		PrintToServer("eyeball_boss %d -> %d", entity, GetEntProp(entity, Prop_Data, "m_iHealth"));
+	}
+
+	entity = MaxClients+1;
+	while((entity = FindEntityByClassname(entity, "merasmus")) > MaxClients)
+	{
+		PrintToServer("merasmus %d -> %d", entity, GetEntProp(entity, Prop_Data, "m_iHealth"));
+	}	
 
 	return Plugin_Handled;
 }
@@ -11545,6 +11619,7 @@ public bool TraceFilter_Reanimator(int entity, int mask, int marker)
 	if(strncmp(classname, "tf_dropped_weapon", 17) == 0) return false;
 	if(strncmp(classname, "entity_revive_marker", 20) == 0) return false;
 	if(strncmp(classname, "tf_projectile_arrow", 19) == 0) return false;
+	if(strncmp(classname, "halloween_souls_pack", 20) == 0) return false;
 
 	//char model[128];
 	//GetEntPropString(entity, Prop_Data, "m_ModelName", model, sizeof(model));
@@ -12148,7 +12223,7 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 		case TFCond_Taunting:
 		{
 			// Fix conga taunt for robot models.
-			if(config.LookupBool(g_hCvarRobot) && !GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+			if(config.LookupBool(g_hCvarRobot))
 			{
 				if(g_nGameMode == GameMode_Race || GetClientTeam(client) == TFTeam_Blue)
 				{
@@ -12164,7 +12239,7 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 							SetEntPropFloat(client, Prop_Send, "m_flCurrentTauntMoveSpeed", 100.0);
 							SetEntProp(client, Prop_Send, "m_bAllowMoveDuringTaunt", true);
 						}
-						case ITEM_ZOOMIN_BROOM:
+						case ITEM_ZOOMIN_BROOM,ITEM_VICTORY_LAP:
 						{
 							SetEntPropFloat(client, Prop_Send, "m_flCurrentTauntMoveSpeed", 200.0);
 							SetEntProp(client, Prop_Send, "m_bAllowMoveDuringTaunt", true);
@@ -15879,4 +15954,53 @@ bool Tank_BombDeployPosition(float pos[3])
 	for(int i=0; i<3; i++) pos[i] = StringToFloat(explode[i]);
 
 	return true;
+}
+
+public void NextFrame_HalloweenBoss(int ref)
+{
+	int boss = EntRefToEntIndex(ref);
+	if(boss > MaxClients)
+	{
+		char className[32];
+		GetEdictClassname(boss, className, sizeof(className));
+
+		float mult;
+		if(strcmp(className, "eyeball_boss") == 0)
+		{
+			mult = config.LookupFloat(g_hCvarBossHealthMultMono);
+		}else if(strcmp(className, "merasmus") == 0)
+		{
+			mult = config.LookupFloat(g_hCvarBossHealthMultMerasmus);
+		}else{
+			mult = config.LookupFloat(g_hCvarBossHealthMultHHH);
+		}
+
+		int maxHealth = GetEntProp(boss, Prop_Data, "m_iMaxHealth");
+		int health = maxHealth;
+		health = RoundToNearest(float(health) * mult);
+		if(health < 100) health = 100;
+
+		SetEntProp(boss, Prop_Data, "m_iHealth", health);
+		SetEntProp(boss, Prop_Data, "m_iMaxHealth", health);
+#if defined DEBUG
+		LogMessage("(NextFrame_HalloweenBoss) Modified %s health x%1.3f: %d -> %d", className, mult, maxHealth, health);
+#endif
+	}
+}
+
+public Action Tank_IsChaseable(int client, int headlessHatman, bool &result)
+{
+	if(client >= 1 && client <= MaxClients)
+	{
+		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+		{
+			if(g_hhhCooldown[client] > 0.0 && g_hhhCooldown[client] > GetEngineTime())
+			{
+				result = false;
+				return Plugin_Changed;
+			}
+		}
+	}
+
+	return Plugin_Continue;
 }

@@ -217,6 +217,17 @@ forward void Tank_OnCalcSpeedPre(int client);
 forward void Tank_OnCalcSpeedPost(int client);
 
 /**
+ * Called whenever the Horseless Headless Horsemann chooses to chase a player.
+ *
+ * @param client 				Client index.
+ * @param headlessHatman		Edict index of the hhh boss.
+ * @param result				True to chase the player, false otherwise.
+ *
+ * @return 						Return Plugin_Continue to use the game result. Return anything else to use the value set in result.
+ */
+forward Action Tank_IsChaseable(int client, int headlessHatman, bool &result);
+
+/**
  * Do not edit below this line!
  */
 public Extension __ext_tank = 
