@@ -1061,7 +1061,7 @@ public void OnPluginStart()
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.1", "Seconds that must pass before the tank is healed.");
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
 	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.85", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
-	g_hCvarBisonBoostSpeed = CreateConVar("tank_bisonboost_speed", "1.4286", "Scale amount for the velocity of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
+	g_hCvarBisonBoostSpeed = CreateConVar("tank_bisonboost_speed", "1.45", "Scale amount for the velocity of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
 	g_hCvarBisonBoostDamage = CreateConVar("tank_bisonboost_damage", "1.6", "Scale amount for the damage of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
 	g_hCvarBisonBoostScale = CreateConVar("tank_bisonboost_scale", "2.0", "Model scale amount of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
 	g_hCvarBossHealthMultHHH = CreateConVar("tank_boss_health_hhh", "0.65", "Max health modifier for Horseless Headless Horsemann.");
@@ -1073,7 +1073,7 @@ public void OnPluginStart()
 	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
-	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.5", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
+	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.6", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
 	g_hCvarRespawnCartBehind = CreateConVar("tank_respawn_cart_behind", "0.25", "A team's tank is considered behind if the difference is greater than this percentage of total track length. Set to over 1.0 to disable.");
 	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "3.0", "Respawn time multiplier per each Giant Robot advantage.");
 	g_hCvarRespawnAdvCap = CreateConVar("tank_respawn_advantage_cap", "3", "Maximum Giant Robot advantage amount that can be factored into respawn time. Set to 0 to disable.");
@@ -15166,11 +15166,16 @@ public void EntityOutput_TriggerTeleport(const char[] output, int caller, int ac
 // void CMonsterResource::SetBossStunPercentage(CMonsterResource *this, float)
 public MRESReturn CMonsterResource_SetBossHealthPercentage(int pThis, Handle hReturn, Handle hParams)
 {
-	if(!g_bEnabled) return MRES_Ignored;
-	if(g_nGameMode != GameMode_Tank && g_nGameMode != GameMode_BombDeploy) return MRES_Ignored;
+	if(g_bEnabled && g_bIsRoundStarted)
+	{
+		if(g_nGameMode == GameMode_Tank || (g_nGameMode == GameMode_BombDeploy && g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive] && g_nTeamGiant[TFTeam_Blue][g_bTeamGiantNoCritCash]))
+		{
+			// Block anything trying to update the monster_resource health bar.
+			return MRES_Supercede;
+		}
+	}
 
-	// Block anything trying to update the monster_resource health bar.
-	return MRES_Supercede;
+	return MRES_Ignored;
 }
 
 public Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunChargeType, bool &result)
