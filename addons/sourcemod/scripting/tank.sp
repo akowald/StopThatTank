@@ -907,9 +907,6 @@ enum
 }
 int g_flareExplodeReason = FlareExplode_Unknown;
 
-bool g_inCalcSpeed[MAXPLAYERS+1];
-int g_tempHealingTarget[MAXPLAYERS+1];
-
 float g_timeCaptureOutline[MAX_TEAMS];
 bool g_playedRoundIntroMusic;
 
@@ -1059,7 +1056,7 @@ public void OnPluginStart()
 	g_hCvarCheckpointHealth = CreateConVar("tank_checkpoint_health", "0.15", "Tank health percentage earned when a checkpoint is reached.");
 	g_hCvarCheckpointTime = CreateConVar("tank_checkpoint_time", "1.0", "Seconds that the tank will incrementaly heal tank_checkpoint_health.");
 	g_hCvarCheckpointInterval = CreateConVar("tank_checkpoint_interval", "0.1", "Seconds that must pass before the tank is healed.");
-	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.80", "Percentage of tank max health where checkpoint healing stops.");
+	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.75", "Percentage of tank max health where checkpoint healing stops.");
 	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.85", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
 	g_hCvarBisonBoostSpeed = CreateConVar("tank_bisonboost_speed", "1.45", "Scale amount for the velocity of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
 	g_hCvarBisonBoostDamage = CreateConVar("tank_bisonboost_damage", "1.6", "Scale amount for the damage of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
@@ -1069,7 +1066,7 @@ public void OnPluginStart()
 	g_hCvarBossHealthMultMerasmus = CreateConVar("tank_boss_health_merasmus", "0.2", "Max health modifier for Merasmus.");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
-	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "3.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
+	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "4.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
@@ -1204,7 +1201,7 @@ public void OnPluginStart()
 
 	g_hCvarHellTowerTimeGate = CreateConVar("tank_helltower_time_gates_open", "30.0", "Seconds after hell starts that the gates open in hell. This triggers the relay which will then delay an additional 29 seconds.");
 	g_hCvarGiantHHHCap = CreateConVar("tank_giant_hhh_cap", "310.0", "Damage cap for the HHH Halloween boss against the giant.");
-	g_hCvarJarateOnHitTime = CreateConVar("tank_jarate_on_hit_time", "4.0", "Seconds that jarate is applied for the jarate_on_hit giant tag.");
+	g_hCvarJarateOnHitTime = CreateConVar("tank_jarate_on_hit_time", "2.0", "Seconds that jarate is applied for the jarate_on_hit giant tag.");
 
 	g_hCvarClassLimits[TFTeam_Red][1] = CreateConVar("tank_classlimit_red_scout", "2", "Class limit for scout. Set to -1 for no limit.");
 	g_hCvarClassLimits[TFTeam_Red][2] = CreateConVar("tank_classlimit_red_sniper", "2", "Class limit for sniper. Set to -1 for no limit.");
@@ -11349,6 +11346,15 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 				{
 					AcceptEntityInput(door, "Open");
 				}
+
+				// This disables RED's second spawn (near 3rd CP) and enables one of RED's spawn doors near the end.
+				relay = Entity_FindEntityByName("turn_on_redspawn2", "logic_relay");
+				if(relay != -1)
+				{
+					AcceptEntityInput(relay, "Trigger");
+				}
+
+				CreateTimer(0.1, Timer_SnowyCoastRedSpawn, _, TIMER_FLAG_NO_MAPCHANGE);
 			}
 		}
 	}
@@ -11358,6 +11364,24 @@ public void Output_OnBlueCapture(const char[] output, int iControlPoint, int act
 	Path_GetOrientation(iPathTrack, flAng);
 	SetEntityModel(iControlPoint, MODEL_ROBOT_HOLOGRAM);
 	TeleportEntity(iControlPoint, NULL_VECTOR, flAng, NULL_VECTOR);
+}
+
+public Action Timer_SnowyCoastRedSpawn(Handle timer)
+{
+	if(!g_bIsRoundStarted) return Plugin_Handled;
+
+	int spawn = Entity_FindEntityByName("redspawn2", "info_player_teamspawn");
+	if(spawn > MaxClients)
+	{
+		AcceptEntityInput(spawn, "Disable");
+	}
+	spawn = Entity_FindEntityByName("redspawn2b", "info_player_teamspawn");
+	if(spawn > MaxClients)
+	{
+		AcceptEntityInput(spawn, "Disable");
+	}	
+
+	return Plugin_Handled;
 }
 
 public Action Timer_SnowyCoastDoors(Handle timer, int ref)
@@ -15789,64 +15813,6 @@ public Action TempEntHook_ParticleEffect(const char[] te_name, int[] players, in
 	return Plugin_Continue;
 }
 
-public void Tank_OnCalcSpeedPre(int client)
-{
-	if(!g_bEnabled) return;
-
-	g_inCalcSpeed[client] = false;
-	// Apply the effects for the giant tag: "no_healing_boost".
-	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_NO_HEALING_BOOST) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
-	{
-		// Temporarily remove the medigun's healing target to take it out of the equation.
-		int medigun = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-		if(medigun > MaxClients)
-		{
-			char className[24];
-			GetEdictClassname(medigun, className, sizeof(className));
-			if(strcmp(className, "tf_weapon_medigun") == 0)
-			{
-				int healingTarget = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
-				if(healingTarget >= 1 && healingTarget <= MaxClients && IsClientInGame(healingTarget))
-				{
-					g_inCalcSpeed[client] = true;
-					g_tempHealingTarget[client] = EntIndexToEntRef(healingTarget);
-					SetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget", -1);
-				}
-			}
-		}
-	}
-}
-
-public void Tank_OnCalcSpeedPost(int client)
-{
-	if(!g_bEnabled) return;
-
-	if(g_inCalcSpeed[client] && client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_NO_HEALING_BOOST) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
-	{
-		int healingTarget = EntRefToEntIndex(g_tempHealingTarget[client]);
-		if(healingTarget >= 1 && healingTarget <= MaxClients && IsClientInGame(healingTarget))
-		{
-			// Restore the healing target on the giant's medigun.
-			int medigun = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
-			if(medigun > MaxClients)
-			{
-				char className[24];
-				GetEdictClassname(medigun, className, sizeof(className));
-				if(strcmp(className, "tf_weapon_medigun") == 0)
-				{
-					int target = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
-					if(target == -1)
-					{
-						SetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget", healingTarget);
-					}
-				}
-			}
-		}
-	}
-	
-	g_inCalcSpeed[client] = false;
-}
-
 void Outline_DrawBoundaries(int client=0, const float mins[3], const float maxs[3], const float origin[3])
 {
 	float corners[4][2];
@@ -16004,6 +15970,25 @@ public Action Tank_IsChaseable(int client, int headlessHatman, bool &result)
 				result = false;
 				return Plugin_Changed;
 			}
+		}
+	}
+
+	return Plugin_Continue;
+}
+
+public Action Tank_OnCalculateMaxSpeed(int client, float &speed)
+{
+	if(!g_bEnabled) return Plugin_Continue;
+
+	if(client >= 1 && client <= MaxClients)
+	{
+		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_flGiantMaxSpeed] > 0.0
+			&& speed > g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_flGiantMaxSpeed] && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+		{
+			// Cap the giant's max speed with the "max-speed" config option in the giant's template.
+			// This bypasses two instances of healing target speed, which we do not want for giants.
+			speed = g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_flGiantMaxSpeed];
+			return Plugin_Handled;
 		}
 	}
 

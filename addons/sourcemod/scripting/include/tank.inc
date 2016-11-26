@@ -203,18 +203,14 @@ enum
 forward Action Tank_OnCanRecieveMedigunChargeEffect(int client, int medigunChargeType, bool &result);
 
 /**
- * Called before player speed calculation begins.
+ * Called whenever the max speed of a player is calculated.
  *
- * @param client 				Client index.
- */
-forward void Tank_OnCalcSpeedPre(int client);
-
-/**
- * Called after player speed calculation concludes.
+ * @param client				Client index.
+ * @param speed					Game calculated max speed.
  *
- * @param client 				Client index.
+ * @param 						Return Plugin_Continue to use the game calculated value. Anything else will override with the value set by speed.
  */
-forward void Tank_OnCalcSpeedPost(int client);
+forward Action Tank_OnCalculateMaxSpeed(int client, float &speed);
 
 /**
  * Called whenever the Horseless Headless Horsemann chooses to chase a player.

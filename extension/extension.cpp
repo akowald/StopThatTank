@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2016 Alex Kowald
+ * Copyright (C) 2014-2017 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -43,9 +43,8 @@ IForward *g_pForwardOnWeaponPickup = NULL;
 IForward *g_pForwardOnWeaponCreate = NULL;
 IForward *g_pForwardPassFilter = NULL;
 IForward *g_pForwardUberEffects = NULL;
-IForward *g_pForwardCalcSpeedPre = NULL;
-IForward *g_pForwardCalcSpeedPost = NULL;
 IForward *g_pForwardIsChaseable = NULL;
+IForward *g_pForwardCalcSpeed = NULL;
 
 void *g_addr_GetItemSchema = NULL;
 void *g_addr_GetAttributeDefinition = NULL;
@@ -248,21 +247,23 @@ DETOUR_DECL_MEMBER1(CanRecieveMedigunChargeEffect, bool, int, medigunChargeType)
 // Detour for double CTFPlayer::TeamFortress_CalculateMaxSpeed(bool)
 DETOUR_DECL_MEMBER1(TeamFortress_CalculateMaxSpeed, double, bool, ignoreCharging)
 {
-	double result;
+	double result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)(ignoreCharging);
 
-	if(g_pForwardCalcSpeedPre != NULL && g_pForwardCalcSpeedPost != NULL)
+	if(g_pForwardCalcSpeed != NULL)
 	{
 		int client = gamehelpers->EntityToBCompatRef(reinterpret_cast<CBaseEntity*>(this));
 
-		g_pForwardCalcSpeedPre->PushCell(client);
-		g_pForwardCalcSpeedPre->Execute(NULL);
+		g_pForwardCalcSpeed->PushCell(client);
+		cell_t speed = sp_ftoc(static_cast<float>(result));
+		g_pForwardCalcSpeed->PushCellByRef(&speed);
 
-		result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)(ignoreCharging);
+		cell_t action = Pl_Continue;
+		g_pForwardCalcSpeed->Execute(&action);
 
-		g_pForwardCalcSpeedPost->PushCell(client);
-		g_pForwardCalcSpeedPost->Execute(NULL);
-	}else{
-		result = DETOUR_MEMBER_CALL(TeamFortress_CalculateMaxSpeed)(ignoreCharging);
+		if(action != Pl_Continue)
+		{
+			return static_cast<double>(sp_ctof(speed));
+		}
 	}
 	
 	return result;
@@ -1063,9 +1064,8 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 	g_pForwardOnWeaponCreate = forwards->CreateForward("Tank_OnWeaponDropped", ET_Event, 5, NULL, Param_Cell, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
 	g_pForwardPassFilter = forwards->CreateForward("Tank_PassFilter", ET_Hook, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
 	g_pForwardUberEffects = forwards->CreateForward("Tank_OnCanRecieveMedigunChargeEffect", ET_Event, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
-	g_pForwardCalcSpeedPre = forwards->CreateForward("Tank_OnCalcSpeedPre", ET_Ignore, 1, NULL, Param_Cell);
-	g_pForwardCalcSpeedPost = forwards->CreateForward("Tank_OnCalcSpeedPost", ET_Ignore, 1, NULL, Param_Cell);
 	g_pForwardIsChaseable = forwards->CreateForward("Tank_IsChaseable", ET_Event, 3, NULL, Param_Cell, Param_Cell, Param_CellByRef);
+	g_pForwardCalcSpeed = forwards->CreateForward("Tank_OnCalculateMaxSpeed", ET_Event, 2, NULL, Param_Cell, Param_CellByRef);
 
 	int iOffset;
 	if(!g_pGameConf->GetOffset("CBaseEntity::ShouldTransmit", &iOffset))
@@ -1170,9 +1170,8 @@ void Tank::SDK_OnUnload()
 	forwards->ReleaseForward(g_pForwardOnWeaponCreate);
 	forwards->ReleaseForward(g_pForwardPassFilter);
 	forwards->ReleaseForward(g_pForwardUberEffects);
-	forwards->ReleaseForward(g_pForwardCalcSpeedPre);
-	forwards->ReleaseForward(g_pForwardCalcSpeedPost);
 	forwards->ReleaseForward(g_pForwardIsChaseable);
+	forwards->ReleaseForward(g_pForwardCalcSpeed);
 
 	if(g_pSDKHooks != NULL)
 	{

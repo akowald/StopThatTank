@@ -68,12 +68,12 @@
 #define GIANTTAG_THE_DONALD					(1 << 19)
 #define GIANTTAG_GUNSLINGER_COMBO			(1 << 20)
 #define GIANTTAG_JULY4 						(1 << 21)
-#define GIANTTAG_NO_HEALING_BOOST			(1 << 22)
-#define GIANTTAG_BISON_BOOST				(1 << 23)
+#define GIANTTAG_BISON_BOOST				(1 << 22)
 
 char g_strGiantTags[][] =
 {
-	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits", "airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit", "dont_spawn_in_hell", "the_donald", "gunslinger_combo", "july4", "no_healing_boost", "bison_boost",
+	"sentrybuster", "pipe_explode_sound", "fill_uber", "medic_aoe", "dont_change_respawn", "scale_buildings", "teleporter", "minigun_sounds", "airbourne_minicrits", "melee_knockback", "melee_knockback_crits",
+	"airblast_crits", "no_loop_sound", "can_drop_bomb", "airblast_kills_stickies", "no_gib", "block_healonhit", "jarate_on_hit", "dont_spawn_in_hell", "the_donald", "gunslinger_combo", "july4", "bison_boost",
 };
 
 enum
@@ -110,6 +110,7 @@ enum eGiantStruct
 	g_iGiantWeaponDefs[MAX_CONFIG_WEAPONS],
 	bool:g_bGiantWeaponBotRestricted[MAX_CONFIG_WEAPONS],
 	Handle:g_hGiantClassnames,
+	Float:g_flGiantMaxSpeed,
 	// Arrays will house the attribute data on the player and weapons
 	Handle:g_hGiantCharAttrib,
 	Handle:g_hGiantCharAttribValue,
@@ -271,6 +272,7 @@ void Giant_LoadTemplates()
 				g_nGiants[iIndex][g_iGiantOverheal] = KvGetNum(hKv, "overheal");
 				g_nGiants[iIndex][g_flGiantCapHealth] = KvGetFloat(hKv, "cap-health", -1.0);
 				g_nGiants[iIndex][g_flGiantScale] = KvGetFloat(hKv, "scale", -1.0);
+				g_nGiants[iIndex][g_flGiantMaxSpeed] = KvGetFloat(hKv, "max-speed", -1.0);
 
 				KvGetString(hKv, "info", g_nGiants[iIndex][g_strGiantDesc], MAXLEN_GIANT_DESC);
 				KvGetString(hKv, "hint", g_nGiants[iIndex][g_strGiantHint], MAXLEN_GIANT_DESC);
