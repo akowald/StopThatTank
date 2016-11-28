@@ -8546,6 +8546,12 @@ void CritCash_RemoveEffects()
 	}
 }
 
+public Action CritCash_OnSpawnPost(int entity)
+{
+	// After the 2015 Halloween update, currency packs will not spawn if there's no nav mesh. This allows Crit Cash to spawn on maps without a nav mesh!
+	SetEntProp(entity, Prop_Send, "m_bDistributed", true);
+}
+
 public Action Bomb_OnTouch(int iBomb, int iToucher)
 {
 	// Don't allow bomb pickup until the round has started and the bomb has been handed off to a giant
@@ -9338,8 +9344,8 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 		}else{
 			// Hook currency touch to award crits to the red team
 			SDKHook(iEntity, SDKHook_Touch, CritCash_OnTouch);
-			// After the 2015 Halloween update, currency packs will not spawn if there's no nav mesh. This allows Crit Cash to spawn on maps without a nav mesh!
-			SetEntProp(iEntity, Prop_Send, "m_bDistributed", true);
+			
+			SDKHook(iEntity, SDKHook_SpawnPost, CritCash_OnSpawnPost);
 		}
 	}else if(g_iCreatingCartDispenser > 0 && strcmp(classname, "dispenser_touch_trigger") == 0)
 	{
