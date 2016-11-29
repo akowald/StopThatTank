@@ -58,8 +58,8 @@
 #define MODEL_ROMEVISION_TRACK_R	"models/bots/tw2/boss_bot/tank_track_r.mdl"
 #define MODLE_ROMEVISION_STATIC		"models/bots/tw2/boss_bot/static_boss_tank.mdl"
 
-#define HIGHTOWER_LIFT_OFFSET_BLUE 	11.0
-#define HIGHTOWER_LIFT_OFFSET_RED 	8.0
+#define HIGHTOWER_LIFT_OFFSET_BLUE 	100.0
+#define HIGHTOWER_LIFT_OFFSET_RED 	100.0
 
 #define SOUND_CART_START		"items/cart_rolling_start.wav"
 #define SOUND_CART_STOP			"items/cart_rolling_stop.wav"
@@ -293,6 +293,8 @@ enum
 };
 #define ARRAY_TRAINPROP_SIZE 2
 
+Address g_ILocomotionTank[MAX_TEAMS];
+
 int g_iRefTank[MAX_TEAMS];
 int g_iRefFakeTank[MAX_TEAMS];
 int g_iRefHealthBar;
@@ -469,6 +471,8 @@ Handle g_hCvarGiantHHHCooldown;
 Handle g_hCvarGiantHHHBlockStun;
 
 Handle g_hSDKGetBaseEntity;
+Handle g_hSDKMyNextBotPointer;
+Handle g_hSDKGetLocomotionInterface;
 Handle g_hSDKSetStartingPath;
 Handle g_hSDKSetSize;
 Handle g_hSDKPlaySpecificSequence;
@@ -493,6 +497,9 @@ Handle g_hSDKWeaponSwitch;
 Handle g_hSDKSolidMask;
 Handle g_hSDKSetBossHealth;
 Handle g_hSDKSendWeaponAnim;
+Handle g_hSDKLocomotionGetGravity;
+Handle g_hSDKLocomotionFaceTowardsHook;
+Handle g_hSDKLocomotionFaceTowards;
 
 Handle g_cookieInfoPanel;
 
@@ -521,6 +528,8 @@ enum eMapHack
 };
 eMapHack g_nMapHack = MapHack_None;
 bool g_bEnableMapHack[MAX_TEAMS];
+
+bool g_bAlternateParenting[MAX_TEAMS];
 
 bool g_bIsRoundStarted;
 bool g_bIsFinale;
@@ -3404,7 +3413,8 @@ public void Event_BroadcastAudio(Handle hEvent, char[] strEventName, bool bDontB
 	
 	if(strcmp(strSound, "Announcer.MVM_Tank_Alert_Spawn") == 0 || strcmp(strSound, "Announcer.MVM_Tank_Alert_Multiple") == 0 || strcmp(strSound, "Announcer.MVM_Tank_Alert_Halfway") == 0 
 		|| strcmp(strSound, "Announcer.MVM_Tank_Alert_Halfway_Multiple") == 0 || strcmp(strSound, "Announcer.MVM_Tank_Alert_Near_Hatch") == 0 || strcmp(strSound, "Announcer.MVM_General_Destruction") == 0
-		|| strcmp(strSound, "Announcer.MVM_Bomb_Reset") == 0)
+		|| strcmp(strSound, "Announcer.MVM_Bomb_Reset") == 0
+		|| strcmp(strSound, "Announcer.MVM_Tank_Alert_Deploying") == 0)
 	{
 		SetEventBroadcast(hEvent, true);
 	}else if(GetEventInt(hEvent, "team") == TFTeam_Red && g_nGameMode != GameMode_Race)
@@ -4171,7 +4181,15 @@ int Tank_CreateTankEntity(int team)
 		// If you spawn a tank outside of MVM population files, you run the risk of hitting this buggy code.
 		// You need to call CTFTankBoss::SetStartingPathTrackNode before calling CTFTankBoss::Spawn.
 		Tank_RestorePath(tank);
-
+		
+		// To avoid problems while parenting the tank, we get its locomotion interface, and block or change the return value of some functions to avoid undesired effects.
+		g_ILocomotionTank[team] = Tank_GetLocomotionInterface(tank);
+		// Setup the locomotion interface hooks:
+		if (g_hSDKLocomotionGetGravity != INVALID_HANDLE)
+			DHookRaw(g_hSDKLocomotionGetGravity, false, g_ILocomotionTank[team]);
+		if (g_hSDKLocomotionFaceTowardsHook != INVALID_HANDLE)
+			DHookRaw(g_hSDKLocomotionFaceTowardsHook, false, g_ILocomotionTank[team]);
+		
 		DispatchSpawn(tank);
 
 		// Set the tank's team (again).
@@ -5941,7 +5959,7 @@ void Tank_Think(int iTank)
 	// As we approach the goal node, parent the tank so it interacts with other map entities properly (and the tank doesn't auto-deploy)
 	if(flDistanceToGoal < flDistanceParent)
 	{
-		if(GetEntPropEnt(iTank, Prop_Send, "moveparent") <= MaxClients)
+		if(GetEntPropEnt(iTank, Prop_Send, "moveparent") <= MaxClients && !g_bAlternateParenting[team])
 		{
 #if defined DEBUG
 			PrintToChatAll("PARENTING FOR GOAL");
@@ -6024,18 +6042,71 @@ void Tank_Think(int iTank)
 #if defined DEBUG
 		PrintToChatAll("DEPLOYING TANK PAYLOAD!");
 #endif
+	}else if (GetEntProp(iTank, Prop_Send, "m_nSequence") == 1 && (g_nMapHack == MapHack_CactusCanyon || !g_bIsFinale) )//Never allow the tank to deploy on its own
+	{
+		int iTankMechanism = EntRefToEntIndex(g_iRefTankMechanism[team]);
+		if(iTankMechanism > MaxClients)
+		{
+			SetVariantString("ref");
+			AcceptEntityInput(EntRefToEntIndex(g_iRefTankMechanism[team]), "SetAnimation");
+		}
+		SetEntProp(iTank, Prop_Send, "m_nSequence", 2);
+		SetEntProp(iTank, Prop_Send, "m_nNewSequenceParity", 2);
+		SetEntProp(iTank, Prop_Send, "m_nResetEventsParity", 2);
+		SetEntPropFloat(iTank, Prop_Send, "m_flPlaybackRate", 0.0);
 	}
 	
-	// While the tank is parented, we need to take care of a few things because the tank's Think routine is blocked
-	if(GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients)
+	// While the tank is parented, we need to take care of a few things because the tank's speed is set to 0.0
+	if(GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients || g_bAlternateParenting[team])
 	{
 		// Control the speeds of the treads based on the speed we are currently moving
 		float trainSpeed = GetEntPropFloat(iTrackTrain, Prop_Data, "m_flSpeed");
 		float flPlaybackRate = trainSpeed / GetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed") * 0.56;
+		if((g_nMapHack == MapHack_Hightower || g_nMapHack == MapHack_HightowerEvent) && g_bEnableMapHack[team]) flPlaybackRate = 0.0;
 		//PrintToServer("Speed: %0.2f", flPlaybackRate);
-		
+			
 		if(iTrackL > MaxClients) SetEntPropFloat(iTrackL, Prop_Send, "m_flPlaybackRate", flPlaybackRate);
 		if(iTrackR > MaxClients) SetEntPropFloat(iTrackR, Prop_Send, "m_flPlaybackRate", flPlaybackRate);
+			
+		//The tank can't be allowed to move anywhere while being parented.
+		SetEntPropFloat(iTank, Prop_Data, "m_speed", 0.0);
+		
+		/* Deprecated, it doesn't seem to work anymore and is useless anyway.
+		//Since we parent the tank, and block its speed, it will face the wrong path correct this problem by getting the path it should face
+		int path = Train_GetCurrentPath(team);
+		if(path > MaxClients)
+		{
+			int nextPath = GetEntDataEnt2(path, Offset_GetNextOffset(path));
+			if(nextPath > MaxClients)
+			{
+				float flPos[3];
+				GetEntPropVector(nextPath, Prop_Data, "m_vecAbsOrigin", flPos);
+				float flAng[3];
+				Path_GetOrientation(nextPath, flAng);
+					
+				GetPositionForward(flPos, flAng, flPos, 100.0);//Move the path position a bit forward to fix a facing problem.
+				Tank_FaceTowards(team, flPos);
+			}
+		}
+		*/
+		
+		if (g_bAlternateParenting[team])
+		{
+			int iTrackTrain2 = EntRefToEntIndex(g_iRefTrackTrain2[team]);
+			if (iTrackTrain2 > MaxClients)
+			{
+				float flTrainPos[3], flTankPos[3];
+				GetEntPropVector(iTrackTrain2, Prop_Send, "m_vecOrigin", flTrainPos);
+				GetEntPropVector(iTank, Prop_Send, "m_vecOrigin", flTankPos);
+				
+				flTankPos[2] = flTrainPos[2];
+				
+				if (g_nMapHack == MapHack_Hightower || g_nMapHack == MapHack_HightowerEvent)
+					flTankPos[2] += (team == TFTeam_Red) ? HIGHTOWER_LIFT_OFFSET_RED : HIGHTOWER_LIFT_OFFSET_BLUE;
+				
+				TeleportEntity(iTank, flTankPos, NULL_VECTOR, NULL_VECTOR);
+			}
+		}
 	}else{
 		Tank_Controller(team, iTank, iTrackTrain);
 	}
@@ -6180,16 +6251,17 @@ void Tank_ThinkRace(int iTank)
 							g_iRefTrackTrain2[team] = EntIndexToEntRef(iLift);
 							SetEntPropFloat(iLift, Prop_Data, "m_maxSpeed", config.LookupFloat(g_hCvarMaxSpeed));
 
-							float flPos[3];
-							GetEntPropVector(iTank, Prop_Send, "m_vecOrigin", flPos);
+							/*float flPos[3];
+							GetEntPropVector(iLift, Prop_Send, "m_vecOrigin", flPos);
 							if(team == TFTeam_Red)
 							{
 								flPos[2] += HIGHTOWER_LIFT_OFFSET_RED;
 							}else{
 								flPos[2] += HIGHTOWER_LIFT_OFFSET_BLUE;
 							}
-							TeleportEntity(iTank, flPos, NULL_VECTOR, NULL_VECTOR);
-
+							TeleportEntity(iTank, flPos, NULL_VECTOR, NULL_VECTOR);*/
+							
+							Tank_UnParent(team);
 							Tank_Parent(team, true);
 						}else{
 							LogMessage("(Tank_ThinkRace) Failed to find \"clamp_blue\" to parent the tank!");
@@ -6202,21 +6274,22 @@ void Tank_ThinkRace(int iTank)
 						if(iLift > MaxClients)
 						{
 #if defined DEBUG
-							PrintToServer("(Tank_ThinkRace) Found tank parent \"clamp_blue\": %d!", iLift);
+							PrintToServer("(Tank_ThinkRace) Found tank parent \"clamp_red\": %d!", iLift);
 #endif
 							g_iRefTrackTrain2[team] = EntIndexToEntRef(iLift);
 							SetEntPropFloat(iLift, Prop_Data, "m_maxSpeed", config.LookupFloat(g_hCvarMaxSpeed));
 
-							float flPos[3];
-							GetEntPropVector(iTank, Prop_Send, "m_vecOrigin", flPos);
+							/*float flPos[3];
+							GetEntPropVector(iLift, Prop_Send, "m_vecOrigin", flPos);
 							if(team == TFTeam_Red)
 							{
 								flPos[2] += HIGHTOWER_LIFT_OFFSET_RED;
 							}else{
 								flPos[2] += HIGHTOWER_LIFT_OFFSET_BLUE;
 							}
-							TeleportEntity(iTank, flPos, NULL_VECTOR, NULL_VECTOR);
+							TeleportEntity(iTank, flPos, NULL_VECTOR, NULL_VECTOR);*/
 
+							Tank_UnParent(team);
 							Tank_Parent(team, true);
 						}else{
 							LogMessage("(Tank_ThinkRace) Failed to find \"clamp_red\" to parent the tank!");
@@ -6301,7 +6374,7 @@ void Tank_ThinkRace(int iTank)
 			flCartSpeed = config.LookupFloat(g_hCvarRaceLvls[0]);
 
 			// The tank can't move backwards..our solution to this is to parent the tank and then unparenting it when it reaches the top
-			if(!g_bRaceParentedForHill[team] && GetEntPropEnt(iTank, Prop_Send, "moveparent") <= MaxClients)
+			if(!g_bRaceParentedForHill[team] && GetEntPropEnt(iTank, Prop_Send, "moveparent") <= MaxClients && !g_bAlternateParenting[team])
 			{
 				Tank_Parent(team);
 				g_bRaceParentedForHill[team] = true;
@@ -6423,7 +6496,7 @@ void Tank_ThinkRace(int iTank)
 	// As we approach the goal node, parent the tank so it interacts with other map entities properly (and the tank doesn't auto-deploy)
 	if(flDistanceToGoal < flDistanceParent)
 	{
-		if(GetEntPropEnt(iTank, Prop_Send, "moveparent") <= MaxClients)
+		if(GetEntPropEnt(iTank, Prop_Send, "moveparent") <= MaxClients && !g_bAlternateParenting[team])
 		{
 #if defined DEBUG
 			PrintToChatAll("PARENTING FOR GOAL");
@@ -6457,19 +6530,71 @@ void Tank_ThinkRace(int iTank)
 		g_bSoundHalfway[team] = true;
 	}
 
-	// While the tank is parented, we need to take care of a few things because the tank's Think routine is blocked
-	// Disable this while the tank sits stationary on hightower's lift
-	if(GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients)
+	if (GetEntProp(iTank, Prop_Send, "m_nSequence") != 2)//Never allow the tank to start the deploy animation on plr maps
+	{
+		int iTankMechanism = EntRefToEntIndex(g_iRefTankMechanism[team]);
+		if(iTankMechanism > MaxClients)
+		{
+			SetVariantString("ref");
+			AcceptEntityInput(EntRefToEntIndex(g_iRefTankMechanism[team]), "SetAnimation");
+		}
+		SetEntProp(iTank, Prop_Send, "m_nSequence", 2);
+		SetEntProp(iTank, Prop_Send, "m_nNewSequenceParity", 2);
+		SetEntProp(iTank, Prop_Send, "m_nResetEventsParity", 2);
+		SetEntPropFloat(iTank, Prop_Send, "m_flPlaybackRate", 0.0);
+	}
+
+	// While the tank is parented, we need to take care of a few things because the tank's speed is set to 0.0
+	if(GetEntPropEnt(iTank, Prop_Send, "moveparent") > MaxClients || g_bAlternateParenting[team])
 	{
 		// Control the speeds of the treads based on the speed we are currently moving
 		float trainSpeed = GetEntPropFloat(iTrackTrain, Prop_Data, "m_flSpeed");
 		float flPlaybackRate = trainSpeed / GetEntPropFloat(iTrackTrain, Prop_Data, "m_maxSpeed") * 0.56;
-		if((g_nMapHack == MapHack_Hightower || g_nMapHack == MapHack_HightowerEvent) && g_bEnableMapHack[team]) flPlaybackRate = 0.0; // When the tank is parented to the lift, it won't be moving anywhere.
+		if((g_nMapHack == MapHack_Hightower || g_nMapHack == MapHack_HightowerEvent) && g_bEnableMapHack[team]) flPlaybackRate = 0.0;
 		//PrintToServer("Speed: %0.2f", flPlaybackRate);
+			
 		if(iTrackL > MaxClients) SetEntPropFloat(iTrackL, Prop_Send, "m_flPlaybackRate", flPlaybackRate);
 		if(iTrackR > MaxClients) SetEntPropFloat(iTrackR, Prop_Send, "m_flPlaybackRate", flPlaybackRate);
-
-		//if(team == TFTeam_Blue) PrintCenterTextAll("Rate: %0.2f", flPlaybackRate);
+			
+		//The tank can't be allowed to move anywhere while being parented.
+		SetEntPropFloat(iTank, Prop_Data, "m_speed", 0.0);
+		
+		/* Deprecated, it doesn't seem to work anymore and is useless anyway.
+		//Since we parent the tank, and block its speed, it will face the wrong path correct this problem by getting the path it should face
+		int path = Train_GetCurrentPath(team);
+		if(path > MaxClients)
+		{
+			int nextPath = GetEntDataEnt2(path, Offset_GetNextOffset(path));
+			if(nextPath > MaxClients)
+			{
+				float flPos[3];
+				GetEntPropVector(nextPath, Prop_Data, "m_vecAbsOrigin", flPos);
+				float flAng[3];
+				Path_GetOrientation(nextPath, flAng);
+					
+				GetPositionForward(flPos, flAng, flPos, 100.0);//Move the path position a bit forward to fix a facing problem.
+				Tank_FaceTowards(team, flPos);
+			}
+		}
+		*/
+		
+		if (g_bAlternateParenting[team])
+		{
+			int iTrackTrain2 = EntRefToEntIndex(g_iRefTrackTrain2[team]);
+			if (iTrackTrain2 > MaxClients)
+			{
+				float flTrainPos[3], flTankPos[3];
+				GetEntPropVector(iTrackTrain2, Prop_Send, "m_vecOrigin", flTrainPos);
+				GetEntPropVector(iTank, Prop_Send, "m_vecOrigin", flTankPos);
+				
+				flTankPos[2] = flTrainPos[2];
+				
+				if (g_nMapHack == MapHack_Hightower || g_nMapHack == MapHack_HightowerEvent)
+					flTankPos[2] += (team == TFTeam_Red) ? HIGHTOWER_LIFT_OFFSET_RED : HIGHTOWER_LIFT_OFFSET_BLUE;
+				
+				TeleportEntity(iTank, flTankPos, NULL_VECTOR, NULL_VECTOR);
+			}
+		}
 	}else if(!g_bRaceIntermission)
 	{
 		Tank_Controller(team, iTank, iTrackTrain);
@@ -6503,6 +6628,22 @@ void Tank_SetStartingPathTrack(int tank, const char[] pathName)
 #endif
 		SDKCall(g_hSDKSetStartingPath, tank, pathName);
 	}
+}
+
+Address Tank_GetLocomotionInterface(int tank)
+{
+	if(g_hSDKMyNextBotPointer != INVALID_HANDLE && g_hSDKGetLocomotionInterface)
+	{
+#if defined DEBUG
+		PrintToServer("(Tank_GetLocomotionInterface) Calling MyNextBotPointer on tank %d..", tank);
+#endif
+		Address TankNextBot = SDKCall(g_hSDKMyNextBotPointer, tank);
+#if defined DEBUG
+		PrintToServer("(Tank_GetLocomotionInterface) Calling GetLocomotionInterface on tank %d..", tank);
+#endif
+		return view_as<Address>(SDKCall(g_hSDKGetLocomotionInterface, TankNextBot));
+	}
+	return Address_Null;
 }
 
 void SDK_SetSize(int iEntity, float flMins[3], float flMaxs[3])
@@ -6858,6 +6999,28 @@ void SDK_Init()
 	}else{
 		LogMessage("Failed to get offset: CMonsterResource::SetBossHealthPercentage!");
 	}
+	
+	offset = GameConfGetOffset(hGamedata, "NextBotGroundLocomotion::GetGravity"); 
+	if(offset > 0)
+	{
+		g_hSDKLocomotionGetGravity = DHookCreate(offset, HookType_Raw, ReturnType_Float, ThisPointer_Address, Tank_GetGravity);
+	}else{
+		LogMessage("Failed to get offset: NextBotGroundLocomotion::GetGravity!");
+	}
+	
+	offset = GameConfGetOffset(hGamedata, "ILocomotion::FaceTowards"); 
+	if(offset > 0)
+	{
+		g_hSDKLocomotionFaceTowardsHook = DHookCreate(offset, HookType_Raw, ReturnType_Void, ThisPointer_Address, Tank_FaceTowardsHook);
+		if(g_hSDKLocomotionFaceTowardsHook != INVALID_HANDLE)
+		{
+			DHookAddParam(g_hSDKLocomotionFaceTowardsHook, HookParamType_Int);
+		}else{
+			LogMessage("Failed to create DHook handle: ILocomotion::FaceTowards!");
+		}
+	}else{
+		LogMessage("Failed to get offset: ILocomotion::FaceTowards!");
+	}
 
 	// This call is used to translate a memory address into an entity index
 	StartPrepSDKCall(SDKCall_Raw);
@@ -6867,6 +7030,37 @@ void SDK_Init()
 	if(g_hSDKGetBaseEntity == INVALID_HANDLE)
 	{
 		LogMessage("Failed to create call: CBaseEntity::GetBaseEntity!");
+	}
+	
+	//This call is used to find the Nextbot interface of an entity.
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, "CBaseEntity::MyNextBotPointer");
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+	g_hSDKMyNextBotPointer = EndPrepSDKCall();
+	if(g_hSDKMyNextBotPointer == INVALID_HANDLE)
+	{
+		LogMessage("Failed to create call: CBaseEntity::MyNextBotPointer!");
+	}
+	
+	//This call is used to find the Locomotion interface of an Nextbot.
+	StartPrepSDKCall(SDKCall_Raw);
+	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, "INextBot::GetLocomotionInterface");
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+	g_hSDKGetLocomotionInterface = EndPrepSDKCall();
+	if(g_hSDKGetLocomotionInterface == INVALID_HANDLE)
+	{
+		LogMessage("Failed to create Virtual Call for INextBot::GetLocomotionInterface!");
+	}
+	
+	//This call is used to force the tank to face a specific point
+	StartPrepSDKCall(SDKCall_Raw);
+	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Virtual, "ILocomotion::FaceTowards");
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);//Fake parameter it's there to tell our dhook that the call is from us.
+	g_hSDKLocomotionFaceTowards = EndPrepSDKCall();
+	if(g_hSDKLocomotionFaceTowards == INVALID_HANDLE)
+	{
+		SetFailState("Failed to create Virtual Call for ILocomotion::FaceTowards!");
 	}
 
 	// This call is used to set the starting path_track for a spawned tank
@@ -7339,18 +7533,66 @@ void Tank_SetNoTarget(int team, bool enable)
 	}
 }
 
+void Tank_FaceTowards(int team, const float flPos[3])
+{
+	if (g_hSDKLocomotionFaceTowards != INVALID_HANDLE)
+	{
+		SDKCall(g_hSDKLocomotionFaceTowards, g_ILocomotionTank[team], flPos, 1);
+	}
+}
+
+public MRESReturn Tank_GetGravity(Address pThis, Handle hReturn)
+{
+	int iTeam;
+	for (iTeam = 0; iTeam < MAX_TEAMS; iTeam++)
+		if (pThis == g_ILocomotionTank[iTeam]) break;
+	int iTank = EntRefToEntIndex(g_iRefTank[iTeam]);
+	if(iTank > MaxClients)
+	{
+		int iParent = GetEntPropEnt(iTank, Prop_Send, "moveparent");
+		if (iParent > MaxClients || g_bAlternateParenting[iTeam]) //Our tank is parented, override its gravity to 0.0
+		{
+			DHookSetReturn(hReturn, 0.0);
+			return MRES_Supercede;
+		}
+	}
+	return MRES_Ignored;
+}
+
+public MRESReturn Tank_FaceTowardsHook(Address pThis, Handle hReturn, Handle hParams)
+{
+	int iTeam;
+	for (iTeam = 0; iTeam < MAX_TEAMS; iTeam++)
+		if (pThis == g_ILocomotionTank[iTeam]) break;
+	int iTank = EntRefToEntIndex(g_iRefTank[iTeam]);
+	if(iTank > MaxClients)
+	{
+		int iParent = GetEntPropEnt(iTank, Prop_Send, "moveparent");
+		if (iParent > MaxClients) //Our tank is parented, let's check if this function call is from us
+		{
+			if (hParams != INVALID_HANDLE)
+			{
+				return MRES_Ignored;
+			}
+			return MRES_Supercede;
+		}
+	}
+	return MRES_Ignored;
+}
+
 void Tank_Parent(int team, bool useAlternate=false)
 {
 	int iTank = EntRefToEntIndex(g_iRefTank[team]);
 	int iRef = g_iRefTrackTrain[team];
-	if(useAlternate) iRef = g_iRefTrackTrain2[team];
-
 	int iTrackTrain = EntRefToEntIndex(iRef);
+	
+	if	(useAlternate && iTank > MaxClients)//If we use the alernate way, that means we are going to make a "fake parenting"
+	{
+		g_bAlternateParenting[team] = true;
+		return;
+	}
 	if(iTank > MaxClients && iTrackTrain > MaxClients)
 	{
-		// Breaks tank physics and makes it follow the train
-		SetEntityMoveType(iTank, MOVETYPE_WALK);
-		
 		SetVariantString("!activator");
 		AcceptEntityInput(iTank, "SetParent", iTrackTrain);
 #if defined DEBUG
@@ -7364,11 +7606,10 @@ void Tank_UnParent(int team)
 {
 	int iTank = EntRefToEntIndex(g_iRefTank[team]);
 	int iTrackTrain = EntRefToEntIndex(g_iRefTrackTrain[team]);
+	g_bAlternateParenting[team] = false;
 	if(iTank > MaxClients && iTrackTrain > MaxClients)
 	{
 		AcceptEntityInput(iTank, "ClearParent");
-
-		SetEntityMoveType(iTank, MOVETYPE_CUSTOM);
 
 		CreateTimer(0.1, Timer_TankTeleport, team, TIMER_FLAG_NO_MAPCHANGE);
 #if defined DEBUG
@@ -7399,8 +7640,6 @@ public Action Timer_TankTeleport(Handle timer, int team)
 		GetEntPropVector(iTrackTrain, Prop_Send, "m_vecOrigin", flPosCart);
 		GetEntPropVector(iTrackTrain, Prop_Send, "m_angRotation", flAngCart);
 		TeleportEntity(tank, flPosCart, flAngCart, NULL_VECTOR);
-		
-		SetEntityMoveType(tank, MOVETYPE_CUSTOM);
 	}
 
 	return Plugin_Handled;
@@ -7651,6 +7890,11 @@ public Action NormalSoundHook(int clients[MAXPLAYERS], int &numClients, char sam
 	float engineTime = GetEngineTime();
 
 	if(strcmp(sample, ")items/cart_rolling.wav") == 0)
+	{
+		return Plugin_Handled;
+	}
+	
+	if(strcmp(sample, SOUND_TANK_DEPLOY) == 0 && entity > MaxClients)//Deploying sound played by the game, don't allow it.
 	{
 		return Plugin_Handled;
 	}
@@ -8169,8 +8413,11 @@ public void OnEntityDestroyed(int entity)
 				StopSound(iTank, SNDCHAN_STATIC, "^mvm/mvm_tank_loop.wav");
 			}
 
-			if(GetEntPropEnt(iTank, Prop_Send, "moveparent") == entity)
+			if(GetEntPropEnt(iTank, Prop_Send, "moveparent") == entity || (g_bAlternateParenting[iTeam] && entity == EntRefToEntIndex(g_iRefTrackTrain2[iTeam])))
 			{
+				//Unparent the tank
+				Tank_UnParent(iTeam);
+				
 				// Give the tank godmode to prevent it from being destroyed by players at this point
 				SetEntProp(iTank, Prop_Data, "m_takedamage", DAMAGE_EVENTS_ONLY); // Buddah
 
@@ -8300,9 +8547,7 @@ public void OnEntityDestroyed(int entity)
 						}
 					}
 				}else{
-					AcceptEntityInput(iTank, "ClearParent");
-					SetEntityMoveType(iTank, MOVETYPE_CUSTOM);
-
+					
 					GetEntPropVector(iTank, Prop_Send, "m_vecOrigin", g_flTankTempPos[iTeam]);
 					GetEntPropVector(iTank, Prop_Send, "m_angRotation", g_flTankTempAng[iTeam]);
 					
@@ -14293,13 +14538,13 @@ void Parent_Think(int tank, int team, float distanceToGoal, float distanceParent
 				if(array[ParentArray_Type] == ParentType_Start)
 				{
 					// The tank needs to be parented.
-					if(GetEntPropEnt(tank, Prop_Send, "moveparent") == -1) // Check to make sure we aren't already parented.
+					if(GetEntPropEnt(tank, Prop_Send, "moveparent") == -1 && !g_bAlternateParenting[team]) // Check to make sure we aren't already parented.
 					{
 						Tank_Parent(team);
 					}
 				}else{
 					// The tank needs to be un-parented.
-					if(GetEntPropEnt(tank, Prop_Send, "moveparent") > MaxClients) // Check to make sure we aren't already parented.
+					if(GetEntPropEnt(tank, Prop_Send, "moveparent") > MaxClients || g_bAlternateParenting[team]) // Check to make sure we aren't already parented.
 					{
 						Tank_UnParent(team);
 					}

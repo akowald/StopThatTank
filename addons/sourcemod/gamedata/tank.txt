@@ -316,6 +316,11 @@
 				"linux"		"19"
 				"windows"	"18"
 			}
+			"CBaseEntity::MyNextBotPointer"
+			{
+				"windows" 	"72"
+				"linux" 	"73"
+			}
 			"CBaseEntity::PhysicsSolidMaskForEntity"
 			{
 				"linux"		"168"
@@ -350,6 +355,21 @@
 			{
 				"linux"		"247"
 				"windows"	"241"
+			}
+			"INextBot::GetLocomotionInterface"
+			{
+				"linux"		"49"
+				"windows"	"48"
+			}
+			"ILocomotion::FaceTowards"
+			{
+				"linux"		"74"
+				"windows"	"73"
+			}
+			"NextBotGroundLocomotion::GetGravity"
+			{
+				"linux"		"106"
+				"windows"	"105"
 			}
 			"CAttributeManager::OnAttributeValuesChanged"
 			{
