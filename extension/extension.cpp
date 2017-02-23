@@ -46,7 +46,7 @@ IForward *g_pForwardUberEffects = NULL;
 IForward *g_pForwardIsChaseable = NULL;
 IForward *g_pForwardCalcSpeed = NULL;
 
-void *g_addr_GetItemSchema = NULL;
+void *g_addr_ItemSystem = NULL;
 void *g_addr_GetAttributeDefinition = NULL;
 void *g_addr_SetRuntimeAttributeValue = NULL;
 void *g_addr_RemoveAttribute = NULL;
@@ -57,6 +57,7 @@ int g_vtbl_ClearCache = 0;
 int g_offsetPlayerShared = 0;
 
 void *g_pCTFGameStats = NULL;
+CEconItemSchema *g_pItemSchema = NULL;
 
 bool g_bShouldTransmitReady = false;
 
@@ -374,11 +375,16 @@ int FindEntityOffset(CBaseEntity *pEntity, const char *strOffset)
 
 CEconItemSchema *TF2_GetItemSchema()
 {
+	if(g_pItemSchema != NULL)
+	{
+		return g_pItemSchema;
+	}
+
 #if defined DEBUG
 	g_pSM->LogMessage(myself, " > TF2_GetItemSchema..");
 #endif
 
-	if(!g_pBinTools || !g_addr_GetItemSchema)
+	if(!g_pBinTools || !g_addr_ItemSystem)
 	{
 		g_pSM->LogMessage(myself, "Failed to call TF2_GetItemSchema!");
 		return NULL;
@@ -386,7 +392,7 @@ CEconItemSchema *TF2_GetItemSchema()
 
 	static ICallWrapper *pWrapper = NULL;
 
-	// CEconItemSchema *GetItemSchema(void) 
+	// CEconItemSystem *ItemSystem(void) 
 	if (!pWrapper)
 	{
 		PassInfo ret;
@@ -394,17 +400,19 @@ CEconItemSchema *TF2_GetItemSchema()
 		ret.size = sizeof(CEconItemSchema *);
 		ret.type = PassType_Basic;
 		
-		pWrapper = g_pBinTools->CreateCall(g_addr_GetItemSchema, CallConv_Cdecl, &ret, NULL, 0);
+		pWrapper = g_pBinTools->CreateCall(g_addr_ItemSystem, CallConv_Cdecl, &ret, NULL, 0);
 	}
 
 	unsigned char vstk[sizeof(void *)];
 	unsigned char *vptr = vstk;
 
-	*(void **)vptr = g_addr_GetItemSchema;
+	*(void **)vptr = g_addr_ItemSystem;
 
 	CEconItemSchema *pItemSchema;
-
 	pWrapper->Execute(vstk, &pItemSchema);
+	pItemSchema = reinterpret_cast<CEconItemSchema *>((uint8_t *)pItemSchema + 4);
+
+	g_pItemSchema = pItemSchema;
 
 	return pItemSchema;
 }
@@ -1045,7 +1053,7 @@ bool Tank::SDK_OnLoad(char *error, size_t maxlength, bool late)
 		isChaseableDetour->EnableDetour();
 	}
 
-	LookupSignature("GetItemSchema", &g_addr_GetItemSchema);
+	LookupSignature("ItemSystem", &g_addr_ItemSystem);
 	LookupSignature("CEconItemSchema::GetAttributeDefinition", &g_addr_GetAttributeDefinition);
 	LookupSignature("CEconItemSchema::GetAttributeDefinitionByName", &g_addr_GetAttributeDefinitionByName);
 	LookupSignature("CAttributeList::SetRuntimeAttributeValue", &g_addr_SetRuntimeAttributeValue);

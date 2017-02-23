@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2016 Alex Kowald
+ * Copyright (C) 2014-2017 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -667,41 +667,29 @@ float Giant_GetModelScale(int templateIndex)
 
 float Giant_GetScaleForPlayers(int team)
 {
-	/* Calculate the scale for the giant's health based on this table:
-		1-2: 15%
-		3-4: 35%
-		5-6: 50%
-		7-8: 75%
-		9-10: 85%
-		11-12: 100%
-		13-14: 115%
-		15-16: 135%
-	*/
-	int iNumPlayers = CountPlayersOnTeam(team);
-	float result = 1.35; // 15-16 players
+	int numPlayers = CountPlayersOnTeam(team);
+	
+	// Lookup the scale for the giant's health.
+	float result = 1.33; // 16+ players
+	float scale[] = { 
+		0.1, 0.1,	// 0-1
+		0.15, 		// 2
+		0.25,		// 3
+		0.33,		// 4
+		0.42,		// 5
+		0.5,		// 6
+		0.6,		// 7
+		0.66,		// 8
+		0.75,		// 9
+		0.85,		// 10
+		0.92,		// 11
+		1.0,		// 12
+		1.1,		// 13
+		1.15,		// 14
+		1.25,		// 15
+	};
 
-	if(iNumPlayers <= 2)
-	{
-		result = 0.15;
-	}else if(iNumPlayers <= 4)
-	{
-		result = 0.35;
-	}else if(iNumPlayers <= 6)
-	{
-		result = 0.5;
-	}else if(iNumPlayers <= 8)
-	{
-		result = 0.65;
-	}else if(iNumPlayers <= 10)
-	{
-		result = 0.85;
-	}else if(iNumPlayers <= 12)
-	{
-		result = 1.0;
-	}else if(iNumPlayers <= 14)
-	{
-		result = 1.15;
-	}
+	if(numPlayers >= 0 && numPlayers < sizeof(scale)) result = scale[numPlayers];
 
 	// The minimum scale amount will be enforced in plr_
 	if(g_nGameMode == GameMode_Race && result < config.LookupFloat(g_hCvarRaceGiantHealthMin)) result = config.LookupFloat(g_hCvarRaceGiantHealthMin);

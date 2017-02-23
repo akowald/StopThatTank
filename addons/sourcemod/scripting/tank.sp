@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2016 Alex Kowald
+ * Copyright (C) 2014-2017 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -1059,15 +1059,15 @@ public void OnPluginStart()
 	g_hCvarCheckpointCutoff = CreateConVar("tank_checkpoint_cutoff", "0.75", "Percentage of tank max health where checkpoint healing stops.");
 	g_hCvarTeleBuildMult = CreateConVar("tank_teleporter_build_mult", "1.85", "Increased teleporter build multiplier for the BLU team in pl and ALL teams in plr. (Set to a negative number to disable.)");
 	g_hCvarBisonBoostSpeed = CreateConVar("tank_bisonboost_speed", "1.45", "Scale amount for the velocity of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
-	g_hCvarBisonBoostDamage = CreateConVar("tank_bisonboost_damage", "1.6", "Scale amount for the damage of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
-	g_hCvarBisonBoostScale = CreateConVar("tank_bisonboost_scale", "2.0", "Model scale amount of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
+	g_hCvarBisonBoostDamage = CreateConVar("tank_bisonboost_damage", "1.85", "Scale amount for the damage of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
+	g_hCvarBisonBoostScale = CreateConVar("tank_bisonboost_scale", "3.0", "Model scale amount of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
 	g_hCvarBossHealthMultHHH = CreateConVar("tank_boss_health_hhh", "0.65", "Max health modifier for Horseless Headless Horsemann.");
 	g_hCvarBossHealthMultMono = CreateConVar("tank_boss_health_mono", "0.4", "Max health modifier for Monoculus.");
 	g_hCvarBossHealthMultMerasmus = CreateConVar("tank_boss_health_merasmus", "0.2", "Max health modifier for Merasmus.");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
-	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "4.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
-	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "9.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
+	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "7.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
+	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "11.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.6", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
@@ -1114,7 +1114,7 @@ public void OnPluginStart()
 	g_hCvarTeleportUber = CreateConVar("tank_teleport_uber", "1.0", "Seconds of uber when a player uses a giant engineer's teleporter.");
 	g_hCvarTimeTip = CreateConVar("tank_time_tip", "220", "Seconds in between chat tips. Anything less than 0 disables chat tips.");
 
-	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "35", "Time (in seconds) that it takes for a dropped bomb to expire.");
+	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "20", "Time (in seconds) that it takes for a dropped bomb to expire.");
 	g_hCvarBombRoundTime = CreateConVar("tank_bomb_round_time", "2.5", "Timelimit (in minutes) that the robots are under to deliever the bomb.");
 	g_hCvarBombDroppedMaxTime = CreateConVar("tank_bomb_dropped_maxtime", "-1.0", "Maximum round time (in minutes) when the bomb is dropped in payload. (Set to -1.0 to disable.)");
 	g_hCvarBombDistanceWarn = CreateConVar("tank_bomb_distance_warn", "650.0", "Distance the bomb must be from the goal for warnings to sound.");
@@ -1127,7 +1127,7 @@ public void OnPluginStart()
 	g_hCvarBombHealDuration = CreateConVar("tank_bomb_heal_duration", "3.0", "Time (seconds) duration of heal effect when a normal robot picks up the bomb.");
 	g_hCvarBombMiniCritsDuration = CreateConVar("tank_bomb_minicrits_duration", "-1.0", "Time (seconds) duration of minicrits when a normal robot picks up the bomb.");
 	g_hCvarBombHealCooldown = CreateConVar("tank_bomb_heal_cooldown", "10.0", "Time (seconds) between dropping the bomb and picking it up that heal effects are granted.");
-	g_hCvarBombBuffsCutoff = CreateConVar("tank_bomb_buffs_cutoff", "5", "Minimum player count required for bomb carrier buffs to be activated.");
+	g_hCvarBombBuffsCutoff = CreateConVar("tank_bomb_buffs_cutoff", "6", "Minimum player count required for bomb carrier buffs to be activated.");
 	g_hCvarBombWinSpeed = CreateConVar("tank_bomb_win_speed", "500.0", "Speed of the payload cart when the robots deploy the bomb, winning the round.");
 	g_hCvarBombSkipDistance = CreateConVar("tank_bomb_skip_distance", "500.0", "Distance you must be to a locked control point to trigger the skipped annotation.");
 	g_hCvarBombDeployPosition = CreateConVar("tank_bomb_deploy_position", "", "x y z position of where the the bomb is deploy. This will override the position of the goal path_track. (delimited by spaces) (leave blank to use path_track)");
@@ -6496,7 +6496,7 @@ void Tank_SetStartingPathTrack(int tank, const char[] pathName)
 		return;
 	}
 	
-	if(tank > MaxClients)
+	if(tank > MaxClients && g_hSDKSetStartingPath != INVALID_HANDLE)
 	{
 #if defined DEBUG
 		PrintToServer("(Tank_SetStartingPathTrack) Setting next path on tank to: \"%s\"..", pathName);
@@ -12998,7 +12998,7 @@ void Stats_Reset()
 void Tank_PrintLicense()
 {
 	PrintToServer("======================================================");
-	PrintToServer("Stop that Tank!  Copyright (C) 2014-2016  Alex Kowald");
+	PrintToServer("Stop that Tank!  Copyright (C) 2014-2017  Alex Kowald");
 	PrintToServer("This program comes with ABSOLUTELY NO WARRANTY.");
 	PrintToServer("This is free software, and you are welcome to");
 	PrintToServer("redistribute it under certain conditions.");

@@ -28,17 +28,17 @@
 				"linux"		"@_ZN11CBaseEntity7SetSizeERK6VectorS2_"
 				"windows"	"\x55\x8B\xEC\xFF\x75\x0C\xFF\x75\x08\x51\xE8\x2A\x2A\x2A\x2A\x83\xC4\x2A\x5D\xC2\x08\x00"
 			}
-			"GetItemSchema"
+			"ItemSystem"
 			{
 				"library"	"server"
-				"linux"		"@_Z13GetItemSchemav"
+				"linux"		"@_Z10ItemSystemv"
 				"windows"	"\xA1\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\x56\x68\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x8B\xF0\x83\xC4\x04"
 			}
 			"CEconItemSchema::GetAttributeDefinition"
 			{
 				"library"	"server"
 				"linux"		"@_ZN15CEconItemSchema22GetAttributeDefinitionEi"
-				"windows"	"\x55\x8B\xEC\x83\xEC\x2A\x53\x56\x8B\xD9\x8D\x4D\x2A\x57\xE8\x2A\x2A\x2A\x2A\x8B\x45\x08\x8D\x8B"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x48\x53\x56\x8B\xD9\x8D\x4D\xBC\x57\xE8\x2A\x2A\x2A\x2A\x8B\x45\x08\x8D\x8B"
 			}
 			"CEconItemSchema::GetAttributeDefinitionByName"
 			{
@@ -50,7 +50,7 @@
 			{
 				"library"	"server"
 				"linux"		"@_ZN14CAttributeList24SetRuntimeAttributeValueEPK28CEconItemAttributeDefinitionf"
-				"windows"	"\x55\x8B\xEC\x83\xEC\x2A\x33\xD2\x53\x8B\xD9\x56\x57\x8B\x73\x2A\x85\xF6\x7E\x2A\x8B\x4D"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x10\x33\xC0\x53\x8B\xD9\x56\x57\x8B\x7D\x08\x8B\x53\x10\x85\xD2\x7E\x2A\x8B\x4B\x04"
 			}
 			"CAttributeList::RemoveAttribute"
 			{
@@ -80,7 +80,7 @@
 			{
 				"library"	"server"
 				"linux"		"@_ZN9CTFPlayer10GetMaxAmmoEii"
-				"windows"	"\x55\x8B\xEC\x8B\x45\x0C\x56\x57\x8B\xF9\x83\xF8\xFF\x75\x2A\xFF\xB7"
+				"windows"	"\x55\x8B\xEC\x8B\x45\x0C\x53\x8B\xD9\x56\x57\x83\xF8\xFF\x75\x2A\xFF\xB3\x2A\x2A\x2A\x2A\xEB\x2A\x50\xE8"
 			}
 			"CBaseTrigger::PointIsWithin"
 			{
@@ -110,7 +110,7 @@
 			{
 				"library"	"server"
 				"linux"		"@_ZN15CTFPlayerShared4HealEP11CBaseEntityfffbP9CTFPlayer"
-				"windows"	"\x55\x8B\xEC\x83\xEC\x28\xF3\x0F\x10\x05\x2A\x2A\x2A\x2A\x53\x56\x8B\x75"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x28\x53\x56\x8B\x75\x08\x0F\x57\xC0\x57\x56\x8B\xF9"
 			}
 			"CTFPlayerShared::FindHealerIndex"
 			{
@@ -140,7 +140,7 @@
 			{
 				"library"	"server"
 				"linux"		"@_ZN16CTFDroppedWeapon6CreateEP9CTFPlayerRK6VectorRK6QAnglePKcPK13CEconItemView"
-				"windows"	"\x55\x8B\xEC\xA1\x2A\x2A\x2A\x2A\x83\xEC\x08\x80\xB8\x2A\x2A\x2A\x2A\x00\x74\x2A\x33\xC0\x8B\xE5\x5D\xC3"
+				"windows"	"\x55\x8B\xEC\x51\xA1\x2A\x2A\x2A\x2A\x80\xB8\x2A\x2A\x2A\x2A\x00\x74\x2A\x33\xC0\x8B\xE5\x5D\xC3"
 			}
 			"CTFPlayer::PickupWeaponFromOther"
 			{
@@ -341,15 +341,15 @@
 				"linux"		"410"
 				"windows"	"396"
 			}
-			"CTFWeaponBase::GetMaxClip1"
-			{
-				"linux"		"322"
-				"windows"	"316"
-			}
 			"CTFWeaponBase::SendWeaponAnim"
 			{
 				"linux"		"247"
 				"windows"	"241"
+			}
+			"CTFWeaponBase::GetMaxClip1"
+			{
+				"linux"		"322"
+				"windows"	"316"
 			}
 			"CAttributeManager::OnAttributeValuesChanged"
 			{
