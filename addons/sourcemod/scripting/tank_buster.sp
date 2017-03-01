@@ -488,7 +488,7 @@ int Buster_GetNumActiveSentries(int team)
 				if(builder >= 1 && builder <= MaxClients && IsClientInGame(builder) && GetClientTeam(builder) == sentryTeam)
 				{
 					// As of the Gun Mettle, mini-sentries will not activate sentry busters.
-					if(!GetEntProp(sentry, Prop_Send, "m_bMiniBuilding") || GetEntProp(builder, Prop_Send, "m_bIsMiniBoss"))
+					if(GetEntProp(sentry, Prop_Send, "m_iUpgradeLevel") > 1 || GetEntProp(builder, Prop_Send, "m_bIsMiniBoss"))
 					{
 						iNumSentries++;
 					}
