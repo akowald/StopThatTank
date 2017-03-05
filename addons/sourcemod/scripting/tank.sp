@@ -4826,27 +4826,30 @@ public Action Tank_OnTakeDamage(int victim, int &attacker, int &inflictor, float
 		//PrintToServer("(Tank_OnTakeDamage) Victim: %d Attacker: %d Inflictor: %d Damage: %0.2f Type: %d", victim, attacker, inflictor, damage, damagetype);
 		//for(int i=0; i<30; i++) if(damagetype & (1 << i)) PrintToServer("Damagetype: %d", i);
 		
-		// Keep track of sentry damage to the tank
+		// Keep track of sentry damage to the tank. Only damage from level 2 and above or Giant sentry is counted.
 		if(inflictor > MaxClients)
 		{
 			char strInflictor[32];
 			GetEdictClassname(inflictor, strInflictor, sizeof(strInflictor));
 			//PrintToServer("inflictor: \"%s\"", strInflictor);
-			if(strcmp(strInflictor, "obj_sentrygun") == 0 || strcmp(strInflictor, "tf_projectile_sentryrocket") == 0)
+			bool countDamage = false;
+			if(strcmp(strInflictor, "tf_projectile_sentryrocket") == 0)
 			{
-				bool countDamage = true;
-				// Mini-sentry damage to tanks will no longer activate a sentry buster unless it is a giant's mini-sentry.
-				if(strcmp(strInflictor, "obj_sentrygun") == 0 && GetEntProp(inflictor, Prop_Send, "m_bMiniBuilding"))
+				countDamage = true;
+			}else if(strcmp(strInflictor, "obj_sentrygun") == 0)
+			{
+				if(GetEntProp(inflictor, Prop_Send, "m_iUpgradeLevel") > 1)
 				{
+					countDamage = true;
+				}else{
 					int builder = GetEntPropEnt(inflictor, Prop_Send, "m_hBuilder");
-					if(builder >= 1 && builder <= MaxClients && IsClientInGame(builder) && !GetEntProp(builder, Prop_Send, "m_bIsMiniBoss"))
+					if(builder >= 1 && builder <= MaxClients && IsClientInGame(builder) && GetEntProp(builder, Prop_Send, "m_bIsMiniBoss"))
 					{
-						countDamage = false;
+						countDamage = true;
 					}
 				}
-
-				if(countDamage) g_bTakingSentryDamage = true;
 			}
+			if(countDamage) g_bTakingSentryDamage = true;
 		}
 
 		if(weapon > MaxClients)
@@ -5077,25 +5080,28 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 
 		if(attacker >= 1 && attacker <= MaxClients && victim != attacker && GetClientTeam(victim) != GetClientTeam(attacker))
 		{
-			// Only track sentry damage to giant players.
+			// Track sentry damage done to the Giant. Only damage from level 2 and above or from a Giant's sentry is counted.
 			if(inflictor > MaxClients)
 			{
 				//PrintToServer("inflictor: \"%s\"", inflictorClass);
-				if(strcmp(inflictorClass, "obj_sentrygun") == 0 || strcmp(inflictorClass, "tf_projectile_sentryrocket") == 0)
+				bool countDamage = false;
+				if(strcmp(inflictorClass, "tf_projectile_sentryrocket") == 0)
 				{
-					bool countDamage = true;
-					// Mini-sentry damage to tanks will no longer activate a sentry buster unless it is a giant's mini-sentry.
-					if(strcmp(inflictorClass, "obj_sentrygun") == 0 && GetEntProp(inflictor, Prop_Send, "m_bMiniBuilding"))
+					countDamage = true;
+				}else if(strcmp(inflictorClass, "obj_sentrygun") == 0)
+				{
+					if(GetEntProp(inflictor, Prop_Send, "m_iUpgradeLevel") > 1)
 					{
+						countDamage = true;
+					}else{
 						int builder = GetEntPropEnt(inflictor, Prop_Send, "m_hBuilder");
-						if(builder >= 1 && builder <= MaxClients && IsClientInGame(builder) && !GetEntProp(builder, Prop_Send, "m_bIsMiniBoss"))
+						if(builder >= 1 && builder <= MaxClients && IsClientInGame(builder) && GetEntProp(builder, Prop_Send, "m_bIsMiniBoss"))
 						{
-							countDamage = false;
+							countDamage = true;
 						}
 					}
-
-					if(countDamage) g_bTakingSentryDamage = true;
 				}
+				if(countDamage) g_bTakingSentryDamage = true;
 			}
 
 			if(Spawner_HasGiantTag(attacker, GIANTTAG_SENTRYBUSTER) && GetEntProp(attacker, Prop_Send, "m_bIsMiniBoss"))
@@ -8667,6 +8673,10 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 			Giant_Clear(iVictim, GiantCleared_Death);
 		}
 
+		char inflictorClass[32];
+		int inflictor = GetEventInt(hEvent, "inflictor_entindex");
+		if(IsValidEntity(inflictor)) GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
+
 		// If the player died from a trigger_hurt and was carrying the bomb, we need to return the bomb back
 		if(g_nGameMode == GameMode_BombDeploy && GetEventInt(hEvent, "customkill") == TF_CUSTOM_TRIGGER_HURT)
 		{
@@ -8674,10 +8684,9 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 			int iBombFlag = EntRefToEntIndex(g_iRefBombFlag);
 			if(iBombFlag > MaxClients && GetEntPropEnt(iBombFlag, Prop_Send, "moveparent") == iVictim)
 			{
-				int iTriggerHurt = GetEventInt(hEvent, "inflictor_entindex");
-				if(iTriggerHurt > MaxClients && IsValidEntity(iTriggerHurt))
+				if(inflictor > MaxClients && strcmp(inflictorClass, "trigger_hurt") == 0)
 				{
-					if(!GetEntProp(iTriggerHurt, Prop_Data, "m_bDisabled") && GetEntPropFloat(iTriggerHurt, Prop_Data, "m_flDamage") > 300.0)
+					if(!GetEntProp(inflictor, Prop_Data, "m_bDisabled") && GetEntPropFloat(inflictor, Prop_Data, "m_flDamage") > 300.0)
 					{
 #if defined DEBUG
 						PrintToServer("(Event_PlayerDeath) %N fell/died with the bomb from a trigger_hurt!", iVictim);
@@ -8712,17 +8721,25 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 
 			if(teamVictim != GetClientTeam(iAttacker))
 			{
-				//PrintToServer("Weapon: \"%s\"", strWeapon);
-				if(strcmp(strWeapon, "wrangler_kill") == 0 || strncmp(strWeapon, "obj_sentrygun", 13) == 0 || strcmp(strWeapon, "obj_minisentry") == 0)
+				//PrintToServer("Weapon: \"%s\" inflictor: \"%s\"", strWeapon, inflictorClass);
+				bool robotKill = false;
+				if(strcmp(inflictorClass, "tf_projectile_sentryrocket") == 0)
 				{
-					// Mini-sentries should not activate a sentry buster unless it is a giant's mini-sentry.
-					if(strcmp(strWeapon, "obj_minisentry") != 0 || GetEntProp(iAttacker, Prop_Send, "m_bIsMiniBoss"))
+					robotKill = true;
+				}else if(inflictor > MaxClients && strcmp(inflictorClass, "obj_sentrygun") == 0)
+				{
+					// Sentries level two and above or built by a Giant should increment the buster robot kills trigger.
+					if(GetEntProp(inflictor, Prop_Send, "m_iUpgradeLevel") > 1 || GetEntProp(iAttacker, Prop_Send, "m_bIsMiniBoss"))
 					{
-						Buster_IncrementStat(BusterStat_Robots, teamVictim, 1);
+						robotKill = true;
 					}
 				}
+				if(robotKill)
+				{
+					Buster_IncrementStat(BusterStat_Robots, teamVictim, 1);
+				}
 
-				// Play a voiceline when a human player kills a giant in pl_
+				// Play a voiceline when a human player kills a giant in pl_.
 				if(giantWasVictim && g_nGameMode != GameMode_Race && teamVictim == TFTeam_Blue && IsPlayerAlive(iAttacker))
 				{
 					switch(TF2_GetPlayerClass(iAttacker))
@@ -8860,7 +8877,7 @@ public void Event_TankHurt(Handle hEvent, const char[] strEventName, bool bDontB
 			}
 
 			g_iDamageStatsTank[iAttacker][team] += iDamage; // stats for tank mvp
-			g_iDamageAccul[iAttacker][team] += iDamage; // acculmulated damage for extra points
+			g_iDamageAccul[iAttacker][team] += iDamage; // accumulated damage for extra points
 			g_iRaceTankDamage[team] += iDamage; // damage to calculate tank speed in plr_
 
 			// Check accumulated points to see if the player has earned some scoreboard points
