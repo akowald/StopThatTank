@@ -467,6 +467,7 @@ Handle g_hCvarBossHealthMultMono;
 Handle g_hCvarBossHealthMultMerasmus;
 Handle g_hCvarGiantHHHCooldown;
 Handle g_hCvarGiantHHHBlockStun;
+Handle g_hCvarGiantHuntsmanDamageMult;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -1151,6 +1152,7 @@ public void OnPluginStart()
 	g_hCvarGiantHandScale = CreateConVar("tank_giant_hand_scale", "1.9", "Giant hand scale to use when the special giant tag is set.");
 	g_hCvarGiantHHHCooldown = CreateConVar("tank_giant_hhh_cooldown", "15.0", "Time after taking damage from the HHH before the giant can be chased again.");
 	g_hCvarGiantHHHBlockStun = CreateConVar("tank_giant_hhh_block_stun", "0", "0/1 - Enable or disable ghost scare stun on giants.");
+	g_hCvarGiantHuntsmanDamageMult = CreateConVar("tank_giant_huntsman_damage_mult", "1.5", "Damage multipler for the Giant's huntsman. (Set to -1.0 to disable.)");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -4897,6 +4899,9 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 	char inflictorClass[32];
 	if(inflictor >= 0) GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
 
+	char weaponClass[32];
+	if(weapon >= 0) GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
+
 	bool overrideReturn = false;
 
 	if(attacker >= 1 && attacker <= MaxClients && g_nSpawner[attacker][g_bSpawnerEnabled] && g_nSpawner[attacker][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(attacker, Prop_Send, "m_bIsMiniBoss"))
@@ -4994,6 +4999,20 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 				}
 			}
 		}
+
+		if(weapon > MaxClients && strcmp(weaponClass, "tf_weapon_compound_bow") == 0 && victim != attacker && victim >= 1 && victim <= MaxClients && IsClientInGame(victim))
+		{
+			float value = config.LookupFloat(g_hCvarGiantHuntsmanDamageMult);
+			if(value > 0.0)
+			{
+#if defined DEBUG
+				PrintToServer("(Player_OnTakeDamage) Boosting Giant %N's damage from %1.2f to %1.2f..", attacker, damage, damage * value);
+#endif
+				damage *= value;
+				overrideReturn = true;
+			}
+		}
+
 	}
 
 	if(victim >= 1 && victim <= MaxClients && g_nSpawner[victim][g_bSpawnerEnabled] && g_nSpawner[victim][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(victim, Prop_Send, "m_bIsMiniBoss"))
@@ -5117,9 +5136,6 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 			if(weapon > MaxClients)
 			{
 				// Note: that the weapon param may not be a weapon, such is the case of monoculus's rockets
-				char weaponClass[32];
-				GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
-
 				if(damagecustom == TF_CUSTOM_BACKSTAB && damagetype & DMG_CRIT && strcmp(weaponClass, "tf_weapon_knife") == 0)
 				{
 					// Someone just backstabbed the giant so set a custom damage and apply a less severe force
