@@ -123,6 +123,7 @@
 #define MAX_EDICTS				2048
 #define ENTITY_LIMIT_BUFFER 	20
 #define MAD_MILK_HEALTH 		8
+#define TF_PROJECTILE_BOWARROW	8
 
 #define ITEM_BAZOOKA 730
 #define ITEM_DEAD_RINGER 59
@@ -680,6 +681,7 @@ int g_iOffset_m_tauntProp;
 int g_iOffset_m_bCapBlocked;
 int g_offset_m_bPlayingHybrid_CTF_CP;
 int g_offset_m_medicRegenMult;
+int g_offset_m_arrowDamage;
 
 int g_iNumTankMaxSimulated;
 
@@ -1152,7 +1154,7 @@ public void OnPluginStart()
 	g_hCvarGiantHandScale = CreateConVar("tank_giant_hand_scale", "1.9", "Giant hand scale to use when the special giant tag is set.");
 	g_hCvarGiantHHHCooldown = CreateConVar("tank_giant_hhh_cooldown", "15.0", "Time after taking damage from the HHH before the giant can be chased again.");
 	g_hCvarGiantHHHBlockStun = CreateConVar("tank_giant_hhh_block_stun", "0", "0/1 - Enable or disable ghost scare stun on giants.");
-	g_hCvarGiantHuntsmanDamageMult = CreateConVar("tank_giant_huntsman_damage_mult", "1.5", "Damage multipler for the Giant's huntsman. (Set to -1.0 to disable.)");
+	g_hCvarGiantHuntsmanDamageMult = CreateConVar("tank_giant_huntsman_damage_mult", "1.584", "Damage multipler for the Giant's huntsman. (Set to -1.0 to disable.)");
 
 	g_hCvarRageBase = CreateConVar("tank_rage_base", "45.0", "Time (seconds) that the giant has to do damage before they expire.");
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
@@ -1352,6 +1354,10 @@ public void OnPluginStart()
 	if(LookupOffset(g_offset_m_medicRegenMult, "CTFPlayer", "m_iSpawnCounter"))
 	{
 		g_offset_m_medicRegenMult += 52; // This offset keeps medic health regen at a constant rate.
+	}
+	if(LookupOffset(g_offset_m_arrowDamage, "CTFProjectile_Arrow", "m_iDeflected"))
+	{
+		g_offset_m_arrowDamage += 4; // This offset stores the arrow's damage.
 	}
 
 	LoadTranslations("common.phrases");
@@ -4999,20 +5005,6 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 				}
 			}
 		}
-
-		if(weapon > MaxClients && strcmp(weaponClass, "tf_weapon_compound_bow") == 0 && victim != attacker && victim >= 1 && victim <= MaxClients && IsClientInGame(victim))
-		{
-			float value = config.LookupFloat(g_hCvarGiantHuntsmanDamageMult);
-			if(value > 0.0)
-			{
-#if defined DEBUG
-				PrintToServer("(Player_OnTakeDamage) Boosting Giant %N's damage from %1.2f to %1.2f..", attacker, damage, damage * value);
-#endif
-				damage *= value;
-				overrideReturn = true;
-			}
-		}
-
 	}
 
 	if(victim >= 1 && victim <= MaxClients && g_nSpawner[victim][g_bSpawnerEnabled] && g_nSpawner[victim][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(victim, Prop_Send, "m_bIsMiniBoss"))
@@ -8568,7 +8560,7 @@ void CritCash_RemoveEffects()
 	}
 }
 
-public Action CritCash_OnSpawnPost(int entity)
+public void CritCash_OnSpawnPost(int entity)
 {
 	// After the 2015 Halloween update, currency packs will not spawn if there's no nav mesh. This allows Crit Cash to spawn on maps without a nav mesh!
 	SetEntProp(entity, Prop_Send, "m_bDistributed", true);
@@ -9412,8 +9404,10 @@ public void OnEntityCreated(int iEntity, const char[] classname)
 		SDKHook(iEntity, SDKHook_Touch, SandmanBall_OnTouch);
 	}else if(strcmp(classname, "tf_projectile_arrow") == 0)
 	{
-		// Fixes for the arrow penetration attribute
+		// Fixes for the arrow penetration attribute.
 		SDKHook(iEntity, SDKHook_Touch, Arrow_OnTouch);
+		// Boosts the damage of the Giant Rapid Fire Huntsman's arrows.
+		RequestFrame(NextFrame_ArrowSpawn, EntIndexToEntRef(iEntity));
 	}else if(strcmp(classname, "tf_projectile_healing_bolt") == 0 || strcmp(classname, "tf_projectile_rocket") == 0 || strcmp(classname, "tf_projectile_syringe") == 0)
 	{
 		// Fix these projectiles from colliding with revive markers.
@@ -9466,6 +9460,32 @@ public void NextFrame_BisonProj(int ref)
 				SetVariantString(scale);
 				AcceptEntityInput(proj, "SetModelScale");
 			}
+		}
+	}
+}
+
+public void NextFrame_ArrowSpawn(int ref)
+{
+	if(g_offset_m_arrowDamage <= 0) return;
+	int arrow = EntRefToEntIndex(ref);
+	if(arrow <= MaxClients) return;
+	if(GetEntProp(arrow, Prop_Send, "m_iProjectileType") != TF_PROJECTILE_BOWARROW) return;
+
+	int weapon =  GetEntPropEnt(arrow, Prop_Send, "m_hOriginalLauncher");
+	if(weapon <= MaxClients) return;
+
+	int client = GetEntPropEnt(weapon, Prop_Send, "m_hOwner");
+	if(client >= 1 && client <= MaxClients && Spawner_HasGiantTag(client, GIANTTAG_HUNTSMAN_BOOST) && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+	{
+		float value = config.LookupFloat(g_hCvarGiantHuntsmanDamageMult);
+		if(value > 0.0)
+		{
+			float damage = GetEntDataFloat(arrow, g_offset_m_arrowDamage);
+#if defined DEBUG
+			PrintToServer("(NextFrame_ArrowSpawn) Boosting arrow damage dealt by %N from %1.3f to %1.3f..", client, damage, value * damage);
+#endif
+			damage *= value;
+			SetEntDataFloat(arrow, g_offset_m_arrowDamage, damage);
 		}
 	}
 }
