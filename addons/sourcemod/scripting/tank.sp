@@ -1117,12 +1117,12 @@ public void OnPluginStart()
 	g_hCvarTeleportUber = CreateConVar("tank_teleport_uber", "1.0", "Seconds of uber when a player uses a giant engineer's teleporter.");
 	g_hCvarTimeTip = CreateConVar("tank_time_tip", "220", "Seconds in between chat tips. Anything less than 0 disables chat tips.");
 
-	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "20", "Time (in seconds) that it takes for a dropped bomb to expire.");
+	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "10", "Time (in seconds) that it takes for a dropped bomb to expire.");
 	g_hCvarBombRoundTime = CreateConVar("tank_bomb_round_time", "2.5", "Timelimit (in minutes) that the robots are under to deliever the bomb.");
 	g_hCvarBombDroppedMaxTime = CreateConVar("tank_bomb_dropped_maxtime", "-1.0", "Maximum round time (in minutes) when the bomb is dropped in payload. (Set to -1.0 to disable.)");
 	g_hCvarBombDistanceWarn = CreateConVar("tank_bomb_distance_warn", "650.0", "Distance the bomb must be from the goal for warnings to sound.");
 	g_hCvarBombTimeDeploy = CreateConVar("tank_bomb_time_deploy", "1.9", "Seconds that it takes for a robot to deploy a bomb.");
-	g_hCvarBombMoveSpeed = CreateConVar("tank_bomb_move_speed", "0.8", "Move speed bonus for normal bomb carriers. (percentage)");
+	g_hCvarBombMoveSpeed = CreateConVar("tank_bomb_move_speed", "0.9", "Move speed bonus for normal bomb carriers. (percentage)");
 	g_hCvarBombCapAreaSize = CreateConVar("tank_bomb_capture_size", "-175.0 -175.0 -50.0 175.0 175.0 125.0", "Define the bomb capture area size. First 3 numbers are the x,y,z mins. Last 3 numbers are the x,y,z maxs. Delimited by space.");
 	g_hCvarBombCaptureRate = CreateConVar("tank_bomb_capture_rate", "2.9", "Capture rate for robots to capture a control point with the bomb.");
 	g_hCvarBombTimeAdd = CreateConVar("tank_bomb_time_add", "60", "Time (seconds) added when a robot captures a control point with the bomb.");
@@ -1189,13 +1189,13 @@ public void OnPluginStart()
 	g_hCvarBusterTriggerGiantPlr = CreateConVar("tank_buster_trigger_giant_plr", "1500", "A sentry buster can spawn when this damage is dealt to the giant by a sentry in plr_ maps.");
 	g_hCvarBusterTriggerRobotsPlr = CreateConVar("tank_buster_trigger_robot_plr", "5", "A sentry buster can spawn after the specified robot kills in plr_ maps.");
 	g_hCvarBusterTimePause = CreateConVar("tank_buster_time_pause", "30.0", "Minimum time (in seconds) enforced on the buster timer when it becomes unpaused.");
-	g_hCvarBusterFormulaBaseFirst = CreateConVar("tank_buster_formula_base_first", "100.0", "Base part for: base - (sentry_mult * active_sentries)");
+	g_hCvarBusterFormulaBaseFirst = CreateConVar("tank_buster_formula_base_first", "90.0", "Base part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterFormulaBaseSecond = CreateConVar("tank_buster_formula_base_second", "60.0", "Base part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterFormulaSentryMult = CreateConVar("tank_buster_formula_sentry_mult", "5.0", "Sentry multiplier part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterExemptMedicUber = CreateConVar("tank_buster_excempt_medic_uber", "0.5", "Uber built to excempt the player from becoming a sentry buster. 0.5 = 50%.");
 	g_hCvarBusterCap = CreateConVar("tank_buster_cap", "1000", "Damage cap against giant robots.");
 
-	g_hCvarSuperSpyMoveSpeed = CreateConVar("tank_superspy_move_speed", "1.4", "Super spy move speed percentage while cloaked.");
+	g_hCvarSuperSpyMoveSpeed = CreateConVar("tank_superspy_move_speed", "1.5", "Super spy move speed percentage while cloaked.");
 	g_hCvarSuperSpyJumpHeight = CreateConVar("tank_superspy_jump_height", "2.0", "Super spy jump height percentage while cloaked.");
 
 	g_hCvarTeamRed = CreateConVar("tank_team_red", "HUMANS", "Team name of the RED team.");
@@ -8641,20 +8641,19 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 
 		g_flTimeLastDied[iVictim] = GetEngineTime();
 
+		int iAttacker = GetClientOfUserId(GetEventInt(hEvent, "attacker"));
 		// Spawn the reanimator whenever a RED team member perishes
 		if(g_nGameMode != GameMode_Race && teamVictim == TFTeam_Red && !Tank_IsInSetup())
 		{
-			// Don't spawn a reanimator when the player is stabbed with the YER
 			char strWeapon[20];
 			GetEventString(hEvent, "weapon_logclassname", strWeapon, sizeof(strWeapon));
-			if(!(GetEventInt(hEvent, "customkill") == TF_CUSTOM_BACKSTAB && (strcmp(strWeapon, "eternal_reward") == 0 || strcmp(strWeapon, "voodoo_pin") == 0)))
+
+			if(!g_bReanimatorSwitched[iVictim] // The player_team event is sent before the player_death event so we must block deaths that occurred immediately after a team changes.
+				&& !(iAttacker >= 1 && iAttacker <= MaxClients && iAttacker != iVictim && Spawner_HasGiantTag(iAttacker, GIANTTAG_NO_REANIMATORS)) // Don't spawn a reanimator if the attacker has the "no_reanimators" tag.
+				&& (!(GetEventInt(hEvent, "customkill") == TF_CUSTOM_BACKSTAB && (strcmp(strWeapon, "eternal_reward") == 0 || strcmp(strWeapon, "voodoo_pin") == 0)))) // Don't spawn a reanimator when the player is stabbed with the YER.
 			{
-				// The player_team event is sent before the player_death event so we must block deaths that occured immediately after a team changes
-				if(!g_bReanimatorSwitched[iVictim])
-				{
-					Reanimator_Cleanup(iVictim);
-					Reanimator_Create(iVictim);
-				}
+				Reanimator_Cleanup(iVictim);
+				Reanimator_Create(iVictim);
 			}
 		}
 
@@ -8706,12 +8705,10 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 		}
 
 		char strWeapon[50];
-		GetEventString(hEvent, "weapon", strWeapon, sizeof(strWeapon));	
-
-		// count deaths to clear the rage hud
-		int iAttacker = GetClientOfUserId(GetEventInt(hEvent, "attacker"));
+		GetEventString(hEvent, "weapon", strWeapon, sizeof(strWeapon));		
 		if(iAttacker >= 1 && iAttacker <= MaxClients && IsClientInGame(iAttacker) && iAttacker != iVictim)
 		{
+			// Count deaths to clear the rage hud
 			RageMeter_OnDamageDealt(iAttacker);
 
 			if(strcmp(strWeapon, "env_explosion") == 0)
@@ -11048,6 +11045,7 @@ public Action Command_Test2(int client, int args)
 	}
 	*/
 
+	/*
 	int entity = MaxClients+1;
 	while((entity = FindEntityByClassname(entity, "headless_hatman")) > MaxClients)
 	{
@@ -11064,7 +11062,8 @@ public Action Command_Test2(int client, int args)
 	while((entity = FindEntityByClassname(entity, "merasmus")) > MaxClients)
 	{
 		PrintToServer("merasmus %d -> %d", entity, GetEntProp(entity, Prop_Data, "m_iHealth"));
-	}	
+	}
+	*/	
 
 	return Plugin_Handled;
 }
