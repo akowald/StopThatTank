@@ -469,6 +469,7 @@ Handle g_hCvarBossHealthMultMerasmus;
 Handle g_hCvarGiantHHHCooldown;
 Handle g_hCvarGiantHHHBlockStun;
 Handle g_hCvarGiantHuntsmanDamageMult;
+Handle g_hCvarBombExplodeOutsideRange;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -925,6 +926,8 @@ bool g_overrideSound = false;
 float g_timeLastRobotDamage = 0.0;
 int g_hitWithScorchShot = 0;
 float g_hhhCooldown[MAXPLAYERS+1];
+int g_diedWithBomb = 0;
+float g_timeDiedWithBomb = 0.0;
 
 enum eSpawnerType
 {
@@ -1072,7 +1075,7 @@ public void OnPluginStart()
 	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "7.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "11.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: et/12*this = final respawn time.");
-	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "3.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
+	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "1.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.6", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
 	g_hCvarRespawnCartBehind = CreateConVar("tank_respawn_cart_behind", "0.25", "A team's tank is considered behind if the difference is greater than this percentage of total track length. Set to over 1.0 to disable.");
 	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "3.0", "Respawn time multiplier per each Giant Robot advantage.");
@@ -1117,12 +1120,12 @@ public void OnPluginStart()
 	g_hCvarTeleportUber = CreateConVar("tank_teleport_uber", "1.0", "Seconds of uber when a player uses a giant engineer's teleporter.");
 	g_hCvarTimeTip = CreateConVar("tank_time_tip", "220", "Seconds in between chat tips. Anything less than 0 disables chat tips.");
 
-	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "10", "Time (in seconds) that it takes for a dropped bomb to expire.");
+	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "15", "Time (in seconds) that it takes for a dropped bomb to expire.");
 	g_hCvarBombRoundTime = CreateConVar("tank_bomb_round_time", "2.5", "Timelimit (in minutes) that the robots are under to deliever the bomb.");
 	g_hCvarBombDroppedMaxTime = CreateConVar("tank_bomb_dropped_maxtime", "-1.0", "Maximum round time (in minutes) when the bomb is dropped in payload. (Set to -1.0 to disable.)");
 	g_hCvarBombDistanceWarn = CreateConVar("tank_bomb_distance_warn", "650.0", "Distance the bomb must be from the goal for warnings to sound.");
 	g_hCvarBombTimeDeploy = CreateConVar("tank_bomb_time_deploy", "1.9", "Seconds that it takes for a robot to deploy a bomb.");
-	g_hCvarBombMoveSpeed = CreateConVar("tank_bomb_move_speed", "0.9", "Move speed bonus for normal bomb carriers. (percentage)");
+	g_hCvarBombMoveSpeed = CreateConVar("tank_bomb_move_speed", "1.0", "Move speed bonus for normal bomb carriers. (percentage)");
 	g_hCvarBombCapAreaSize = CreateConVar("tank_bomb_capture_size", "-175.0 -175.0 -50.0 175.0 175.0 125.0", "Define the bomb capture area size. First 3 numbers are the x,y,z mins. Last 3 numbers are the x,y,z maxs. Delimited by space.");
 	g_hCvarBombCaptureRate = CreateConVar("tank_bomb_capture_rate", "2.9", "Capture rate for robots to capture a control point with the bomb.");
 	g_hCvarBombTimeAdd = CreateConVar("tank_bomb_time_add", "60", "Time (seconds) added when a robot captures a control point with the bomb.");
@@ -1135,6 +1138,7 @@ public void OnPluginStart()
 	g_hCvarBombSkipDistance = CreateConVar("tank_bomb_skip_distance", "500.0", "Distance you must be to a locked control point to trigger the skipped annotation.");
 	g_hCvarBombDeployPosition = CreateConVar("tank_bomb_deploy_position", "", "x y z position of where the the bomb is deploy. This will override the position of the goal path_track. (delimited by spaces) (leave blank to use path_track)");
 	g_hCvarBombRingOffsetZ = CreateConVar("tank_bomb_ring_offset_z", "-40.0", "z position offset for the bomb deploy ring effect.");
+	g_hCvarBombExplodeOutsideRange = CreateConVar("tank_bomb_explode_outside_range", "0", "0/1 - Enable or disable exploding the bomb carrier if they are outside capture alarm range in overtime.");
 
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
 	g_hCvarGiantForce = CreateConVar("tank_giant_force", "-1", "Index of giant template to pick. (-1 = random)");
@@ -4622,6 +4626,8 @@ public Action Timer_SpawnBomb_Part1(Handle hTimer)
 				g_finalBombDeployer = 0;
 				g_timeControlPointSkipped = 0.0;
 				g_timeCaptureOutline[TFTeam_Blue] = 0.0;
+				g_diedWithBomb = 0;
+				g_timeDiedWithBomb = 0.0;
 				
 				DispatchKeyValue(iBomb, "GameType", "2");
 				char strTemp[50];
@@ -8684,14 +8690,14 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 		int inflictor = GetEventInt(hEvent, "inflictor_entindex");
 		if(IsValidEntity(inflictor)) GetEdictClassname(inflictor, inflictorClass, sizeof(inflictorClass));
 
-		// If the player died from a trigger_hurt and was carrying the bomb, we need to return the bomb back
-		if(g_nGameMode == GameMode_BombDeploy && GetEventInt(hEvent, "customkill") == TF_CUSTOM_TRIGGER_HURT)
+		if(g_nGameMode == GameMode_BombDeploy)
 		{
-			// Check if the player that died was carrying the bomb
+			// Check if the player that died was carrying the bomb.
 			int iBombFlag = EntRefToEntIndex(g_iRefBombFlag);
 			if(iBombFlag > MaxClients && GetEntPropEnt(iBombFlag, Prop_Send, "moveparent") == iVictim)
 			{
-				if(inflictor > MaxClients && strcmp(inflictorClass, "trigger_hurt") == 0)
+				// If the player died from a trigger_hurt and was carrying the bomb, we need to return the bomb back.
+				if(GetEventInt(hEvent, "customkill") == TF_CUSTOM_TRIGGER_HURT && inflictor > MaxClients && strcmp(inflictorClass, "trigger_hurt") == 0)
 				{
 					if(!GetEntProp(inflictor, Prop_Data, "m_bDisabled") && GetEntPropFloat(inflictor, Prop_Data, "m_flDamage") > 300.0)
 					{
@@ -8700,6 +8706,19 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 #endif
 						g_flTimeBombFell = GetEngineTime();
 					}
+				}
+
+				// Explosion effects when the bomb carrier dies in overtime.
+				if(g_flBombGameEnd != 0.0 && GetEngineTime() > g_flBombGameEnd)
+				{
+#if defined DEBUG
+					PrintToServer("(Event_PlayerDeath) %N dropped the bomb in overtime!", iVictim);
+#endif	 			
+		 			// This will create the explosion effects.
+		 			g_diedWithBomb = (view_as<int>(giantWasVictim) & 1)|(GetClientUserId(iVictim) << 1);
+					g_timeDiedWithBomb = GetEngineTime();
+					
+					// Bomb_Think should end the round on the next frame..
 				}
 			}
 		}
@@ -9799,6 +9818,26 @@ void Bomb_Think(int iBomb)
 			StopSound(iBomb, SNDCHAN_AUTO, SOUND_RING);
 			//BroadcastSoundToTeam(TFTeam_Spectator, "Announcer.MVM_Bomb_Reset");
 			
+			if(g_diedWithBomb != 0 && g_timeDiedWithBomb > 0.0 && GetEngineTime() - g_timeDiedWithBomb < 0.5)
+			{
+				bool wasGiant = view_as<bool>(g_diedWithBomb & 1);
+				int victim = GetClientOfUserId(g_diedWithBomb >> 1);
+				if(victim >= 1 && victim <= MaxClients && IsClientInGame(victim) && GetClientTeam(victim) == TFTeam_Blue)
+				{
+					EmitSoundToAll(SOUND_BOMB_EXPLODE);
+
+					if(wasGiant)
+					{
+						Buster_Explode(victim, _, "mvm_hatch_destroy");
+					}else{
+						Buster_Explode(victim, 50.0, "mvm_hatch_destroy");
+					}
+				}
+			}
+
+			g_diedWithBomb = 0;
+			g_timeDiedWithBomb = 0.0;
+
 			Bomb_Cleanup();
 			
 			GameLogic_DoNext();
@@ -9807,7 +9846,7 @@ void Bomb_Think(int iBomb)
 		g_iBombPlayerPlanting = 0;
 		return;
 	}
-	
+
 	// Don't allow players to circumvent slower move speed by taunting.
 	SetEntPropFloat(client, Prop_Send, "m_flCurrentTauntMoveSpeed", 0.0);
 	SetEntProp(client, Prop_Send, "m_bAllowMoveDuringTaunt", false);
@@ -9956,7 +9995,7 @@ void Bomb_Think(int iBomb)
 		}
 
 		// A player is carrying the bomb outside the warn area so check if we need to end the game
-		if(!bInCapture && g_flBombGameEnd != 0.0 && GetEngineTime() > g_flBombGameEnd)
+		if(!bInCapture && g_flBombGameEnd != 0.0 && GetEngineTime() > g_flBombGameEnd && GetConVarBool(g_hCvarBombExplodeOutsideRange))
 		{
 			// BOOM!
 			StopSound(iBomb, SNDCHAN_AUTO, SOUND_RING);
