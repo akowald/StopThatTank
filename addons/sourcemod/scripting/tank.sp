@@ -385,6 +385,7 @@ Handle g_hCvarBusterTriggerRobotsPlr;
 Handle g_hCvarBusterTimeWarn;
 Handle g_hCvarAttribHaulSpeed;
 Handle g_hCvarAttribMetalMult;
+Handle g_hCvarAttribBuildingHealth;
 Handle g_hCvarGiantWarnTime;
 Handle g_hCvarGiantWarnCutoff;
 Handle g_hCvarRaceTimeGiantStart;
@@ -470,6 +471,7 @@ Handle g_hCvarGiantHHHCooldown;
 Handle g_hCvarGiantHHHBlockStun;
 Handle g_hCvarGiantHuntsmanDamageMult;
 Handle g_hCvarBombExplodeOutsideRange;
+Handle g_hCvarBombExplodeOvertime;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -908,7 +910,7 @@ enum
 	FlareExplode_Unknown=0,
 	FlareExplode_Collision,
 	FlareExplode_Detonated,
-}
+};
 int g_flareExplodeReason = FlareExplode_Unknown;
 
 float g_timeCaptureOutline[MAX_TEAMS];
@@ -926,8 +928,13 @@ bool g_overrideSound = false;
 float g_timeLastRobotDamage = 0.0;
 int g_hitWithScorchShot = 0;
 float g_hhhCooldown[MAXPLAYERS+1];
-int g_diedWithBomb = 0;
-float g_timeDiedWithBomb = 0.0;
+enum g_diedWithBombStruct
+{
+	g_diedWithBombUserId,
+	bool:g_diedWithBombWasGiant,
+	Float:g_diedWithBombTime,
+};
+int g_diedWithBomb[g_diedWithBombStruct];
 
 enum eSpawnerType
 {
@@ -1113,7 +1120,8 @@ public void OnPluginStart()
 	g_hCvarPointsForDeploy = CreateConVar("tank_points_for_deploy", "5", "Scoreboard points awarded when a bomb carrier deploys the bomb in pl.");
 
 	g_hCvarAttribHaulSpeed = CreateConVar("tank_haul_speed", "1.1111", "Haul speed modifier for RED engineers on pl_ or ALL engineers on plr_.");
-	g_hCvarAttribMetalMult = CreateConVar("tank_metal_mult", "1.7", "Metal multiplier for RED engineers on pl_ or ALL engineers on plr_.");
+	g_hCvarAttribMetalMult = CreateConVar("tank_metal_mult", "-1.0", "Metal multiplier for RED engineers on pl_ or ALL engineers on plr_. Set to -1.0 to disable. (old value: 1.7)");
+	g_hCvarAttribBuildingHealth = CreateConVar("tank_attrib_building_health", "1.25", "Building health multipler for RED engineers on pl_. Set to -1.0 to disable.");
 	g_hCvarTankStuckTime = CreateConVar("tank_stuck_time", "2.0", "Seconds a player must be stuck in a tank to be teleported back out.");
 	g_hCvarZapPenalty = CreateConVar("tank_zap_penalty", "200", "Metal penalty for zapping Sir Nukesalot's projectile with the short circuit.");
 	g_hCvarSirNukesCap = CreateConVar("tank_sirnukes_cap", "500", "Cap for sir nukesalot's deflected projectiles self damage.");
@@ -1139,6 +1147,7 @@ public void OnPluginStart()
 	g_hCvarBombDeployPosition = CreateConVar("tank_bomb_deploy_position", "", "x y z position of where the the bomb is deploy. This will override the position of the goal path_track. (delimited by spaces) (leave blank to use path_track)");
 	g_hCvarBombRingOffsetZ = CreateConVar("tank_bomb_ring_offset_z", "-40.0", "z position offset for the bomb deploy ring effect.");
 	g_hCvarBombExplodeOutsideRange = CreateConVar("tank_bomb_explode_outside_range", "0", "0/1 - Enable or disable exploding the bomb carrier if they are outside capture alarm range in overtime.");
+	g_hCvarBombExplodeOvertime = CreateConVar("tank_bomb_explode_overtime", "0", "0/1 - Enable or disable exploding the bomb carrier if they are killed in overtime.");
 
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
 	g_hCvarGiantForce = CreateConVar("tank_giant_force", "-1", "Index of giant template to pick. (-1 = random)");
@@ -4626,8 +4635,8 @@ public Action Timer_SpawnBomb_Part1(Handle hTimer)
 				g_finalBombDeployer = 0;
 				g_timeControlPointSkipped = 0.0;
 				g_timeCaptureOutline[TFTeam_Blue] = 0.0;
-				g_diedWithBomb = 0;
-				g_timeDiedWithBomb = 0.0;
+				g_diedWithBomb[g_diedWithBombUserId] = 0;
+				g_diedWithBomb[g_diedWithBombTime] = 0.0;
 				
 				DispatchKeyValue(iBomb, "GameType", "2");
 				char strTemp[50];
@@ -8715,8 +8724,8 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 					PrintToServer("(Event_PlayerDeath) %N dropped the bomb in overtime!", iVictim);
 #endif	 			
 		 			// This will create the explosion effects.
-		 			g_diedWithBomb = (view_as<int>(giantWasVictim) & 1)|(GetClientUserId(iVictim) << 1);
-					g_timeDiedWithBomb = GetEngineTime();
+		 			g_diedWithBomb[g_diedWithBombUserId] = GetClientUserId(iVictim);
+					g_diedWithBomb[g_diedWithBombTime] = GetEngineTime();
 					
 					// Bomb_Think should end the round on the next frame..
 				}
@@ -9818,15 +9827,14 @@ void Bomb_Think(int iBomb)
 			StopSound(iBomb, SNDCHAN_AUTO, SOUND_RING);
 			//BroadcastSoundToTeam(TFTeam_Spectator, "Announcer.MVM_Bomb_Reset");
 			
-			if(g_diedWithBomb != 0 && g_timeDiedWithBomb > 0.0 && GetEngineTime() - g_timeDiedWithBomb < 0.5)
+			if(g_diedWithBomb[g_diedWithBombUserId] != 0 && g_diedWithBomb[g_diedWithBombTime] > 0.0 && GetEngineTime() - g_diedWithBomb[g_diedWithBombTime] < 0.5 && config.LookupBool(g_hCvarBombExplodeOvertime))
 			{
-				bool wasGiant = view_as<bool>(g_diedWithBomb & 1);
-				int victim = GetClientOfUserId(g_diedWithBomb >> 1);
+				int victim = GetClientOfUserId(g_diedWithBomb[g_diedWithBombUserId]);
 				if(victim >= 1 && victim <= MaxClients && IsClientInGame(victim) && GetClientTeam(victim) == TFTeam_Blue)
 				{
 					EmitSoundToAll(SOUND_BOMB_EXPLODE);
 
-					if(wasGiant)
+					if(g_diedWithBomb[g_diedWithBombWasGiant])
 					{
 						Buster_Explode(victim, _, "mvm_hatch_destroy");
 					}else{
@@ -9835,8 +9843,8 @@ void Bomb_Think(int iBomb)
 				}
 			}
 
-			g_diedWithBomb = 0;
-			g_timeDiedWithBomb = 0.0;
+			g_diedWithBomb[g_diedWithBombUserId] = 0;
+			g_diedWithBomb[g_diedWithBombTime] = 0.0;
 
 			Bomb_Cleanup();
 			
@@ -9995,7 +10003,7 @@ void Bomb_Think(int iBomb)
 		}
 
 		// A player is carrying the bomb outside the warn area so check if we need to end the game
-		if(!bInCapture && g_flBombGameEnd != 0.0 && GetEngineTime() > g_flBombGameEnd && GetConVarBool(g_hCvarBombExplodeOutsideRange))
+		if(!bInCapture && g_flBombGameEnd != 0.0 && GetEngineTime() > g_flBombGameEnd && config.LookupBool(g_hCvarBombExplodeOutsideRange))
 		{
 			// BOOM!
 			StopSound(iBomb, SNDCHAN_AUTO, SOUND_RING);
@@ -12641,6 +12649,9 @@ void Attributes_Clear(int client)
 
 	// This attribute is used by engineers to speed up teleporter deploy.
 	Tank_RemoveAttribute(client, ATTRIB_TELEPORTER_BUILD_RATE_MULTIPLIER);
+
+	// This attribute is used by engineers to increase building health.
+	Tank_RemoveAttribute(client, ATTRIB_BUILDING_HEALTH_BONUS);
 }
 
 void Attributes_Set(int client)
@@ -12657,11 +12668,16 @@ void Attributes_Set(int client)
 		case TFClass_Engineer:
 		{
 			// Experiment with giving Engineers increased metal capacity.
-			Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_METAL_INCREASED, config.LookupFloat(g_hCvarAttribMetalMult));
+			float mult = config.LookupFloat(g_hCvarAttribMetalMult);
+			if(mult > 0.0) Tank_SetAttributeValue(client, ATTRIB_MAXAMMO_METAL_INCREASED, mult);
 			SetEntProp(client, Prop_Send, "m_iAmmo", MaxMetal_Get(client), 4, 3);
 
+			// Experiment with giving Engineers increased building health.
+			mult = config.LookupFloat(g_hCvarAttribBuildingHealth);
+			if(mult > 0.0) Tank_SetAttributeValue(client, ATTRIB_BUILDING_HEALTH_BONUS, mult);
+
 			// Increases engineer teleporter build speed.
-			float mult = config.LookupFloat(g_hCvarTeleBuildMult);
+			mult = config.LookupFloat(g_hCvarTeleBuildMult);
 			if(mult > 0.0) Tank_SetAttributeValue(client, ATTRIB_TELEPORTER_BUILD_RATE_MULTIPLIER, mult);
 		}
 	}
