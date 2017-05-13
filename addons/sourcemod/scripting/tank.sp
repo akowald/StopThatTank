@@ -472,6 +472,7 @@ Handle g_hCvarGiantHHHBlockStun;
 Handle g_hCvarGiantHuntsmanDamageMult;
 Handle g_hCvarBombExplodeOutsideRange;
 Handle g_hCvarBombExplodeOvertime;
+Handle g_hCvarBombGiantRespawnDelay;
 
 Handle g_hSDKGetBaseEntity;
 Handle g_hSDKSetStartingPath;
@@ -1080,15 +1081,16 @@ public void OnPluginStart()
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
 	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "7.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
-	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "11.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
+	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "7.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "1.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
-	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.6", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
+	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.75", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
 	g_hCvarRespawnCartBehind = CreateConVar("tank_respawn_cart_behind", "0.25", "A team's tank is considered behind if the difference is greater than this percentage of total track length. Set to over 1.0 to disable.");
 	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "3.0", "Respawn time multiplier per each Giant Robot advantage.");
 	g_hCvarRespawnAdvCap = CreateConVar("tank_respawn_advantage_cap", "3", "Maximum Giant Robot advantage amount that can be factored into respawn time. Set to 0 to disable.");
 	g_hCvarRespawnAdvRunaway = CreateConVar("tank_respawn_advantage_runaway", "1", "When the Giant Robot advantage is equal to or greater than this, the opposite team's respawn is reduced. Set to a really high number like 100 to disable.");
 	g_hCvarRespawnGiantTag = CreateConVar("tank_respawn_giant_tag", "0.1", "Respawn time for BLU in pl when a Giant with the \"dont_change_respawn\" tag is out.");
+	g_hCvarBombGiantRespawnDelay = CreateConVar("tank_respawn_giant_delay", "8.0", "Seconds to wait after the giant spawns before tank_respawn_giant respawn time kicks in for BLU. (Set to 0.0 to disable.)");
 
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
 	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.03", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
@@ -1120,8 +1122,8 @@ public void OnPluginStart()
 	g_hCvarPointsForDeploy = CreateConVar("tank_points_for_deploy", "5", "Scoreboard points awarded when a bomb carrier deploys the bomb in pl.");
 
 	g_hCvarAttribHaulSpeed = CreateConVar("tank_haul_speed", "1.1111", "Haul speed modifier for RED engineers on pl_ or ALL engineers on plr_.");
-	g_hCvarAttribMetalMult = CreateConVar("tank_metal_mult", "-1.0", "Metal multiplier for RED engineers on pl_ or ALL engineers on plr_. Set to -1.0 to disable. (old value: 1.7)");
-	g_hCvarAttribBuildingHealth = CreateConVar("tank_attrib_building_health", "1.25", "Building health multipler for RED engineers on pl_. Set to -1.0 to disable.");
+	g_hCvarAttribMetalMult = CreateConVar("tank_metal_mult", "1.7", "Metal multiplier for RED engineers on pl_ or ALL engineers on plr_. Set to -1.0 to disable.");
+	g_hCvarAttribBuildingHealth = CreateConVar("tank_attrib_building_health", "-1.0", "Building health multipler for RED engineers on pl_. Set to -1.0 to disable.");
 	g_hCvarTankStuckTime = CreateConVar("tank_stuck_time", "2.0", "Seconds a player must be stuck in a tank to be teleported back out.");
 	g_hCvarZapPenalty = CreateConVar("tank_zap_penalty", "200", "Metal penalty for zapping Sir Nukesalot's projectile with the short circuit.");
 	g_hCvarSirNukesCap = CreateConVar("tank_sirnukes_cap", "500", "Cap for sir nukesalot's deflected projectiles self damage.");
@@ -1201,8 +1203,8 @@ public void OnPluginStart()
 	g_hCvarBusterTriggerTankPlr = CreateConVar("tank_buster_trigger_tank_plr", "3250", "A sentry buster can spawn when this damage is dealt to the tank by a sentry in plr_ maps.");
 	g_hCvarBusterTriggerGiantPlr = CreateConVar("tank_buster_trigger_giant_plr", "1500", "A sentry buster can spawn when this damage is dealt to the giant by a sentry in plr_ maps.");
 	g_hCvarBusterTriggerRobotsPlr = CreateConVar("tank_buster_trigger_robot_plr", "5", "A sentry buster can spawn after the specified robot kills in plr_ maps.");
-	g_hCvarBusterTimePause = CreateConVar("tank_buster_time_pause", "30.0", "Minimum time (in seconds) enforced on the buster timer when it becomes unpaused.");
-	g_hCvarBusterFormulaBaseFirst = CreateConVar("tank_buster_formula_base_first", "90.0", "Base part for: base - (sentry_mult * active_sentries)");
+	g_hCvarBusterTimePause = CreateConVar("tank_buster_time_pause", "20.0", "Minimum time (in seconds) enforced on the buster timer when it becomes unpaused.");
+	g_hCvarBusterFormulaBaseFirst = CreateConVar("tank_buster_formula_base_first", "75.0", "Base part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterFormulaBaseSecond = CreateConVar("tank_buster_formula_base_second", "60.0", "Base part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterFormulaSentryMult = CreateConVar("tank_buster_formula_sentry_mult", "5.0", "Sentry multiplier part for: base - (sentry_mult * active_sentries)");
 	g_hCvarBusterExemptMedicUber = CreateConVar("tank_buster_excempt_medic_uber", "0.5", "Uber built to excempt the player from becoming a sentry buster. 0.5 = 50%.");
@@ -15659,10 +15661,12 @@ void Tank_EnforceRespawnTimes()
 		TF2_SetRespawnTime(TFTeam_Red, respawnBombRed[TFTeam_Red]);
 
 		// Give BLU a slightly higher respawn time when they have a Giant Robot out.
+		float engineTime = GetEngineTime();
 		bool giantOut = false;
 		for(int i=1; i<=MaxClients; i++)
 		{
 			if( g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
+			 && g_nSpawner[i][g_flSpawnerTimeSpawned] > 0.0 && engineTime - g_nSpawner[i][g_flSpawnerTimeSpawned] > config.LookupFloat(g_hCvarBombGiantRespawnDelay)
 			 && IsClientInGame(i) && GetClientTeam(i) == TFTeam_Blue && IsPlayerAlive(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
 			{
 				giantOut = true;
@@ -15769,6 +15773,7 @@ void Tank_EnforceRespawnTimes()
 	}
 
 	/*
+	// Useful for debugging respawn wave times.
 	int removeMe;
 	float waveRed = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", TFTeam_Red);
 	float waveBlue = GameRules_GetPropFloat("m_TeamRespawnWaveTimes", TFTeam_Blue);
