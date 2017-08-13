@@ -6,7 +6,7 @@ from ambuild2 import run
 
 builder = run.PrepareBuild(sourcePath = sys.path[0])
 
-builder.options.add_option('--hl2sdk-root', type=str, dest='hl2sdk_root', default='../../../hl2sdk',
+builder.options.add_option('--hl2sdk-root', type=str, dest='hl2sdk_root', default='../../../alliedmodders',
 		                   help='Root search folder for HL2SDKs')
 builder.options.add_option('--mms-path', type=str, dest='mms_path', default='../../../metamod-source-1.10',
                        help='Path to Metamod:Source')

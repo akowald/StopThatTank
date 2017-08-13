@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5.7"
+#define PLUGIN_VERSION 				"1.5.8"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -353,7 +353,6 @@ Handle g_hCvarBombTimeAdd;
 Handle g_hCvarBombTimePenalty;
 Handle g_hCvarRespawnBombRed;
 Handle g_hCvarBombHealDuration;
-Handle g_hCvarBombMiniCritsDuration;
 Handle g_hCvarBombHealCooldown;
 Handle g_hCvarCheckpointDistance;
 Handle g_hCvarRestartGame;
@@ -366,7 +365,9 @@ Handle g_hCvarPointsForGiantPlr;
 Handle g_hCvarPointsDamageTank;
 Handle g_hCvarPointsDamageGiant;
 Handle g_hCvarGiantKnifeDamage;
-Handle g_hCvarBombBuffsCutoff;
+Handle g_hCvarBombBuffsTier1;
+Handle g_hCvarBombBuffsTier2;
+Handle g_hCvarBombBuffsTier3;
 Handle g_hCvarRaceLvls[MAX_RACE_LEVELS];
 Handle g_hCvarRaceInterval;
 Handle g_hCvarRaceDamageBase;
@@ -743,6 +744,7 @@ bool g_bBombGone;
 float g_flTimeBombFell;
 bool g_bombAtFinalCheckpoint;
 float g_timeBombWarning[MAXPLAYERS+1];
+int g_lastBombTier = -1;
 
 Handle g_hHudSync;
 
@@ -1075,22 +1077,22 @@ public void OnPluginStart()
 	g_hCvarBisonBoostSpeed = CreateConVar("tank_bisonboost_speed", "1.45", "Scale amount for the velocity of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
 	g_hCvarBisonBoostDamage = CreateConVar("tank_bisonboost_damage", "1.85", "Scale amount for the damage of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
 	g_hCvarBisonBoostScale = CreateConVar("tank_bisonboost_scale", "3.0", "Model scale amount of bison/pomson projectiles when the 'bison_boost' giant tag is set.");
-	g_hCvarBossHealthMultHHH = CreateConVar("tank_boss_health_hhh", "0.65", "Max health modifier for Horseless Headless Horsemann.");
-	g_hCvarBossHealthMultMono = CreateConVar("tank_boss_health_mono", "0.4", "Max health modifier for Monoculus.");
-	g_hCvarBossHealthMultMerasmus = CreateConVar("tank_boss_health_merasmus", "0.2", "Max health modifier for Merasmus.");
+	g_hCvarBossHealthMultHHH = CreateConVar("tank_boss_health_hhh", "0.5", "Max health modifier for Horseless Headless Horsemann.");
+	g_hCvarBossHealthMultMono = CreateConVar("tank_boss_health_mono", "0.15", "Max health modifier for Monoculus.");
+	g_hCvarBossHealthMultMerasmus = CreateConVar("tank_boss_health_merasmus", "0.15", "Max health modifier for Merasmus.");
 
 	g_hCvarRespawnBase = CreateConVar("tank_respawn_base", "0.1", "Respawn time base for both teams. No respawn time can be less than this value.");
 	g_hCvarRespawnTank = CreateConVar("tank_respawn_tank", "7.0", "Respawn time for BLU in pl when the Tank is out. Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnGiant = CreateConVar("tank_respawn_giant", "7.0", "Respawn time for BLU in pl when a Giant is out. Note: This will be scaled to playercount: et/12*this = final respawn time."); // 4.0 default
 	g_hCvarRespawnRace = CreateConVar("tank_respawn_race", "3.0", "Respawn time for both teams in tank race (plr). Note: This will be scaled to playercount: et/12*this = final respawn time.");
 	g_hCvarRespawnBombRed = CreateConVar("tank_respawn_bomb", "1.0", "Respawn time for RED during the bomb mission. This will be scaled to playercount: et/12*this = final respawn time.");
-	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "0.75", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
+	g_hCvarRespawnScaleMin = CreateConVar("tank_respawn_scale_min", "1.0", "Scaled respawn times will be a minimum of this percentage. Set to a high number such as 5.0 to disable.");
 	g_hCvarRespawnCartBehind = CreateConVar("tank_respawn_cart_behind", "0.25", "A team's tank is considered behind if the difference is greater than this percentage of total track length. Set to over 1.0 to disable.");
-	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "3.0", "Respawn time multiplier per each Giant Robot advantage.");
+	g_hCvarRespawnAdvMult = CreateConVar("tank_respawn_advantage_mult", "5.0", "Respawn time multiplier per each Giant Robot advantage.");
 	g_hCvarRespawnAdvCap = CreateConVar("tank_respawn_advantage_cap", "3", "Maximum Giant Robot advantage amount that can be factored into respawn time. Set to 0 to disable.");
 	g_hCvarRespawnAdvRunaway = CreateConVar("tank_respawn_advantage_runaway", "1", "When the Giant Robot advantage is equal to or greater than this, the opposite team's respawn is reduced. Set to a really high number like 100 to disable.");
 	g_hCvarRespawnGiantTag = CreateConVar("tank_respawn_giant_tag", "0.1", "Respawn time for BLU in pl when a Giant with the \"dont_change_respawn\" tag is out.");
-	g_hCvarBombGiantRespawnDelay = CreateConVar("tank_respawn_giant_delay", "8.0", "Seconds to wait after the giant spawns before tank_respawn_giant respawn time kicks in for BLU. (Set to 0.0 to disable.)");
+	g_hCvarBombGiantRespawnDelay = CreateConVar("tank_respawn_giant_delay", "10.0", "Seconds to wait after the giant spawns before tank_respawn_giant respawn time kicks in for BLU. (Set to 0.0 to disable.)");
 
 	g_hCvarCheckpointDistance = CreateConVar("tank_checkpoint_distance", "5600", "Track distance for each simulated extra tank. These are used in checkpoint tank health bonus calculation.");
 	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.03", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
@@ -1101,7 +1103,7 @@ public void OnPluginStart()
 	g_hCvarFinaleDefault = CreateConVar("tank_is_finale", "yes", "By default the tank will deploy the bomb and explode when it reaches the end of the tracks. For multi-stage maps, set this to \"no\" to prevent that from happening.");
 	g_hCvarTankHealthMultiplier = CreateConVar("tank_health_multiplier", "1.0", "Set a tank max health multiplier that is applied to the final max health of the tank. 2.0 = double tank health.");
 	g_hCvarDeployDistance = CreateConVar("tank_deploy_distance", "400.0", "Trigger the tank deploy sequence when the cart is this close to the end.");
-	g_hCvarMinPlantDistance = CreateConVar("tank_min_plant_distance", "100.0", "The minimum distance the bomb planter must be from the goal path_track node in order to deploy the bomb.");
+	g_hCvarMinPlantDistance = CreateConVar("tank_min_plant_distance", "75.0", "The minimum distance the bomb planter must be from the goal path_track node in order to deploy the bomb.");
 	g_hCvarDefaultGiantScale = CreateConVar("tank_default_giant_scale", "1.75", "The default giant scale that will be used if no scale is specified in the giant's template.");
 	g_hCvarGoalDistance = CreateConVar("tank_goal_distance", "325.0", "When the tank reaches this distance to the goal, it will be parented to the cart.");
 	g_hCvarGiantHealthMultiplier = CreateConVar("tank_giant_health_multiplier", "1.0", "Set a giant max health multiplier that is applied to the total health of the tank. (includes overheal) 2.0 = double giant health.");
@@ -1113,8 +1115,8 @@ public void OnPluginStart()
 	g_hCvarTeleportStartBlue = CreateConVar("tank_teleport_start_blue", "", "The targetname of the path_track to teleport the cart to when the round begins. Leaving this blank will use start_node from the team_train_watcher. Set this to \"disabled\" to disable teleporting.");
 	g_hCvarTeleportGoal = CreateConVar("tank_teleport_goal", "", "The targetname of the path_track to teleport the cart to when the bomb is deployed. The cart will start moving forward from this position and trigger a win.");
 
-	g_hCvarPointsForTank = CreateConVar("tank_points_for_tank", "2", "Scoreboard points awarded when enough damage is done to the tank.");
-	g_hCvarPointsForTankPlr = CreateConVar("tank_points_for_tank_plr", "1", "Scoreboard points awarded when enough damage is done to the tank.");
+	g_hCvarPointsForTank = CreateConVar("tank_points_for_tank", "0", "Scoreboard points awarded when enough damage is done to the tank.");
+	g_hCvarPointsForTankPlr = CreateConVar("tank_points_for_tank_plr", "0", "Scoreboard points awarded when enough damage is done to the tank.");
 	g_hCvarPointsForGiant = CreateConVar("tank_points_for_giant", "2", "Scoreboard points awarded when enough damage is done to the giant.");
 	g_hCvarPointsForGiantPlr = CreateConVar("tank_points_for_giant_plr", "1", "Scoreboard points awarded when enough damage is done to the giant.");
 	g_hCvarPointsDamageTank = CreateConVar("tank_points_damage_tank", "1000", "Tank damage required to be rewarded with scoreboard points.");
@@ -1130,7 +1132,7 @@ public void OnPluginStart()
 	g_hCvarTeleportUber = CreateConVar("tank_teleport_uber", "1.0", "Seconds of uber when a player uses a giant engineer's teleporter.");
 	g_hCvarTimeTip = CreateConVar("tank_time_tip", "220", "Seconds in between chat tips. Anything less than 0 disables chat tips.");
 
-	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "15", "Time (in seconds) that it takes for a dropped bomb to expire.");
+	g_hCvarBombReturnTime = CreateConVar("tank_bomb_return_time", "30", "Time (in seconds) that it takes for a dropped bomb to expire.");
 	g_hCvarBombRoundTime = CreateConVar("tank_bomb_round_time", "2.5", "Timelimit (in minutes) that the robots are under to deliever the bomb.");
 	g_hCvarBombDroppedMaxTime = CreateConVar("tank_bomb_dropped_maxtime", "-1.0", "Maximum round time (in minutes) when the bomb is dropped in payload. (Set to -1.0 to disable.)");
 	g_hCvarBombDistanceWarn = CreateConVar("tank_bomb_distance_warn", "650.0", "Distance the bomb must be from the goal for warnings to sound.");
@@ -1141,14 +1143,15 @@ public void OnPluginStart()
 	g_hCvarBombTimeAdd = CreateConVar("tank_bomb_time_add", "60", "Time (seconds) added when a robot captures a control point with the bomb.");
 	g_hCvarBombTimePenalty = CreateConVar("tank_bomb_time_penalty", "8.0", "Time (seconds) after a bomb turns up out of bounds that it is respawned back in the game.");
 	g_hCvarBombHealDuration = CreateConVar("tank_bomb_heal_duration", "3.0", "Time (seconds) duration of heal effect when a normal robot picks up the bomb.");
-	g_hCvarBombMiniCritsDuration = CreateConVar("tank_bomb_minicrits_duration", "-1.0", "Time (seconds) duration of minicrits when a normal robot picks up the bomb.");
 	g_hCvarBombHealCooldown = CreateConVar("tank_bomb_heal_cooldown", "10.0", "Time (seconds) between dropping the bomb and picking it up that heal effects are granted.");
-	g_hCvarBombBuffsCutoff = CreateConVar("tank_bomb_buffs_cutoff", "6", "Minimum player count required for bomb carrier buffs to be activated.");
+	g_hCvarBombBuffsTier1 = CreateConVar("tank_bomb_buffs_tier_1", "5", "Minimum player count for bomb carrier buffs: minicrits.");
+	g_hCvarBombBuffsTier2 = CreateConVar("tank_bomb_buffs_tier_2", "7", "Minimum player count for bomb carrier buffs: minicrits, defense buffs, healing");
+	g_hCvarBombBuffsTier3 = CreateConVar("tank_bomb_buffs_tier_3", "9", "Minimum player count for bomb carrier buffs: crits, defense buffs, healing");
 	g_hCvarBombWinSpeed = CreateConVar("tank_bomb_win_speed", "500.0", "Speed of the payload cart when the robots deploy the bomb, winning the round.");
 	g_hCvarBombSkipDistance = CreateConVar("tank_bomb_skip_distance", "500.0", "Distance you must be to a locked control point to trigger the skipped annotation.");
 	g_hCvarBombDeployPosition = CreateConVar("tank_bomb_deploy_position", "", "x y z position of where the the bomb is deploy. This will override the position of the goal path_track. (delimited by spaces) (leave blank to use path_track)");
 	g_hCvarBombRingOffsetZ = CreateConVar("tank_bomb_ring_offset_z", "-40.0", "z position offset for the bomb deploy ring effect.");
-	g_hCvarBombExplodeOutsideRange = CreateConVar("tank_bomb_explode_outside_range", "0", "0/1 - Enable or disable exploding the bomb carrier if they are outside capture alarm range in overtime.");
+	g_hCvarBombExplodeOutsideRange = CreateConVar("tank_bomb_explode_outside_range", "1", "0/1 - Enable or disable exploding the bomb carrier if they are outside capture alarm range in overtime.");
 	g_hCvarBombExplodeOvertime = CreateConVar("tank_bomb_explode_overtime", "0", "0/1 - Enable or disable exploding the bomb carrier if they are killed in overtime.");
 
 	g_hCvarGiantAmmoMultiplier = CreateConVar("tank_giant_ammo_multiplier", "10.0", "Ammo multiplier for giant robots.");
@@ -1175,14 +1178,14 @@ public void OnPluginStart()
 	g_hCvarRageScale = CreateConVar("tank_rage_scale", "25.0", "The maximum time (seconds) that will be added to the rage meter base. This will scale for player count.");
 	g_hCvarRageLow = CreateConVar("tank_rage_low", "20.0", "The rage meter will show when the player's rage meter has this much time (seconds) left.");
 
-	g_hCvarRaceLvls[0] = CreateConVar("tank_race_level_0", "-0.24", "-1.0-0.0 - The speed the tank moves backwards < on hills as a percentage of maxspeed.", _, true, -1.0, true, 0.0);
-	g_hCvarRaceLvls[1] = CreateConVar("tank_race_level_1", "0.15", "0.0-1.0 - The speed the tank moves at x1 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
+	g_hCvarRaceLvls[0] = CreateConVar("tank_race_level_0", "-0.35", "-1.0-0.0 - The speed the tank moves backwards < on hills as a percentage of maxspeed.", _, true, -1.0, true, 0.0);
+	g_hCvarRaceLvls[1] = CreateConVar("tank_race_level_1", "0", "0.0-1.0 - The speed the tank moves at x1 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
 	g_hCvarRaceLvls[2] = CreateConVar("tank_race_level_2", "0.4", "0.0-1.0 - The speed the tank moves at x2 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
 	g_hCvarRaceLvls[3] = CreateConVar("tank_race_level_3", "0.7", "0.0-1.0 - The speed the tank moves at x3 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
 	g_hCvarRaceLvls[4] = CreateConVar("tank_race_level_4", "1.0", "0.0-1.0 - The speed the tank moves at x4 as a percentage of maxspeed.", _, true, 0.0, true, 1.0);
 	g_hCvarRaceInterval = CreateConVar("tank_race_interval", "3.0", "Time (seconds) in between tank level/speed changes.");
 	g_hCvarRaceDamageBase = CreateConVar("tank_race_damage_base", "50", "base + EPC * average | The base damage in the formula for each level interval.");
-	g_hCvarRaceDamageAverage = CreateConVar("tank_race_damage_average", "9", "base + EPC * average | The average damage in the formula for each level interval.");
+	g_hCvarRaceDamageAverage = CreateConVar("tank_race_damage_average", "8", "base + EPC * average | The average damage in the formula for each level interval.");
 	g_hCvarRaceTimeGiantStart = CreateConVar("tank_race_time_giant_start", "0.75", "Time (minutes) after tanks start moving when giant robots will spawn.");
 	g_hCvarRaceTimeIntermission = CreateConVar("tank_race_time_intermission", "0.9", "Time (minutes) after giants spawn that the tanks will move again. Set to -1.0 to disable intermission. Can't be less than 0.2.");
 	g_hCvarRaceTimeWave = CreateConVar("tank_race_time_wave", "0.75", "Time (minutes) between giant waves in payload race. The first giant spawn time is set with tank_race_time_giant_start.");
@@ -4639,7 +4642,8 @@ public Action Timer_SpawnBomb_Part1(Handle hTimer)
 				g_timeCaptureOutline[TFTeam_Blue] = 0.0;
 				g_diedWithBomb[g_diedWithBombUserId] = 0;
 				g_diedWithBomb[g_diedWithBombTime] = 0.0;
-				
+				g_lastBombTier = -1;
+
 				DispatchKeyValue(iBomb, "GameType", "2");
 				char strTemp[50];
 				config.LookupString(g_hCvarBombReturnTime, strTemp, sizeof(strTemp));
@@ -9857,6 +9861,8 @@ void Bomb_Think(int iBomb)
 		return;
 	}
 
+	ApplyBombCarrierEffects(client);
+
 	// Don't allow players to circumvent slower move speed by taunting.
 	SetEntPropFloat(client, Prop_Send, "m_flCurrentTauntMoveSpeed", 0.0);
 	SetEntProp(client, Prop_Send, "m_bAllowMoveDuringTaunt", false);
@@ -10608,6 +10614,8 @@ public void Event_FlagEvent(Handle hEvent, const char[] strEventName, bool bDont
 	if(g_nGameMode != GameMode_BombDeploy || !g_bIsRoundStarted) return; // Don't run unless we are in bomb deployment mode
 	if(GetEventInt(hEvent, "eventtype") != view_as<int>(FlagEvent_Dropped)) return; // Don't run unless the flag was dropped
 
+	g_lastBombTier = -1;
+
 	// Check if a robot dropped the bomb, if so then remove the minicrits and the healing effect
 	int client = GetEventInt(hEvent, "player");
 	if(client >= 1 && client <= MaxClients && IsClientInGame(client)) // Don't worry about team, they could have switched teams by now..
@@ -10616,7 +10624,13 @@ public void Event_FlagEvent(Handle hEvent, const char[] strEventName, bool bDont
 		PrintToServer("(Event_FlagEvent) %N has dropped the bomb!", client);
 #endif
 		TF2_RemoveCondition(client, TFCond_HalloweenQuickHeal);
-		TF2_RemoveCondition(client, TFCond_Buffed);
+		if(TF2_IsPlayerInCondition(client, TFCond_Buffed))
+		{
+			TF2_RemoveCondition(client, TFCond_Buffed);
+			TF2_AddCondition(client, TFCond_Buffed, 1.0, client);
+		}
+		TF2_RemoveCondition(client, TFCond_CritOnFlagCapture);
+		TF2_RemoveCondition(client, TFCond_DefenseBuffNoCritBlock);
 
 		g_flTimeBombDropped[client] = GetEngineTime(); // Record when the robot dropped the bomb so we can add a cooldown for the healing effect
 
@@ -10886,6 +10900,7 @@ public void Bomb_OnRobotPickup(const char[] output, int caller, int activator, f
 	
 	g_flBombLastMessage = 0.0; // Send an annotation to the player that picks up the bomb ASAP
 	g_timeControlPointSkipped = 0.0;
+	g_lastBombTier = -1;
 
 	Timer_KillBombReturn(); // In case a player manages to pick up the bomb while it is sitting on the ground waiting to be returned
 
@@ -10902,23 +10917,16 @@ public void Bomb_OnRobotPickup(const char[] output, int caller, int activator, f
 		// If a normal robot picks up the bomb, we need to slow them down for balance, apply a 0.5 move speed bonus
 		if(GetEntProp(client, Prop_Send, "m_bIsMiniBoss") == 0)
 		{
-			// As a balance, there will be no bomb carrier buffs if the player count is below x amount
 			int playerCount;
 			for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) == TFTeam_Red) playerCount++;
-			if(playerCount >= config.LookupInt(g_hCvarBombBuffsCutoff))
-			{
-#if defined DEBUG
-				PrintToServer("(Bomb_OnRobotPickup) %N picked up the bomb, applying slow-down/defense buff!", client);
-#endif
-				// 42 is the defense buff that MvM uses, resistance to crits
-				TF2_AddCondition(client, TFCond_DefenseBuffNoCritBlock, -1.0);
-				TF2_AddCondition(client, TFCond_Buffed, config.LookupFloat(g_hCvarBombMiniCritsDuration), client);
 
+			if(playerCount >= config.LookupInt(g_hCvarBombBuffsTier3) || playerCount >= config.LookupInt(g_hCvarBombBuffsTier2))
+			{
 				// There's a cool down for the healing effect so the robot carrier can't just drop the bomb and pick it up again for free health
 				if(g_flTimeBombDropped[client] == 0.0 || GetEngineTime() - g_flTimeBombDropped[client] > config.LookupFloat(g_hCvarBombHealCooldown))
 				{
 					TF2_AddCondition(client, TFCond_HalloweenQuickHeal, config.LookupFloat(g_hCvarBombHealDuration));
-				}
+				}	
 			}
 
 			// Nerf: Robot carriers move slower
@@ -10968,6 +10976,72 @@ public void Bomb_OnRobotPickup(const char[] output, int caller, int activator, f
 			}
 		}
 	}
+}
+
+void ApplyBombCarrierEffects(int client)
+{
+	// Apply these persistent bomb carrier effects after the giant has been destroyed.
+	// The effects are tiered for balance.
+	if(GetEntProp(client, Prop_Send, "m_bIsMiniBoss")) return;
+
+	int playerCount;
+	for(int i=1; i<=MaxClients; i++) if(IsClientInGame(i) && GetClientTeam(i) == TFTeam_Red) playerCount++;
+
+	int tier = -1;
+	if(playerCount >= config.LookupInt(g_hCvarBombBuffsTier3))
+	{
+		tier = 3;
+	}else if(playerCount >= config.LookupInt(g_hCvarBombBuffsTier2))
+	{
+		tier = 2;
+	}else if(playerCount >= config.LookupInt(g_hCvarBombBuffsTier1))
+	{
+		tier = 1;
+	}
+
+	switch(tier)
+	{
+		case 1: // minicrits
+		{
+			if(TF2_IsPlayerInCondition(client, TFCond_CritOnFlagCapture)) TF2_RemoveCondition(client, TFCond_CritOnFlagCapture);
+			if(TF2_IsPlayerInCondition(client, TFCond_DefenseBuffNoCritBlock)) TF2_RemoveCondition(client, TFCond_DefenseBuffNoCritBlock);
+			
+			if(!TF2_IsPlayerInCondition(client, TFCond_Buffed)) TF2_AddCondition(client, TFCond_Buffed, -1.0, client);
+		}
+		case 2: // minicrits, defense buffs
+		{
+			if(TF2_IsPlayerInCondition(client, TFCond_CritOnFlagCapture)) TF2_RemoveCondition(client, TFCond_CritOnFlagCapture);
+			
+			if(!TF2_IsPlayerInCondition(client, TFCond_Buffed)) TF2_AddCondition(client, TFCond_Buffed, -1.0, client);
+			if(!TF2_IsPlayerInCondition(client, TFCond_DefenseBuffNoCritBlock)) TF2_AddCondition(client, TFCond_DefenseBuffNoCritBlock, -1.0);	// This is the defense buff that MvM uses, resistance to crits.
+		}
+		case 3: // crits, defense buffs
+		{
+			if(!g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive])
+			{
+				if(!TF2_IsPlayerInCondition(client, TFCond_CritOnFlagCapture)) TF2_AddCondition(client, TFCond_CritOnFlagCapture, -1.0, client);
+			}else{
+				if(TF2_IsPlayerInCondition(client, TFCond_CritOnFlagCapture)) TF2_RemoveCondition(client, TFCond_CritOnFlagCapture);
+			}
+
+			if(!TF2_IsPlayerInCondition(client, TFCond_Buffed)) TF2_AddCondition(client, TFCond_Buffed, -1.0, client); // For players that use the Cow Mangler.
+			if(!TF2_IsPlayerInCondition(client, TFCond_DefenseBuffNoCritBlock)) TF2_AddCondition(client, TFCond_DefenseBuffNoCritBlock, -1.0);	// This is the defense buff that MvM uses, resistance to crits.
+		}
+		default:
+		{
+			if(TF2_IsPlayerInCondition(client, TFCond_CritOnFlagCapture)) TF2_RemoveCondition(client, TFCond_CritOnFlagCapture);
+			if(TF2_IsPlayerInCondition(client, TFCond_DefenseBuffNoCritBlock)) TF2_RemoveCondition(client, TFCond_DefenseBuffNoCritBlock);
+			if(TF2_IsPlayerInCondition(client, TFCond_Buffed) && g_lastBombTier != tier)
+			{
+				TF2_RemoveCondition(client, TFCond_Buffed);
+				TF2_AddCondition(client, TFCond_Buffed, 1.0, client);
+			}
+		}
+	}
+
+	if(g_lastBombTier != tier) 
+
+	g_lastBombTier = tier;
 }
 
 void Bomb_Cleanup()
