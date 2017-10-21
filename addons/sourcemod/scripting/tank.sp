@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5.8"
+#define PLUGIN_VERSION 				"1.5.9"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -154,7 +154,6 @@
 #define ATTRIB_KILLSTREAK_TIER 2025
 #define ATTRIB_MAJOR_INCREASED_JUMP_HEIGHT 443
 #define ATTRIB_HEALTH_DRAIN 129
-#define ATTRIB_WEAPON_ALLOW_INSPECT 731
 #define ATTRIB_PARTICLE_INDEX 134
 #define ATTRIB_REDUCED_HEALING_FROM_MEDIC 740
 #define ATTRIB_DAMAGE_BONUS 2
@@ -421,7 +420,6 @@ Handle g_hCvarRageBase;
 Handle g_hCvarRageScale;
 Handle g_hCvarRageLow;
 Handle g_hCvarBusterCap;
-Handle g_hCvarWeaponInspect;
 Handle g_hCvarRaceTimeOvertime;
 Handle g_hCvarFinaleDefault;
 Handle g_hCvarTankHealthMultiplier;
@@ -1098,7 +1096,6 @@ public void OnPluginStart()
 	g_hCvarScrambleHealth = CreateConVar("tank_scramble_health", "0.03", "Trigger a team scramble if the tank's health is greater than this percentage of max health when the round is won. (RED is getting rolled)");
 	g_hCvarScrambleEnabled = CreateConVar("tank_scramble_enabled", "1", "0/1 - Enable or disable triggering team scrambles.");
 	g_hCvarScrambleProgress = CreateConVar("tank_scramble_progress", "0.25", "Scramble teams if the difference between the two team's tanks is more than this percentage. Set to over 1.0 to disable.");
-	g_hCvarWeaponInspect = CreateConVar("tank_weapon_inspect", "2", "0 - no changes to the game | 1 - only the giant's weapons can be inspected | 2 - every weapon can be inspected.");
 	g_hCvarScrambleGiants = CreateConVar("tank_scramble_giants", "2", "Scramble teams in payload race if one team has this many or more giants alive when the round is over. Set to -1 to disable.");
 	g_hCvarFinaleDefault = CreateConVar("tank_is_finale", "yes", "By default the tank will deploy the bomb and explode when it reaches the end of the tracks. For multi-stage maps, set this to \"no\" to prevent that from happening.");
 	g_hCvarTankHealthMultiplier = CreateConVar("tank_health_multiplier", "1.0", "Set a tank max health multiplier that is applied to the final max health of the tank. 2.0 = double tank health.");
@@ -2932,19 +2929,6 @@ public void Event_Inventory(Handle hEvent, char[] strEventName, bool bDontBroadc
 		switch(TF2_GetPlayerClass(client))
 		{
 			case TFClass_Engineer: Player_SetDefaultMetal(client);
-		}
-
-		// Give the new weapon inspect feature to everyone because why not!
-		if(config.LookupInt(g_hCvarWeaponInspect) == 2)
-		{
-			for(int slot=0; slot<3; slot++)
-			{
-				int weapon = GetPlayerWeaponSlot(client, slot);
-				if(weapon > MaxClients)
-				{
-					Tank_SetAttributeValue(weapon, ATTRIB_WEAPON_ALLOW_INSPECT, 1.0);
-				}
-			}
 		}
 	}
 }

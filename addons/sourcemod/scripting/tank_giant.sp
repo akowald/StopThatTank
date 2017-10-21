@@ -761,7 +761,6 @@ void Giant_GiveWeapons(int client)
 
 		int numAttribs = 0;
 		TF2Items_SetAttribute(hItem, numAttribs++, ATTRIB_KILLSTREAK_TIER, 1.0); // the standard killstreak tier
-		if(i >= 0 && i <= 2 && config.LookupInt(g_hCvarWeaponInspect) >= 1) TF2Items_SetAttribute(hItem, numAttribs++, ATTRIB_WEAPON_ALLOW_INSPECT, 1.0); // Allows the weapon to be inspected by pressing 'f'.
 
 		// Gives the mod creators Banshee and linux_lover weapons with self-made quality to make them feel special.
 		if(isSpecial && i >= 0 && i <= 3)
