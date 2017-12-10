@@ -685,6 +685,7 @@ int g_iOffset_m_bCapBlocked;
 int g_offset_m_bPlayingHybrid_CTF_CP;
 int g_offset_m_medicRegenMult;
 int g_offset_m_arrowDamage;
+int g_offset_m_flLastDamageTime;
 
 int g_iNumTankMaxSimulated;
 
@@ -1374,6 +1375,24 @@ public void OnPluginStart()
 	{
 		g_offset_m_arrowDamage += 4; // This offset stores the arrow's damage.
 	}
+	if(LookupOffset(g_offset_m_flLastDamageTime, "CTFPlayer", "m_flMvMLastDamageTime"))
+	{
+		g_offset_m_flLastDamageTime -= 4; // This offset keeps track of when the medic last took damage and factors into the regen calculation.
+	}
+
+#if defined DEBUG
+	PrintToServer("g_iOffsetReviveMarker\t\t= %d", g_iOffsetReviveMarker);
+	PrintToServer("g_iOffset_m_Shared\t\t= %d", g_iOffset_m_Shared);
+	PrintToServer("g_offset_m_bPlayingHybrid_CTF_CP= %d", g_offset_m_bPlayingHybrid_CTF_CP);
+	PrintToServer("g_iOffset_m_numGibs\t\t= %d", g_iOffset_m_numGibs);
+	PrintToServer("g_iOffset_m_buildingPercentage\t= %d", g_iOffset_m_buildingPercentage);
+	PrintToServer("g_iOffset_m_uberChunk\t\t= %d", g_iOffset_m_uberChunk);
+	PrintToServer("g_iOffset_m_tauntProp\t\t= %d", g_iOffset_m_tauntProp);
+	PrintToServer("g_iOffset_m_bCapBlocked\t\t= %d", g_iOffset_m_bCapBlocked);
+	PrintToServer("g_offset_m_medicRegenMult\t= %d", g_offset_m_medicRegenMult);
+	PrintToServer("g_offset_m_arrowDamage\t\t= %d", g_offset_m_arrowDamage);
+	PrintToServer("g_offset_m_flLastDamageTime\t= %d", g_offset_m_flLastDamageTime);
+#endif
 
 	LoadTranslations("common.phrases");
 	LoadTranslations("tank.phrases");
@@ -1955,10 +1974,10 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 					}
 
 					// Cancels out medic health regeneration on medic sentry busters.
-					if(class == TFClass_Medic)
+					if(class == TFClass_Medic && g_offset_m_flLastDamageTime > 0 && g_offset_m_medicRegenMult > 0)
 					{
-						SetEntPropFloat(client, Prop_Send, "m_flLastDamageTime", GetEngineTime());
-						if(g_offset_m_medicRegenMult > 0) SetEntDataFloat(client, g_offset_m_medicRegenMult, 0.0);
+						SetEntDataFloat(client, g_offset_m_flLastDamageTime, GetEngineTime());
+						SetEntDataFloat(client, g_offset_m_medicRegenMult, 0.0);
 					}
 
 					// Make attack cause the player to taunt and self-destruct
@@ -5169,7 +5188,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 
 					// Block the attacker from making repetitive backstabs. In contrast to the razorback, we will allow the spy to cloak. 
 					EmitSoundToClient(attacker, SOUND_BACKSTAB);
-					SDK_SendWeaponAnim(weapon, 0x61B);
+					SDK_SendWeaponAnim(weapon, 0x648);
 					float gameTime = GetGameTime()+2.5;
 					SetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack", gameTime);
 					SetEntPropFloat(attacker, Prop_Send, "m_flNextAttack", gameTime);
