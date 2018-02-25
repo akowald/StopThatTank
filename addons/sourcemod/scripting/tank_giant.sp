@@ -554,6 +554,12 @@ void Giant_MakeGiantRobot(int client, int iIndex)
 	TFClassType giantClass = g_nGiants[iIndex][g_nGiantClass];
 	if(giantClass == TFClass_Unknown) giantClass = playerClass;
 
+	// Prevents a crash related to weapon switch animation
+	for(int slot = WeaponSlot_Primary; slot <= WeaponSlot_InvisWatch; slot++)
+	{
+		if(GetPlayerWeaponSlot(client, slot) > MaxClients) TF2_RemoveItemInSlot(client, slot);
+	}
+
 	// Respawn the player and move them to the tank spawn spot
 	g_iClassOverride = client; // Flag this player as immune to class restrictions
 	TF2_SetPlayerClass(client, giantClass, true, true);

@@ -545,11 +545,6 @@ public Action Spawner_Timer_Spawn(Handle hTimer, int client)
 					AcceptEntityInput(bomb, "ForceDrop");
 				}
 			}
-			
-			//Prevents a crash related to weapon switch animation
-			for (int iSlot = WeaponSlot_Primary; iSlot <= WeaponSlot_InvisWatch; iSlot++)
-				if (GetPlayerWeaponSlot(client, iSlot) > MaxClients)
-					TF2_RemoveItemInSlot(client, iSlot);
 
 			// Spawns a giant robot in the cached spawn position
 			float flPos[3];
