@@ -7786,22 +7786,26 @@ public Action NormalSoundHook(int clients[MAXPLAYERS], int &numClients, char sam
 	}
 
 	// Catch when a projectile is zapped by the short circuit to detect when sir nukesalot's ball is zapped
-	if(strcmp(sample, ")weapons\\barret_arm_shot.wav") == 0)
+	if(strcmp(sample, ")weapons\\upgrade_explosive_headshot.wav") == 0)
 	{
 		if(entity > MaxClients)
 		{
 			char className[32];
 			GetEdictClassname(entity, className, sizeof(className));
-			if(strcmp(className, "tf_weapon_mechanical_arm") == 0)
+			if(strcmp(className, "tf_projectile_mechanicalarmorb") == 0)
 			{
-				int iOwner = GetEntPropEnt(entity, Prop_Send, "m_hOwner");
-				if(iOwner >= 1 && iOwner <= MaxClients && IsClientInGame(iOwner) && IsPlayerAlive(iOwner))
+				int iLauncher = GetEntPropEnt(entity, Prop_Send, "m_hLauncher");
+				if (iLauncher > MaxClients)
 				{
-					g_iUserIdLastZapper = GetClientUserId(iOwner);
+					int iOwner = GetEntPropEnt(iLauncher, Prop_Send, "m_hOwner");
+					if(iOwner >= 1 && iOwner <= MaxClients && IsClientInGame(iOwner) && IsPlayerAlive(iOwner))
+					{
+						g_iUserIdLastZapper = GetClientUserId(iOwner);
+					}
 				}
+				g_flTimeLastZapped = engineTime;
 			}
 		}
-		g_flTimeLastZapped = engineTime;
 	}
 	
 	// Detect when a giant deflects a projectile with the flamethrower
