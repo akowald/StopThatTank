@@ -1,0 +1,352 @@
+"Phrases"
+{
+	"Tank_Chat_Health_Multiplier"
+	{
+		"#format"		"{1:s},{2:c},{3:c},{4:s}"
+		"ru"			"{1} Танк{2} множитель здоровья: {3}x{4}"
+	}
+	"Tank_Chat_Inbound_Single"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:d},{5:c}"
+		"ru"			"{1} Танк{2} в пути: {3}{4}{5} ОЗ"
+	}
+	"Tank_Chat_Inbound_Multiple"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:c}"
+		"ru"			"{1} Танки{2} в пути: Стреляйте по вражескому {3}Танку{4}, чтобы замедлить это."
+	}
+	"Tank_Chat_TeamScramble_Triggered"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"ru"			"{1}{2}Перераспределение команд{3} было запущено!"
+	}
+	"Tank_Chat_TankDeploy"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:d},{5:c},{6:d}"
+		"ru"			"{1} Танк{2} был развернут с {3}{4}{5} оставшимися ОЗ ({6}%%)!"
+	}
+	"Tank_Chat_Giant_WillSpawnAt_ControlPoint"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c},{7:s},{8:d},{9:c}"
+		"ru"			"{1} Следующий {2}Гигантский робот{3} появится через {4}{5}{6}с на {7}Контрольной точке {8}{9}."
+	}
+	"Tank_Chat_Giant_WillSpawnAt_Start"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c},{7:s},{8:c}"
+		"ru"			"{1} Следующий {2}Гигантский робот{3} появится через {4}{5}{6}с на {7}спавне{8}."
+	}
+	"Tank_Chat_Tank_MVP"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:N},{5:s},{6:d},{7:c},{8:c},{9:d}"
+		"ru"			"{1} Танк{2} MVP: {3}{4} {5}{6}{7} ОЗ {8}{9}%%"
+	}
+	"Tank_Chat_BombSpawned_AtCart"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"ru"			"{1}{2}Бомба{3} появилась!"
+	}
+	"Tank_Chat_Tank_PassedCheckpoint_Health"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:c},{5:c},{6:d},{7:c}"
+		"ru"			"{1} Танк{2} пересекает {3}контрольную точку{4}: {5}+{6}{7} ОЗ"
+	}
+	"Tank_Chat_Tank_PassedCheckpoint"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:c}"
+		"ru"			"{1} Танк{2} пересекает {3}контрольную точку{4}"
+	}
+	"Tank_Chat_TankKS_Kills_Mk"
+	{
+		"#format"		"{1:s},{2:s},{3:d},{4:c},{5:d}"
+		"ru"			"{1} {2} Танк Mk.{3}{4} - Убийств: {5}"
+	}
+	"Tank_Chat_TankKS_NewRank_Mk"
+	{
+		"#format"		"{1:c},{2:s},{3:s},{4:d},{5:c}"
+		"ru"			"{1} Танк достиг нового ранга: {2}{3} Mk.{4}{5}!"
+	}
+	"Tank_GameText_TankKS_NewRank_Mk"
+	{
+		"#format"		"{1:s},{2:d}"
+		"ru"			"Танк достиг нового ранга: {1} Mk.{2}!"
+	}
+	"Tank_Chat_TankKS_Kills"
+	{
+		"#format"		"{1:s},{2:s},{3:c},{4:d}"
+		"ru"			"{1} {2} Танк{3} - Убийств: {4}"
+	}
+	"Tank_Chat_TankKS_NewRank"
+	{
+		"#format"		"{1:c},{2:s},{3:s},{4:c}"
+		"ru"			"{1} Танк достиг нового ранга: {2}{3}{4}!"
+	}
+	"Tank_GameText_TankKS_NewRank"
+	{
+		"#format"		"{1:s}"
+		"ru"			"Танк достиг нового ранга: {1}!"
+	}
+	"Tank_Chat_RestartingRound"
+	{
+		"#format"		"{1:c}"
+		"ru"			"{1} Перезапуск раунда, потому что все вышли!"
+	}
+	"Tank_Chat_BombDeploy"
+	{
+		"#format"		"{1:s},{2:N},{3:c},{4:s},{5:d},{6:c},{7:d}"
+		"ru"			"{1} {2}{3} развернул бомбу с {4}{5}{6} оставшимися ОЗ ({7}%%)!"
+	}
+	"Tank_Chat_Passed_1"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:s},{5:c}"
+		"ru"			"{1} Вы не станете {2}Гигантом{3} или {4}Разрушителем Турелей{5}."
+	}
+	"Tank_Chat_Passed_2"
+	{
+		"#format"		"{1:c}"
+		"ru"			"{1} Напишите /pass чтобы вернуться назад."
+	}
+	"Tank_Chat_NotPassed_1"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:s},{5:c}"
+		"ru"			"{1} Вы можете стать {2}Гигантом{3} или {4}Разрушителем Турелей{5}."
+	}
+	"Tank_Chat_NotPassed_2"
+	{
+		"#format"		"{1:c}"
+		"ru"			"{1} Напишите /pass чтобы вернуться назад."
+	}
+	"Tank_Chat_UsedTeleporter"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c}"
+		"ru"			"{1} Вы забрали телепорт игрока {2}{3}{4}!"
+	}
+	"Tank_Chat_UsedTeleporter_NoBuilder"
+	{
+		"#format"		"{1:c}"
+		"ru"			"{1} Вы были телепортированы в игру!"
+	}
+	"Tank_Chat_Tip"
+	{
+		"#format"		"{1:s},{2:c},{3:s}"
+		"ru"			"{1}Совет:{2} {3}"
+	}
+	"Tank_Chat_RareBug_Badwater"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:s},{5:c}"
+		"ru"			"{1}{2}Танк{3} был уничтожен очень близко к концу. Подбираем {4}победителя{5}.."
+	}
+	"Tank_Chat_FailSafe_BombDeploy"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"ru"			"{1} Раунд уже должен был закончиться. Подбираем {2}победителя{3}.."
+	}
+	"Tank_Chat_Buster_Queued"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:s},{5:N},{6:c}"
+		"ru"			"{1} Следующий {2}Разрушитель Турелей{3} будет через {4}{5}{6}."
+	}
+	"Tank_Chat_Buster_Next_NoOne"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"ru"			"{1} Никто не собирается стать {2}Разрушителем Турелей{3}."
+	}
+	"Tank_Center_Buster_YouAreNext"
+	{
+		"ru"			"Вы станете следующим Разрушителем Турелей! Чтобы отменить, напишите /pass."
+	}
+	"Tank_Chat_Buster_AutoPassed"
+	{
+		"#format"		"{1:s},{2:c},{3:c},{4:s},{5:c}"
+		"ru"			"{1} Разрушитель Турелей{2} автоматически прошел: {3}{4}{5}."
+	}
+	"Tank_Chat_Buster_Warning"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c},{7:c},{8:c}"
+		"ru"			"{1} Вы станете {2}Разрушителем Турелей{3} через {4}{5}с{6}! Напишите {7}/pass{8} чтобы вернуться назад."
+	}
+	"Tank_Annotation_Buster_Warning"
+	{
+		"#format"		"{1:d}"
+		"ru"			"Вы станете Разрушителем Турелей через {1}с!\nНапишите /pass чтобы вернуться назад."
+	}
+	"Tank_Chat_Giant_Spawned"
+	{
+		"#format"		"{1:s},{2:N},{3:c},{4:s},{5:s},{6:s},{7:d},{8:c}"
+		"ru"			"{1} {2}{3} стал: {4}{5}  {6}{7}{8} ОЗ"
+	}
+	"Tank_Chat_Giant_Warning"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c}"
+		"ru"			"{1} Вы станете {2}Гигантским роботом{3} через {4}{5}с{6}.. Напишите /pass чтобы вернуться назад."
+	}
+	"Tank_Annotation_Giant_Warning"
+	{
+		"#format"		"{1:d}"
+		"ru"			"Вы станете Гигантским роботом через {1}с..\nНапишите /pass чтобы вернуться назад."
+	}
+	"Tank_Chat_Giant_AFK"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c}"
+		"ru"			"{1} Гигант {2}{3}{4} кажется АФК.."
+	}
+	"Tank_Chat_Giant_MVP"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c},{5:s},{6:s},{7:N},{8:s},{9:d},{10:c},{11:c},{12:d}"
+		"ru"			"{1} Гигант {2}{3}{4} {5}. MVP: {6}{7} {8}{9}{10} ОЗ {11}{12}%%"
+	}
+	"Tank_Chat_RageMeter_Expired"
+	{
+		"#format"		"{1:c}"
+		"ru"			"{1} Ваша шкала ярости исчерпана, из-за того, что вы не наносили урон игрокам!"
+	}
+	"Tank_Center_Backstabbed"
+	{
+		"ru"			"!!!!!! ВАС УДАРИЛИ В СПИНУ !!!!!"
+	}
+	"Tank_Center_SuperSpyHint"
+	{
+		"ru"			"АУЧ! Восстановите немного здоровья, нанося удары в спину."
+	}
+	"Tank_Annotation_Bomb_Spawned"
+	{
+		"ru"			"Бомба вошла в область!"
+	}
+	"Tank_Annotation_Bomb_MovedBack"
+	{
+		"ru"			"Бомба была перемещена назад."
+	}
+	"Tank_Annotation_Bomb_PickupHint_Giant"
+	{
+		"ru"			"Возьмите бомбу обратно!"
+	}
+	"Tank_Annotation_Bomb_PickupHint"
+	{
+		"ru"			"Поднимите бомбу, прежде чем она пропадет!"
+	}
+	"Tank_Annotation_Borneo_Detour"
+	{
+		"ru"			"Вы не влезаете! Найдите обходной путь.\nПоднимитесь по лестнице и поверните направо. →"
+	}
+	"Tank_Annotation_CactusCanyon_Hint"
+	{
+		"ru"			"Ждите поезда здесь.\nПусть он ударит тебя, чтобы взорвать бомбу."
+	}
+	"Tank_Annotation_Deploy"
+	{
+		"ru"			"Разверните бомбу здесь!"
+	}
+	"Tank_Annotation_Capture"
+	{
+		"ru"			"Захватите эту контрольную точку"
+	}
+	"Tank_Annotation_Buster_Hint"
+	{
+		"ru"			"Атакуйте или используйте насмешку, чтобы самоуничтожиться!"
+	}
+	"Tank_Annotation_Giant_Spawned"
+	{
+		// This message shows when a team giant spawns.
+		// Right now it passes the giant's name from the template file.
+		"#format"		"{1:s}"
+		"ru"			"{1}"
+	}
+	"Tank_Annotation_Giant_Spawned_BombDeploy"
+	{
+		"#format"		"{1:s}"
+		"ru"			"{1} имеет бомбу!"
+	}
+	"Tank_Annotation_SkippedControlPoint"
+	{
+		"ru"			"ПОВЕРНИСЬ НАЗАД дум-дум.\nСначала захватите эту контрольную точку!"
+	}
+	"Tank_Menu_Settings_Title"
+	{
+		"ru"			"Настройки Stop That Tank"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel"
+	{
+		"#format"		"{1:T}"
+		"ru"			"Показать панель гигантов: {1}"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_AlwaysShow"
+	{
+		"ru"			"Всегда показывать"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadOnly"
+	{
+		"ru"			"Только Сопровождение"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadRaceOnly"
+	{
+		"ru"			"Только Гонка вагонеток"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_Never"
+	{
+		"ru"			"Никогда"
+	}
+	"Tank_Chat_ShowGiantInfo"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c},{5:s},{6:s},{7:c}"
+		"ru"			"{1} {2}{3}{4} скоро станет: {5}{6}{7}"
+	}
+	"Tank_Menu_Giant_Main_Title"
+	{
+		"ru"			"Узнать больше о Гигантах:"
+	}
+	"Tank_Menu_Giant_Desc_WillBecome"
+	{
+		"#format"		"{1:N}"
+		"ru"			"{1} скоро станет:"
+	}
+	"Tank_Dismiss"
+	{
+		"ru"			"Отклонить"
+	}
+	"Tank_GoBack"
+	{
+		"ru"			"Назад"
+	}
+	"Tank_Chat_Creators"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:s},{5:c},{6:s},{7:c}"
+		"ru"			"{1}Stop that Tank!{2} ({3}) от {4}Banshee{5} и {6}linux_lover{7}."
+	}
+	"Tank_Chat_Deploy_LostConnection"
+	{
+		"#format"		"{1:s},{2:N},{3:c}"
+		"ru"			"{1} {2}{3} потерял соединение, поэтому бомба была сброшена."
+	}
+	"Tank_Chat_FailToLoad"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"ru"			"{1} Ошибка загрузки {2}Stop that Tank!{3}. Смотрите логи для получения дополнительной информации. Раунд перезапускается.."
+	}
+	"Tank_Annotation_Giant_SwatBuster"
+	{
+		"ru"			"Swat Busters away with your melee!"
+	}
+	"Tank_Annotation_HellHint"
+	{
+		"ru"			"Пробейся к Острову Черепа!"
+	}
+	"Tank_GameText_Overtime"
+	{
+		"ru"			"Танки больше не будут катиться назад."
+	}
+	"Tank_Center_CantDeploy"
+	{
+		"ru"			"Вы не можете развернуть в то время как вы НЕУЯЗВИМЫЕ!"
+	}
+	"Tank_Center_CantMegaHeal"
+	{
+		"ru"			"Вы не можете скинуть бомбу МЕГАЛЕЧЕНИЯ в зоне тревоги!"
+	}
+	"Tank_Center_CantMegaHealCarrier"
+	{
+		"ru"			"Вы не можете скинуть бомбу МЕГАЛЕЧЕНИЯ в зоне тревоги!"
+	}
+	"Tank_Center_CantPopUber"
+	{
+		"ru"			"Вы не можете использовать УБЕР-ЗАРЯД в зоне тревоги!"
+	}
+}
