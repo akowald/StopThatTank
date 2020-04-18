@@ -13,7 +13,7 @@
 	"Tank_Chat_Inbound_Multiple"
 	{
 		"#format"		"{1:s},{2:c},{3:s},{4:c}"
-		"ru"			"{1} Танки{2} в пути: Стреляйте по вражескому {3}Танку{4}, чтобы замедлить это."
+		"ru"			"{1} Танки{2} в пути: Стреляйте по вражескому {3}Танку{4}, чтобы замедлить его."
 	}
 	"Tank_Chat_TeamScramble_Triggered"
 	{
@@ -38,7 +38,7 @@
 	"Tank_Chat_Tank_MVP"
 	{
 		"#format"		"{1:s},{2:c},{3:s},{4:N},{5:s},{6:d},{7:c},{8:c},{9:d}"
-		"ru"			"{1} Танк{2} MVP: {3}{4} {5}{6}{7} ОЗ {8}{9}%%"
+		"ru"			"{1} Танк{2} Самый ценный игрок: {3}{4} {5}{6}{7} ОЗ {8}{9}%%"
 	}
 	"Tank_Chat_BombSpawned_AtCart"
 	{
@@ -192,7 +192,7 @@
 	"Tank_Chat_Giant_MVP"
 	{
 		"#format"		"{1:c},{2:s},{3:N},{4:c},{5:s},{6:s},{7:N},{8:s},{9:d},{10:c},{11:c},{12:d}"
-		"ru"			"{1} Гигант {2}{3}{4} {5}. MVP: {6}{7} {8}{9}{10} ОЗ {11}{12}%%"
+		"ru"			"{1} Гигант {2}{3}{4} {5}. Самый ценный игрок: {6}{7} {8}{9}{10} ОЗ {11}{12}%%"
 	}
 	"Tank_Chat_RageMeter_Expired"
 	{
@@ -323,7 +323,7 @@
 	}
 	"Tank_Annotation_Giant_SwatBuster"
 	{
-		"ru"			"Swat Busters away with your melee!"
+		"ru"			"Swat Busters далеко от вашего оружия ближнего боя!"
 	}
 	"Tank_Annotation_HellHint"
 	{
