@@ -323,7 +323,7 @@
 	}
 	"Tank_Annotation_Giant_SwatBuster"
 	{
-		"ru"			"Swat Busters away with your melee!"
+		"ru"			"Swat Busters далеко от вашего оружия ближнего боя!"
 	}
 	"Tank_Annotation_HellHint"
 	{
