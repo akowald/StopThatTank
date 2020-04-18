@@ -8211,7 +8211,7 @@ public void OnEntityDestroyed(int entity)
 				StopSound(iTank, SNDCHAN_STATIC, "^mvm/mvm_tank_loop.wav");
 			}
 
-			if(GetEntPropEnt(iTank, Prop_Send, "moveparent") == entity)
+			if(GetEntPropEnt(iTank, Prop_Send, "moveparent") == entity && entity > 0)
 			{
 				// Give the tank godmode to prevent it from being destroyed by players at this point
 				SetEntProp(iTank, Prop_Data, "m_takedamage", DAMAGE_EVENTS_ONLY); // Buddah
