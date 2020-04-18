@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2017 Alex Kowald
+ * Copyright (C) 2014-2020 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -29,30 +29,30 @@
 #error This plugin must be compiled from tank.sp
 #endif
 
-enum eSentryVisionStruct
+enum struct eSentryVisionStruct
 {
-	Handle:g_hSentryVisionList,			// List of all obj_sentrygun entities that are being watched
-};
-int g_nSentryVision[eSentryVisionStruct];
+	Handle g_hSentryVisionList; // List of all obj_sentrygun entities that are being watched
+}
+eSentryVisionStruct g_nSentryVision;
 
 bool g_hitBySentryBuster[MAXPLAYERS+1];
 
-enum eBusterStruct
+enum struct eBusterStruct
 {
-	bool:g_bBusterActive, // Whether or not to run the buster logic and choose/spawn another buster
-	g_iBusterQueuedUserId, // Userid of the queued sentry buster
+	bool g_bBusterActive; // Whether or not to run the buster logic and choose/spawn another buster
+	int g_iBusterQueuedUserId; // Userid of the queued sentry buster
 	// 3 conditions to be met in order for a sentry buster to be spawned
-	g_iBusterTriggerTankBySentry, // Damage dealt to the tank by a sentry
-	g_iBusterTriggerGiantBySentry, // Damage dealt to the giant by a sentry
-	g_iBusterTriggerRobotsBySentry, // Damage dealt to normal robots by a sentry
-	Float:g_flBusterTimeWarned, // Time when the queued sentry buster is warned
-	Float:g_flBusterTriggerTimer, // Timer to bring out the sentry buster
-	g_iBusterNumSentOut, // Number of sentry busters spawned during the round
-	Float:g_flBusterTimeLastThink, // Time when the last think occurred, used for the buster timer trigger
-	bool:g_bBusterTimerStarted, // Flag when the buster timer has been started
-	bool:g_bBusterNoticeSent, // Flag when the user has been notified.
-};
-int g_nBuster[MAX_TEAMS][eBusterStruct];
+	int g_iBusterTriggerTankBySentry; // Damage dealt to the tank by a sentry
+	int g_iBusterTriggerGiantBySentry; // Damage dealt to the giant by a sentry
+	int g_iBusterTriggerRobotsBySentry; // Damage dealt to normal robots by a sentry
+	float g_flBusterTimeWarned; // Time when the queued sentry buster is warned
+	float g_flBusterTriggerTimer; // Timer to bring out the sentry buster
+	int g_iBusterNumSentOut; // Number of sentry busters spawned during the round
+	float g_flBusterTimeLastThink; // Time when the last think occurred, used for the buster timer trigger
+	bool g_bBusterTimerStarted; // Flag when the buster timer has been started
+	bool g_bBusterNoticeSent; // Flag when the user has been notified.
+}
+eBusterStruct g_nBuster[MAX_TEAMS];
 
 enum
 {
@@ -63,17 +63,17 @@ enum
 
 void Buster_Cleanup(int team)
 {
-	g_nBuster[team][g_bBusterActive] = false;
-	g_nBuster[team][g_iBusterQueuedUserId] = 0;
-	g_nBuster[team][g_flBusterTimeWarned] = 0.0;
-	g_nBuster[team][g_iBusterNumSentOut] = 0;
-	g_nBuster[team][g_flBusterTimeLastThink] = 0.0;
-	g_nBuster[team][g_bBusterTimerStarted] = false;
+	g_nBuster[team].g_bBusterActive = false;
+	g_nBuster[team].g_iBusterQueuedUserId = 0;
+	g_nBuster[team].g_flBusterTimeWarned = 0.0;
+	g_nBuster[team].g_iBusterNumSentOut = 0;
+	g_nBuster[team].g_flBusterTimeLastThink = 0.0;
+	g_nBuster[team].g_bBusterTimerStarted = false;
 
-	g_nBuster[team][g_iBusterTriggerGiantBySentry] = 0;
-	g_nBuster[team][g_iBusterTriggerRobotsBySentry] = 0;
-	g_nBuster[team][g_iBusterTriggerTankBySentry] = 0;
-	g_nBuster[team][g_flBusterTriggerTimer] = 0.0;
+	g_nBuster[team].g_iBusterTriggerGiantBySentry = 0;
+	g_nBuster[team].g_iBusterTriggerRobotsBySentry = 0;
+	g_nBuster[team].g_iBusterTriggerTankBySentry = 0;
+	g_nBuster[team].g_flBusterTriggerTimer = 0.0;
 }
 
 int Buster_PickPlayer(int team, int dontConsider=-1)
@@ -84,13 +84,13 @@ int Buster_PickPlayer(int team, int dontConsider=-1)
 	// Picks a random player to become the sentry buster
 	for(int i=1; i<=MaxClients; i++)
 	{
-		if(IsClientInGame(i) && GetClientTeam(i) == team && !g_nSpawner[i][g_bSpawnerEnabled])
+		if(IsClientInGame(i) && GetClientTeam(i) == team && !g_nSpawner[i].g_bSpawnerEnabled)
 		{
 			// Check if the player is already selected to be the giant robot
-			if(g_nTeamGiant[team][g_bTeamGiantActive] && GetClientUserId(i) == g_nTeamGiant[team][g_iTeamGiantQueuedUserId]) continue;
+			if(g_nTeamGiant[team].g_bTeamGiantActive && GetClientUserId(i) == g_nTeamGiant[team].g_iTeamGiantQueuedUserId) continue;
 
 			// Check if the player is already spawning as a giant
-			if(g_nSpawner[i][g_bSpawnerEnabled]) continue;
+			if(g_nSpawner[i].g_bSpawnerEnabled) continue;
 
 			// Player has already passed this round
 			if(g_bBusterPassed[i]) continue;
@@ -139,9 +139,9 @@ void Buster_QueuePlayer(int team, int client)
 		}
 	}
 
-	g_nBuster[team][g_iBusterQueuedUserId] = GetClientUserId(client);
+	g_nBuster[team].g_iBusterQueuedUserId = GetClientUserId(client);
 	// Whenever a new player is selected, reset the warn period
-	g_nBuster[team][g_flBusterTimeWarned] = 0.0;	
+	g_nBuster[team].g_flBusterTimeWarned = 0.0;	
 }
 
 bool Buster_IsMedicExempt(int client)
@@ -238,21 +238,21 @@ void Buster_Think(int team)
 	float flCurrentTime = GetEngineTime();
 
 	// Not active yet - in between rounds
-	if(!g_nBuster[team][g_bBusterActive]) return;
+	if(!g_nBuster[team].g_bBusterActive) return;
 
 	// Ensure that there is a valid person queued up to become the sentry buster
 	int client = 0;
 	bool bIsValid = false;
-	if(g_nBuster[team][g_iBusterQueuedUserId] != 0)
+	if(g_nBuster[team].g_iBusterQueuedUserId != 0)
 	{
 		// Check if the queued player is still valid
-		client = GetClientOfUserId(g_nBuster[team][g_iBusterQueuedUserId]);
-		if(client >= 1 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == team && !g_nSpawner[client][g_bSpawnerEnabled] && !g_bBusterPassed[client]
-			&& !(g_nTeamGiant[team][g_bTeamGiantActive] && g_nTeamGiant[team][g_iTeamGiantQueuedUserId] == g_nBuster[team][g_iBusterQueuedUserId]))
+		client = GetClientOfUserId(g_nBuster[team].g_iBusterQueuedUserId);
+		if(client >= 1 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == team && !g_nSpawner[client].g_bSpawnerEnabled && !g_bBusterPassed[client]
+			&& !(g_nTeamGiant[team].g_bTeamGiantActive && g_nTeamGiant[team].g_iTeamGiantQueuedUserId == g_nBuster[team].g_iBusterQueuedUserId))
 		{
 			bIsValid = true;
 		}else{
-			g_nBuster[team][g_iBusterQueuedUserId] = 0;
+			g_nBuster[team].g_iBusterQueuedUserId = 0;
 		}
 	}
 
@@ -275,26 +275,26 @@ void Buster_Think(int team)
 	}
 
 	int oppositeTeam = (team == TFTeam_Red) ? TFTeam_Blue : TFTeam_Red;
-	if(g_nBuster[team][g_bBusterTimerStarted] && g_nBuster[team][g_flBusterTimeLastThink] != 0.0)
+	if(g_nBuster[team].g_bBusterTimerStarted && g_nBuster[team].g_flBusterTimeLastThink != 0.0)
 	{
 		if(Buster_GetNumActiveSentries(oppositeTeam) == 0)
 		{
 			// The buster timer should be paused
 			// Enforce a minimum time when the buster timer becomes paused
 			float flMinPause = config.LookupFloat(g_hCvarBusterTimePause);
-			if(g_nBuster[team][g_flBusterTriggerTimer] < flMinPause)
+			if(g_nBuster[team].g_flBusterTriggerTimer < flMinPause)
 			{
-				g_nBuster[team][g_flBusterTriggerTimer] = flMinPause;
+				g_nBuster[team].g_flBusterTriggerTimer = flMinPause;
 			}
 		}else{
 			// The buster timer is not paused
 			// Decrement the buster timer based on how much time has passed since the last think
-			g_nBuster[team][g_flBusterTriggerTimer] -= flCurrentTime - g_nBuster[team][g_flBusterTimeLastThink];
+			g_nBuster[team].g_flBusterTriggerTimer -= flCurrentTime - g_nBuster[team].g_flBusterTimeLastThink;
 		}
 	}
 
 	// Check if the sentry buster is being warned/spawned
-	if(g_nBuster[team][g_flBusterTimeWarned] == 0.0)
+	if(g_nBuster[team].g_flBusterTimeWarned == 0.0)
 	{
 		// Sentry buster has not been warned yet
 		if(Buster_AreConditionsMet(team))
@@ -376,7 +376,7 @@ void Buster_Think(int team)
 				return;
 			}
 
-			g_nBuster[team][g_flBusterTimeWarned] = flCurrentTime;
+			g_nBuster[team].g_flBusterTimeWarned = flCurrentTime;
 
 			// Prompt the player that they will become a sentry buster in a few minutes so they have time to pass it.
 			Handle hEvent = CreateEvent("show_annotation");
@@ -418,55 +418,55 @@ void Buster_Think(int team)
 		}
 	}else{
 		// Sentry buster is currently being warned
-		if(flCurrentTime - g_nBuster[team][g_flBusterTimeWarned] > config.LookupFloat(g_hCvarBusterTimeWarn))
+		if(flCurrentTime - g_nBuster[team].g_flBusterTimeWarned > config.LookupFloat(g_hCvarBusterTimeWarn))
 		{
 			// The player has had ample warning so make them a sentry buster
 			Spawner_Spawn(client, Spawn_GiantRobot, Buster_PickTemplate());
 			
 			// Reset all three conditions
-			g_nBuster[team][g_iBusterTriggerTankBySentry] = 0;
-			g_nBuster[team][g_iBusterTriggerGiantBySentry] = 0;
-			g_nBuster[team][g_iBusterTriggerRobotsBySentry] = 0;
-			g_nBuster[team][g_flBusterTriggerTimer] = 0.0;
-			g_nBuster[team][g_bBusterTimerStarted] = false;
+			g_nBuster[team].g_iBusterTriggerTankBySentry = 0;
+			g_nBuster[team].g_iBusterTriggerGiantBySentry = 0;
+			g_nBuster[team].g_iBusterTriggerRobotsBySentry = 0;
+			g_nBuster[team].g_flBusterTriggerTimer = 0.0;
+			g_nBuster[team].g_bBusterTimerStarted = false;
 
-			g_nBuster[team][g_flBusterTimeWarned] = 0.0;
-			g_nBuster[team][g_iBusterQueuedUserId] = 0;
+			g_nBuster[team].g_flBusterTimeWarned = 0.0;
+			g_nBuster[team].g_iBusterQueuedUserId = 0;
 
 			g_bBusterUsed[client] = true; // flag this person so they will not become the buster again for the rest of the round
 
-			g_nBuster[team][g_iBusterNumSentOut]++;
+			g_nBuster[team].g_iBusterNumSentOut++;
 		}
 	}
 }
 
 void Buster_IncrementStat(int stat, int team, int value)
 {
-	if(!g_nBuster[team][g_bBusterActive]) return;
+	if(!g_nBuster[team].g_bBusterActive) return;
 	if(!g_bIsRoundStarted) return;
 
 	switch(stat)
 	{
-		case BusterStat_Tank: g_nBuster[team][g_iBusterTriggerTankBySentry] += value;
-		case BusterStat_Giant: g_nBuster[team][g_iBusterTriggerGiantBySentry] += value;
-		case BusterStat_Robots: g_nBuster[team][g_iBusterTriggerRobotsBySentry] += value;
+		case BusterStat_Tank: g_nBuster[team].g_iBusterTriggerTankBySentry += value;
+		case BusterStat_Giant: g_nBuster[team].g_iBusterTriggerGiantBySentry += value;
+		case BusterStat_Robots: g_nBuster[team].g_iBusterTriggerRobotsBySentry += value;
 	}
 
 	// Prep the "buster timer", a fourth sentry buster trigger
-	if(!g_nBuster[team][g_bBusterTimerStarted])
+	if(!g_nBuster[team].g_bBusterTimerStarted)
 	{
-		g_nBuster[team][g_bBusterTimerStarted] = true;
+		g_nBuster[team].g_bBusterTimerStarted = true;
 
 		int oppositeTeam = (team == TFTeam_Red) ? TFTeam_Blue : TFTeam_Red;
 		int numSentries = Buster_GetNumActiveSentries(oppositeTeam);
 		// Formula: Buster timer = base - (sentry_multiplier * num_active_sentries)
-		if(g_nBuster[team][g_iBusterNumSentOut] == 0)
+		if(g_nBuster[team].g_iBusterNumSentOut == 0)
 		{
 			// First buster of the round
-			g_nBuster[team][g_flBusterTriggerTimer] = config.LookupFloat(g_hCvarBusterFormulaBaseFirst) - (config.LookupFloat(g_hCvarBusterFormulaSentryMult) * float(numSentries));
+			g_nBuster[team].g_flBusterTriggerTimer = config.LookupFloat(g_hCvarBusterFormulaBaseFirst) - (config.LookupFloat(g_hCvarBusterFormulaSentryMult) * float(numSentries));
 		}else{
 			// Every buster afterward
-			g_nBuster[team][g_flBusterTriggerTimer] = config.LookupFloat(g_hCvarBusterFormulaBaseSecond) - (config.LookupFloat(g_hCvarBusterFormulaSentryMult) * float(numSentries));
+			g_nBuster[team].g_flBusterTriggerTimer = config.LookupFloat(g_hCvarBusterFormulaBaseSecond) - (config.LookupFloat(g_hCvarBusterFormulaSentryMult) * float(numSentries));
 		}
 	}
 }
@@ -515,13 +515,13 @@ bool Buster_AreConditionsMet(int team)
 		hTriggerRobots = g_hCvarBusterTriggerRobotsPlr;
 	}
 
-	if(g_nBuster[team][g_iBusterTriggerTankBySentry] >= config.LookupInt(hTriggerTank) || g_nBuster[team][g_iBusterTriggerGiantBySentry] >= config.LookupInt(hTriggerGiant) || g_nBuster[team][g_iBusterTriggerRobotsBySentry] >= config.LookupInt(hTriggerRobots))
+	if(g_nBuster[team].g_iBusterTriggerTankBySentry >= config.LookupInt(hTriggerTank) || g_nBuster[team].g_iBusterTriggerGiantBySentry >= config.LookupInt(hTriggerGiant) || g_nBuster[team].g_iBusterTriggerRobotsBySentry >= config.LookupInt(hTriggerRobots))
 	{
 		bTriggerMet = true;
 	}
 
 	// Check if the sentry buster timer has elapsed
-	if(g_nBuster[team][g_bBusterTimerStarted] && g_nBuster[team][g_flBusterTriggerTimer] <= 0.0)
+	if(g_nBuster[team].g_bBusterTimerStarted && g_nBuster[team].g_flBusterTriggerTimer <= 0.0)
 	{
 		bTriggerMet = true;
 	}
@@ -735,7 +735,7 @@ public Action Command_Buster(int client, int args)
 	{
 		// This command allows players to see who will become the next sentry buster on their team
 
-		int iBuster = GetClientOfUserId(g_nBuster[team][g_iBusterQueuedUserId]);
+		int iBuster = GetClientOfUserId(g_nBuster[team].g_iBusterQueuedUserId);
 		if(iBuster >= 1 && iBuster <= MaxClients && IsClientInGame(iBuster))
 		{
 			PrintToChat(client, "%t", "Tank_Chat_Buster_Queued", 0x01, g_strTeamColors[team], 0x01, g_strTeamColors[team], iBuster, 0x01);
@@ -750,7 +750,7 @@ public Action Command_Buster(int client, int args)
 		Handle hPanel = CreatePanel();
 
 		char strText[200];
-		Format(strText, sizeof(strText), "RED's next buster: %N\nBLU's next buster: %N\n \nCurrent BLU conditions:", GetClientOfUserId(g_nBuster[TFTeam_Red][g_iBusterQueuedUserId]), GetClientOfUserId(g_nBuster[TFTeam_Blue][g_iBusterQueuedUserId]));
+		Format(strText, sizeof(strText), "RED's next buster: %N\nBLU's next buster: %N\n \nCurrent BLU conditions:", GetClientOfUserId(g_nBuster[TFTeam_Red].g_iBusterQueuedUserId), GetClientOfUserId(g_nBuster[TFTeam_Blue].g_iBusterQueuedUserId));
 		SetPanelTitle(hPanel, strText);
 
 		int iTriggerTank = (g_nGameMode == GameMode_Race) ? config.LookupInt(g_hCvarBusterTriggerTankPlr) :  config.LookupInt(g_hCvarBusterTriggerTank);
@@ -758,13 +758,13 @@ public Action Command_Buster(int client, int args)
 		int iTriggerRobots = (g_nGameMode == GameMode_Race) ? config.LookupInt(g_hCvarBusterTriggerRobotsPlr) : config.LookupInt(g_hCvarBusterTriggerRobots);
 
 		// Show the damage amounts of the current triggers
-		Format(strText, sizeof(strText), "Tank damage: %d/%d (%d%%)", g_nBuster[TFTeam_Blue][g_iBusterTriggerTankBySentry], iTriggerTank, RoundToNearest(float(g_nBuster[TFTeam_Blue][g_iBusterTriggerTankBySentry]) / float(iTriggerTank) * 100.0));
+		Format(strText, sizeof(strText), "Tank damage: %d/%d (%d%%)", g_nBuster[TFTeam_Blue].g_iBusterTriggerTankBySentry, iTriggerTank, RoundToNearest(float(g_nBuster[TFTeam_Blue].g_iBusterTriggerTankBySentry) / float(iTriggerTank) * 100.0));
 		DrawPanelText(hPanel, strText);
-		Format(strText, sizeof(strText), "Giant damage: %d/%d (%d%%)", g_nBuster[TFTeam_Blue][g_iBusterTriggerGiantBySentry], iTriggerGiant, RoundToNearest(float(g_nBuster[TFTeam_Blue][g_iBusterTriggerGiantBySentry]) / float(iTriggerGiant) * 100.0));
+		Format(strText, sizeof(strText), "Giant damage: %d/%d (%d%%)", g_nBuster[TFTeam_Blue].g_iBusterTriggerGiantBySentry, iTriggerGiant, RoundToNearest(float(g_nBuster[TFTeam_Blue].g_iBusterTriggerGiantBySentry) / float(iTriggerGiant) * 100.0));
 		DrawPanelText(hPanel, strText);
-		Format(strText, sizeof(strText), "Robot kills: %d/%d (%d%%)\n ", g_nBuster[TFTeam_Blue][g_iBusterTriggerRobotsBySentry], iTriggerRobots, RoundToNearest(float(g_nBuster[TFTeam_Blue][g_iBusterTriggerRobotsBySentry]) / float(iTriggerRobots) * 100.0));
+		Format(strText, sizeof(strText), "Robot kills: %d/%d (%d%%)\n ", g_nBuster[TFTeam_Blue].g_iBusterTriggerRobotsBySentry, iTriggerRobots, RoundToNearest(float(g_nBuster[TFTeam_Blue].g_iBusterTriggerRobotsBySentry) / float(iTriggerRobots) * 100.0));
 		DrawPanelText(hPanel, strText);
-		Format(strText, sizeof(strText), "Buster timer(%d): %1.2f", g_nBuster[TFTeam_Blue][g_bBusterTimerStarted], g_nBuster[TFTeam_Blue][g_flBusterTriggerTimer]);
+		Format(strText, sizeof(strText), "Buster timer(%d): %1.2f", g_nBuster[TFTeam_Blue].g_bBusterTimerStarted, g_nBuster[TFTeam_Blue].g_flBusterTriggerTimer);
 		DrawPanelText(hPanel, strText);
 
 		Format(strText, sizeof(strText), "Num active sentries: %d", Buster_GetNumActiveSentries(TFTeam_Red));
@@ -782,12 +782,12 @@ public Action Command_Buster(int client, int args)
 int Buster_PickTemplate()
 {
 	int iForcedTemplate = config.LookupInt(g_hCvarBusterForce);
-	if(iForcedTemplate != -1 && iForcedTemplate >= 0 && iForcedTemplate < MAX_NUM_TEMPLATES && g_nGiants[iForcedTemplate][g_bGiantTemplateEnabled] && g_nGiants[iForcedTemplate][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) return iForcedTemplate;
+	if(iForcedTemplate != -1 && iForcedTemplate >= 0 && iForcedTemplate < MAX_NUM_TEMPLATES && g_nGiants[iForcedTemplate].g_bGiantTemplateEnabled && g_nGiants[iForcedTemplate].g_iGiantTags & GIANTTAG_SENTRYBUSTER) return iForcedTemplate;
 
 	Handle hArray = CreateArray();
 	for(int i=0; i<MAX_NUM_TEMPLATES; i++)
 	{
-		if(g_nGiants[i][g_bGiantTemplateEnabled] && !g_nGiants[i][g_bGiantAdminOnly] && g_nGiants[i][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
+		if(g_nGiants[i].g_bGiantTemplateEnabled && !g_nGiants[i].g_bGiantAdminOnly && g_nGiants[i].g_iGiantTags & GIANTTAG_SENTRYBUSTER)
 		{
 			PushArrayCell(hArray, i);
 		}
@@ -895,7 +895,7 @@ void SentryVision_OnSentryCreated(int iSentryGun)
 		//AcceptEntityInput(iGlow, "SetParentAttachment");
 
 		SentryVision_SetReference(iGlow, iSentryGun);
-		PushArrayCell(g_nSentryVision[g_hSentryVisionList], EntIndexToEntRef(iGlow));
+		PushArrayCell(g_nSentryVision.g_hSentryVisionList, EntIndexToEntRef(iGlow));
 #if defined DEBUG
 		PrintToServer("(SentryVision_OnSentryCreated) Created glow entity: %d!", EntIndexToEntRef(iGlow));
 #endif
@@ -906,9 +906,9 @@ void SentryVision_OnSentryCreated(int iSentryGun)
 
 void SentryVision_Think()
 {
-	for(int i=GetArraySize(g_nSentryVision[g_hSentryVisionList])-1; i>=0; i--)
+	for(int i=GetArraySize(g_nSentryVision.g_hSentryVisionList)-1; i>=0; i--)
 	{
-		int iGlow = EntRefToEntIndex(GetArrayCell(g_nSentryVision[g_hSentryVisionList], i));
+		int iGlow = EntRefToEntIndex(GetArrayCell(g_nSentryVision.g_hSentryVisionList, i));
 		if(iGlow > MaxClients)
 		{
 			int iSentryGun = EntRefToEntIndex(SentryVision_GetReference(iGlow));
@@ -918,15 +918,15 @@ void SentryVision_Think()
 				//SentryVision_UpdateFlags(iGlow, iSentryGun);
 			}else{
 #if defined DEBUG
-				PrintToServer("(SentryVision_Think) Removed glow entity (non-existant sentry): %d!", GetArrayCell(g_nSentryVision[g_hSentryVisionList], i));
+				PrintToServer("(SentryVision_Think) Removed glow entity (non-existant sentry): %d!", GetArrayCell(g_nSentryVision.g_hSentryVisionList, i));
 #endif
-				RemoveFromArray(g_nSentryVision[g_hSentryVisionList], i);
+				RemoveFromArray(g_nSentryVision.g_hSentryVisionList, i);
 			}
 		}else{
 #if defined DEBUG
-			PrintToServer("(SentryVision_Think) Removed glow entity (no longer exists): %d!", GetArrayCell(g_nSentryVision[g_hSentryVisionList], i));
+			PrintToServer("(SentryVision_Think) Removed glow entity (no longer exists): %d!", GetArrayCell(g_nSentryVision.g_hSentryVisionList, i));
 #endif
-			RemoveFromArray(g_nSentryVision[g_hSentryVisionList], i);
+			RemoveFromArray(g_nSentryVision.g_hSentryVisionList, i);
 		}
 	}
 }

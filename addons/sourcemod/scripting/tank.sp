@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2017 Alex Kowald
+ * Copyright (C) 2014-2020 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -42,7 +42,7 @@
 // Enable this for diagnostic messages in server console (very verbose)
 //#define DEBUG
 
-#define PLUGIN_VERSION 				"1.5.9"
+#define PLUGIN_VERSION 				"1.6.0"
 
 #define MODEL_TANK 					"models/bots/boss_bot/boss_tank.mdl"			// Model of the normal tank boss
 #define MODEL_TRACK_L				"models/bots/boss_bot/tank_track_L.mdl"			// Model of the left tank track
@@ -801,16 +801,16 @@ enum eTeleporterState
 	TeleporterState_Connected
 };
 
-enum eGiantTeleporterStruct
+enum struct eGiantTeleporterStruct
 {
-	g_iGiantTeleporterRefExit,					// Entity reference of the teleporter exit
-	Handle:g_hGiantTeleporterTeleQueue,			// Array of players in queue to be teleported
-	eTeleporterState:g_nGiantTeleporterState,	// State of the current teleporter exit
-	Float:g_flGiantTeleporterLastTeleport,		// Time when the last person was teleported
-	Float:g_flGiantTeleporterBeamUpdated, 		// Time when the beam above the teleporter was last updated
-	g_iGiantTeleporterRefParticle,				// Entity reference of the teleporter exit beam for pl_ only. plr_ will use the tempent beam to show different team colors.
-};
-int g_nGiantTeleporter[MAX_TEAMS][eGiantTeleporterStruct];
+	int g_iGiantTeleporterRefExit;				// Entity reference of the teleporter exit
+	Handle g_hGiantTeleporterTeleQueue;			// Array of players in queue to be teleported
+	eTeleporterState g_nGiantTeleporterState;	// State of the current teleporter exit
+	float g_flGiantTeleporterLastTeleport;		// Time when the last person was teleported
+	float g_flGiantTeleporterBeamUpdated; 		// Time when the beam above the teleporter was last updated
+	int g_iGiantTeleporterRefParticle;			// Entity reference of the teleporter exit beam for pl_ only. plr_ will use the tempent beam to show different team colors.
+}
+eGiantTeleporterStruct g_nGiantTeleporter[MAX_TEAMS];
 
 float g_flTimeCashPickup[MAXPLAYERS+1];
 float g_flHasShield[MAXPLAYERS+1];
@@ -850,12 +850,12 @@ int g_modelRomevisionTrackL = -1;
 int g_modelRomevisionTrackR = -1;
 int g_teamOverrides[4] = {0, 0, 3, 0}; // This is the m_nModelIndexOverrides index for each team.
 
-enum eDisguisedStruct
+enum struct eDisguisedStruct
 {
-	g_iDisguisedTeam, // The spy's disguised team
-	g_iDisguisedClass // The spy's disguised class
-};
-int g_nDisguised[MAXPLAYERS+1][eDisguisedStruct];
+	int g_iDisguisedTeam; // The spy's disguised team
+	int g_iDisguisedClass; // The spy's disguised class
+}
+eDisguisedStruct g_nDisguised[MAXPLAYERS+1];
 
 bool g_blockLogAction = false;
 
@@ -930,13 +930,13 @@ bool g_overrideSound = false;
 float g_timeLastRobotDamage = 0.0;
 int g_hitWithScorchShot = 0;
 float g_hhhCooldown[MAXPLAYERS+1];
-enum g_diedWithBombStruct
+enum struct g_diedWithBombStruct
 {
-	g_diedWithBombUserId,
-	bool:g_diedWithBombWasGiant,
-	Float:g_diedWithBombTime,
-};
-int g_diedWithBomb[g_diedWithBombStruct];
+	int g_diedWithBombUserId;
+	bool g_diedWithBombWasGiant;
+	float g_diedWithBombTime;
+}
+g_diedWithBombStruct g_diedWithBomb;
 
 enum eSpawnerType
 {
@@ -950,20 +950,20 @@ enum eSpawnerType
 #define SPAWNER_SIZE 				MAXPLAYERS+MAX_TEAMS+1
 #define SPAWNER_MAX_REMINDERS 		3
 // Structure for the giant/tank spawner that supports spawning multiple giants at a time onto the playing field.
-enum eSpawnerStruct
+enum struct eSpawnerStruct
 {
-	bool:g_bSpawnerEnabled,									// Flag to show if spawner is enabled
-	Float:g_flSpawnerPos[3],								// Spawn position saved for later
-	Float:g_flSpawnerAng[3],								// Spawn angle saved for later
-	Handle:g_hSpawnerTimer,									// Timer used in the spawn process
-	eSpawnerType:g_nSpawnerType,							// Spawn object type: Spawn_Tank or Spawn_GiantRobot
-	g_iSpawnerGiantIndex,									// Template giant index used
-	Float:g_flSpawnerTimeSpawned, 							// Engine time when the object has been spawned
-	g_iSpawnerFlags, 										// Flags to be used when invoking Spawner_Spawn
-	g_iSpawnerExtraEnt, 									// A reference to any entity
-	bool:g_bSpawnerShownReminder[SPAWNER_MAX_REMINDERS],	// Flag that a particular reminder has been shown.
-};
-int g_nSpawner[SPAWNER_SIZE][eSpawnerStruct];
+	bool g_bSpawnerEnabled;									// Flag to show if spawner is enabled
+	float g_flSpawnerPos[3];								// Spawn position saved for later
+	float g_flSpawnerAng[3];								// Spawn angle saved for later
+	Handle g_hSpawnerTimer;									// Timer used in the spawn process
+	eSpawnerType g_nSpawnerType;							// Spawn object type: Spawn_Tank or Spawn_GiantRobot
+	int g_iSpawnerGiantIndex;								// Template giant index used
+	float g_flSpawnerTimeSpawned; 							// Engine time when the object has been spawned
+	int g_iSpawnerFlags; 									// Flags to be used when invoking Spawner_Spawn
+	int g_iSpawnerExtraEnt; 								// A reference to any entity
+	bool g_bSpawnerShownReminder[SPAWNER_MAX_REMINDERS];	// Flag that a particular reminder has been shown.
+}
+eSpawnerStruct g_nSpawner[SPAWNER_SIZE];
 
 enum
 {
@@ -979,15 +979,15 @@ enum
 	AnnouncerMessage_LargeDifference,
 	AnnouncerMessage_CatchingUp,
 };
-enum eAnnouncerStruct
+enum struct eAnnouncerStruct
 {
-	bool:g_announcerActive,									// Engage announcer logic.
-	bool:g_announcerCloseGame, 								// Tanks are neck-and-neck at the end.
-	bool:g_announcerLargeDifference,						// Tanks are far apart from each other in terms of progress.
-	bool:g_announcerCatchingUp,								// Tanks are catching up to each other.
-	Float:g_announcerLastMessage[ANNOUNCER_MAX_MESSAGES],	// Time when the last message was sent.
-};
-int g_announcer[eAnnouncerStruct];
+	bool g_announcerActive;									// Engage announcer logic.
+	bool g_announcerCloseGame; 								// Tanks are neck-and-neck at the end.
+	bool g_announcerLargeDifference;						// Tanks are far apart from each other in terms of progress.
+	bool g_announcerCatchingUp;								// Tanks are catching up to each other.
+	float g_announcerLastMessage[ANNOUNCER_MAX_MESSAGES];	// Time when the last message was sent.
+}
+eAnnouncerStruct g_announcer;
 
 enum
 {
@@ -997,19 +997,19 @@ enum
 	ShowInfoPanel_Never,
 };
 #define MAX_SHOW_INFO_PANEL 3
-enum eSettingsStruct
+enum struct eSettingsStruct
 {
-	g_settingsShowInfoPanel,								// When to show the giant info panel when a team giant is selected.
-};
-int g_settings[MAXPLAYERS+1][eSettingsStruct];
+	int g_settingsShowInfoPanel;						// When to show the giant info panel when a team giant is selected.
+}
+eSettingsStruct g_settings[MAXPLAYERS+1];
 
 #define TANKRANK_NAME_MAXLEN 64
-enum eTankRankStruct
+enum struct eTankRankStruct
 {
-	g_tankRankNumKills,
-	String:g_tankRankName[TANKRANK_NAME_MAXLEN]
-};
-int g_tankRank[][eTankRankStruct] = {
+	int g_tankRankNumKills;
+	char g_tankRankName[TANKRANK_NAME_MAXLEN];
+}
+eTankRankStruct g_tankRank[] = {
 	{50, "Unremarkable"},
 	{150, "Scarcely Lethal"},
 	{250, "Mildly Menacing"},
@@ -1319,9 +1319,9 @@ public void OnPluginStart()
 
 	for(int i=2; i<=3; i++)
 	{
-		g_nGiantTeleporter[i][g_hGiantTeleporterTeleQueue] = CreateArray();
+		g_nGiantTeleporter[i].g_hGiantTeleporterTeleQueue = CreateArray();
 	}
-	g_nSentryVision[g_hSentryVisionList] = CreateArray();
+	g_nSentryVision.g_hSentryVisionList = CreateArray();
 	
 	HookEntityOutput("team_round_timer", "On10SecRemain", Output_On10SecRemaining);
 	HookEntityOutput("team_control_point", "OnCapTeam2", Output_OnBlueCapture);
@@ -1789,7 +1789,7 @@ public void OnPluginEnd()
 		if(IsClientInGame(i))
 		{
 			Attributes_Clear(i);
-			if(g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot) Giant_Clear(i);
+			if(g_nSpawner[i].g_bSpawnerEnabled && g_nSpawner[i].g_nSpawnerType == Spawn_GiantRobot) Giant_Clear(i);
 		}
 	}
 
@@ -1847,7 +1847,7 @@ public void ConVarChanged_ChatTips(ConVar convar, char[] oldValue, char[] newVal
 public void OnClientDisconnect(int client)
 {
 	// Check if a giant robot has disconnected, this will ensure that looping sounds are stopped
-	if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot)
+	if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot)
 	{
 		Giant_Clear(client, GiantCleared_Disconnect);
 	}
@@ -1931,7 +1931,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				}
 
 				// If we are hightower, we need to remove the outline when the giant uses the invis spell.
-				if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
+				if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER))
 				{
 					// m_bGlowEnabled should only be set on non-spy giants in plr mode.
 					if(g_nGameMode == GameMode_Race && class != TFClass_Spy)
@@ -1946,9 +1946,9 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				}
 
 				// Apply "cap-health" rule set in the giant template.
-				if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot)
+				if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot)
 				{
-					float mult = g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_flGiantCapHealth];
+					float mult = g_nGiants[g_nSpawner[client].g_iSpawnerGiantIndex].g_flGiantCapHealth;
 					if(mult > 0.0)
 					{
 						int cap = RoundToNearest(float(SDK_GetMaxHealth(client)) * mult);
@@ -1982,7 +1982,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 
 					// Make attack cause the player to taunt and self-destruct
 					// Prevent the bomb becoming armed as soon as they spawn
-					if(g_nSpawner[client][g_flSpawnerTimeSpawned] != 0.0 && GetEngineTime() - g_nSpawner[client][g_flSpawnerTimeSpawned] > 2.5 && buttons & IN_ATTACK)
+					if(g_nSpawner[client].g_flSpawnerTimeSpawned != 0.0 && GetEngineTime() - g_nSpawner[client].g_flSpawnerTimeSpawned > 2.5 && buttons & IN_ATTACK)
 					{
 						FakeClientCommand(client, "taunt");
 					}
@@ -2006,7 +2006,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 						GetClientAbsOrigin(client, busterPos);
 						for(int i=1; i<=MaxClients; i++)
 						{
-							if(i != client && g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) && g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_MELEE_KNOCKBACK && !g_nSpawner[i][g_bSpawnerShownReminder][SpawnerReminder_BusterSwat]
+							if(i != client && g_nSpawner[i].g_bSpawnerEnabled && g_nSpawner[i].g_nSpawnerType == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER) && g_nGiants[g_nSpawner[i].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_MELEE_KNOCKBACK && !g_nSpawner[i].g_bSpawnerShownReminder[SpawnerReminder_BusterSwat]
 								&& IsClientInGame(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss") && IsPlayerAlive(i) && GetClientTeam(i) != team)
 							{
 								float giantPos[3];
@@ -2014,7 +2014,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 								if(GetVectorDistance(busterPos, giantPos) < 350.0)
 								{
 									// Sentry Buster is invading the Giant's personal space.
-									g_nSpawner[i][g_bSpawnerShownReminder][SpawnerReminder_BusterSwat] = true;
+									g_nSpawner[i].g_bSpawnerShownReminder[SpawnerReminder_BusterSwat] = true;
 
 									Handle event = CreateEvent("show_annotation");
 									if(event != INVALID_HANDLE)
@@ -2038,7 +2038,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 					}
 				}
 				
-				if(g_nMapHack == MapHack_Borneo && g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !g_nSpawner[client][g_bSpawnerShownReminder][SpawnerReminder_BorneoDetour])
+				if(g_nMapHack == MapHack_Borneo && g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && !g_nSpawner[client].g_bSpawnerShownReminder[SpawnerReminder_BorneoDetour])
 				{
 					// Remind any Giant or Sentry Buster to take the detour when they get near the third control point in Borneo.
 					int controlPoint = EntRefToEntIndex(g_iRefLinkedCPs[TFTeam_Blue][2]);
@@ -2053,7 +2053,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 							GetClientAbsOrigin(client, playerPos);
 							if(GetVectorDistance(controlPos, playerPos, true) < 62500.0) // 250.0^2
 							{
-								g_nSpawner[client][g_bSpawnerShownReminder][SpawnerReminder_BorneoDetour] = true;
+								g_nSpawner[client].g_bSpawnerShownReminder[SpawnerReminder_BorneoDetour] = true;
 
 								Borneo_ShowAlternativeRoute(client);
 							}
@@ -2162,11 +2162,11 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 				}
 
 				// Remind the Super Spy when his health is low that he can regenerate health by backstabbing.
-				if(Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALONHIT) && class == TFClass_Spy && !g_nSpawner[client][g_bSpawnerShownReminder][SpawnerReminder_SuperSpyLowHealth])
+				if(Spawner_HasGiantTag(client, GIANTTAG_BLOCK_HEALONHIT) && class == TFClass_Spy && !g_nSpawner[client].g_bSpawnerShownReminder[SpawnerReminder_SuperSpyLowHealth])
 				{
 					if(float(GetClientHealth(client)) / float(SDK_GetMaxHealth(client)) < 0.5)
 					{
-						g_nSpawner[client][g_bSpawnerShownReminder][SpawnerReminder_SuperSpyLowHealth] = true;
+						g_nSpawner[client].g_bSpawnerShownReminder[SpawnerReminder_SuperSpyLowHealth] = true;
 
 						EmitSoundToClient(client, SOUND_SUPERSPY_HINT);
 						PrintCenterText(client, "%t", "Tank_Center_SuperSpyHint");
@@ -2179,7 +2179,7 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 			{
 				int iDisguisedClass = GetEntProp(client, Prop_Send, "m_nDisguiseClass");
 				int iDisguisedTeam = GetEntProp(client, Prop_Send, "m_nDisguiseTeam");
-				if(g_nDisguised[client][g_iDisguisedClass] != iDisguisedClass || g_nDisguised[client][g_iDisguisedTeam] != iDisguisedTeam)
+				if(g_nDisguised[client].g_iDisguisedClass != iDisguisedClass || g_nDisguised[client].g_iDisguisedTeam != iDisguisedTeam)
 				{
 					if(iDisguisedClass == 0 && iDisguisedTeam == 0)
 					{
@@ -2187,8 +2187,8 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 					}else{
 						ModelOverrides_Think(client, iDisguisedClass, iDisguisedTeam);
 
-						g_nDisguised[client][g_iDisguisedClass] = iDisguisedClass;
-						g_nDisguised[client][g_iDisguisedTeam] = iDisguisedTeam;
+						g_nDisguised[client].g_iDisguisedClass = iDisguisedClass;
+						g_nDisguised[client].g_iDisguisedTeam = iDisguisedTeam;
 					}
 				}
 			}
@@ -2990,7 +2990,7 @@ public void Event_SetupFinished(Handle hEvent, char[] strEventName, bool bDontBr
 		SetEntPropFloat(iWatcher, Prop_Send, "m_flRecedeTime", GetGameTime()+graceTime);
 	}
 	Buster_Cleanup(TFTeam_Blue);
-	g_nBuster[TFTeam_Blue][g_bBusterActive] = true;
+	g_nBuster[TFTeam_Blue].g_bBusterActive = true;
 
 	if(g_nGameMode == GameMode_Race)
 	{
@@ -3001,7 +3001,7 @@ public void Event_SetupFinished(Handle hEvent, char[] strEventName, bool bDontBr
 			SetEntPropFloat(iWatcher, Prop_Send, "m_flRecedeTime", GetGameTime()+graceTime);
 		}
 		Buster_Cleanup(TFTeam_Red);
-		g_nBuster[TFTeam_Red][g_bBusterActive] = true;
+		g_nBuster[TFTeam_Red].g_bBusterActive = true;
 	}
 
 	RequestFrame(NextFrame_EndSetup);
@@ -3226,8 +3226,8 @@ public void RaceTimer_On30SecRemain(char[] output, int caller, int activator, fl
 	for(int iTeam=2; iTeam<=3; iTeam++)
 	{
 		Giant_Cleanup(iTeam);
-		g_nTeamGiant[iTeam][g_bTeamGiantActive] = true;
-		g_nTeamGiant[iTeam][g_flTeamGiantTimeRoundStarts] = GetEngineTime()+30.0-5.0; // time when the spawn process should begin
+		g_nTeamGiant[iTeam].g_bTeamGiantActive = true;
+		g_nTeamGiant[iTeam].g_flTeamGiantTimeRoundStarts = GetEngineTime() + 30.0 - 5.0; // time when the spawn process should begin
 	}
 }
 
@@ -3607,7 +3607,7 @@ public void Event_RoundWin(Handle hEvent, char[] strEventName, bool bDontBroadca
 						for(int client=1; client<=MaxClients; client++)
 						{
 							if(IsClientInGame(client) && !IsFakeClient(client) && GetClientTeam(client) == team && GetEntProp(client, Prop_Send, "m_bIsMiniBoss") &&
-								g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
+								g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER))
 							{
 								numGiants++;
 
@@ -4549,8 +4549,8 @@ void GameLogic_DoNext()
 
 		// Activate the giant spawner to start looking for an eligible player to become the giant robot
 		Giant_Cleanup(TFTeam_Blue);
-		g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive] = true;
-		g_nTeamGiant[TFTeam_Blue][g_flTeamGiantTimeRoundStarts] = GetEngineTime()+flTimeCooldown-5.0; // time when the spawn process should begin
+		g_nTeamGiant[TFTeam_Blue].g_bTeamGiantActive = true;
+		g_nTeamGiant[TFTeam_Blue].g_flTeamGiantTimeRoundStarts = GetEngineTime() + flTimeCooldown - 5.0; // time when the spawn process should begin
 
 		Timer_KillStart();
 		g_hTimerStart = CreateTimer(flTimeCooldown-3.0, Timer_SpawnBomb_Part1, _, TIMER_REPEAT); // spawns the bomb on the ground
@@ -4643,8 +4643,8 @@ public Action Timer_SpawnBomb_Part1(Handle hTimer)
 				g_finalBombDeployer = 0;
 				g_timeControlPointSkipped = 0.0;
 				g_timeCaptureOutline[TFTeam_Blue] = 0.0;
-				g_diedWithBomb[g_diedWithBombUserId] = 0;
-				g_diedWithBomb[g_diedWithBombTime] = 0.0;
+				g_diedWithBomb.g_diedWithBombUserId = 0;
+				g_diedWithBomb.g_diedWithBombTime = 0.0;
 				g_lastBombTier = -1;
 
 				DispatchKeyValue(iBomb, "GameType", "2");
@@ -4681,10 +4681,10 @@ public Action Timer_SpawnBomb_Part1(Handle hTimer)
 				
 				SDKHook(iBomb, SDKHook_Touch, Bomb_OnTouch);
 
-				if(g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive])
+				if(g_nTeamGiant[TFTeam_Blue].g_bTeamGiantActive)
 				{
-					int giant = GetClientOfUserId(g_nTeamGiant[TFTeam_Blue][g_iTeamGiantQueuedUserId]);
-					if(giant >= 1 && giant <= MaxClients && IsClientInGame(giant) && IsPlayerAlive(giant) && g_nSpawner[giant][g_bSpawnerEnabled] && g_nSpawner[giant][g_nSpawnerType] == Spawn_GiantRobot
+					int giant = GetClientOfUserId(g_nTeamGiant[TFTeam_Blue].g_iTeamGiantQueuedUserId);
+					if(giant >= 1 && giant <= MaxClients && IsClientInGame(giant) && IsPlayerAlive(giant) && g_nSpawner[giant].g_bSpawnerEnabled && g_nSpawner[giant].g_nSpawnerType == Spawn_GiantRobot
 						&& GetEntProp(giant, Prop_Send, "m_bIsMiniBoss"))
 					{
 #if defined DEBUG
@@ -4732,7 +4732,7 @@ public Action Timer_SpawnBomb_Part2(Handle hTimer)
 			
 			// Try to find the current queued player to become the giant
 			// If there is none, then send out a message prompting players to pick up the bomb
-			int iGiant = GetClientOfUserId(g_nTeamGiant[TFTeam_Blue][g_iTeamGiantQueuedUserId]);
+			int iGiant = GetClientOfUserId(g_nTeamGiant[TFTeam_Blue].g_iTeamGiantQueuedUserId);
 			if(iGiant <= 0 || iGiant > MaxClients)
 			{
 				Handle hEvent = CreateEvent("show_annotation");
@@ -4934,7 +4934,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 
 	bool overrideReturn = false;
 
-	if(attacker >= 1 && attacker <= MaxClients && g_nSpawner[attacker][g_bSpawnerEnabled] && g_nSpawner[attacker][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(attacker, Prop_Send, "m_bIsMiniBoss"))
+	if(attacker >= 1 && attacker <= MaxClients && g_nSpawner[attacker].g_bSpawnerEnabled && g_nSpawner[attacker].g_nSpawnerType == Spawn_GiantRobot && GetEntProp(attacker, Prop_Send, "m_bIsMiniBoss"))
 	{
 		// Increase knockback on victim for melee damage
 		if((Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK) || Spawner_HasGiantTag(attacker, GIANTTAG_MELEE_KNOCKBACK_CRITS)) && weapon > MaxClients && victim != attacker && victim >= 1 && victim <= MaxClients)
@@ -5031,7 +5031,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		}
 	}
 
-	if(victim >= 1 && victim <= MaxClients && g_nSpawner[victim][g_bSpawnerEnabled] && g_nSpawner[victim][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(victim, Prop_Send, "m_bIsMiniBoss"))
+	if(victim >= 1 && victim <= MaxClients && g_nSpawner[victim].g_bSpawnerEnabled && g_nSpawner[victim].g_nSpawnerType == Spawn_GiantRobot && GetEntProp(victim, Prop_Send, "m_bIsMiniBoss"))
 	{
 		// Catch when the giant comes out of the minify magic spell and block the damage.
 		if(victim == attacker && victim == inflictor && damagetype == 1 && weapon == -1 && damagecustom == 0 && damage == 9999.0)
@@ -5043,7 +5043,7 @@ public Action Player_OnTakeDamage(int victim, int &attacker, int &inflictor, flo
 		}
 
 		// Catch when the sentry buster hits one health and self-destruct
-		if(g_nGiants[g_nSpawner[victim][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
+		if(g_nGiants[g_nSpawner[victim].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER)
 		{
 			if(g_flTimeBusterTaunt[victim] == 0.0)
 			{
@@ -5433,8 +5433,8 @@ public void OnGameFrame()
 
 	// Set the last think time for the buster timer trigger
 	float flCurrentTime = GetEngineTime();
-	g_nBuster[TFTeam_Blue][g_flBusterTimeLastThink] = flCurrentTime;
-	g_nBuster[TFTeam_Red][g_flBusterTimeLastThink] = flCurrentTime;	
+	g_nBuster[TFTeam_Blue].g_flBusterTimeLastThink = flCurrentTime;
+	g_nBuster[TFTeam_Red].g_flBusterTimeLastThink = flCurrentTime;	
 
 	// Run the logic keeping track of player giants
 	Giant_Think(TFTeam_Blue);
@@ -5491,7 +5491,7 @@ public void OnGameFrame()
 	// Logic for the giant engineer teleporter
 	for(int iTeam=2; iTeam<=3; iTeam++)
 	{
-		if(g_nGiantTeleporter[iTeam][g_iGiantTeleporterRefExit] != 0)
+		if(g_nGiantTeleporter[iTeam].g_iGiantTeleporterRefExit != 0)
 		{
 			GiantTeleporter_Think(iTeam);
 		}
@@ -8103,9 +8103,9 @@ public void Event_PlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroa
 			// Player has spawned and is an acceptable class
 			if(g_iClassOverride != client) Attributes_Set(client); // Don't apply special attributes when a player is becoming a giant
 
-			if(g_bIsRoundStarted && (team == TFTeam_Red || team == TFTeam_Blue) && g_nGiantTeleporter[team][g_iGiantTeleporterRefExit] != 0 && g_iClassOverride != client && !g_nSpawner[client][g_bSpawnerEnabled])
+			if(g_bIsRoundStarted && (team == TFTeam_Red || team == TFTeam_Blue) && g_nGiantTeleporter[team].g_iGiantTeleporterRefExit != 0 && g_iClassOverride != client && !g_nSpawner[client].g_bSpawnerEnabled)
 			{
-				int iExit = EntRefToEntIndex(g_nGiantTeleporter[team][g_iGiantTeleporterRefExit]);
+				int iExit = EntRefToEntIndex(g_nGiantTeleporter[team].g_iGiantTeleporterRefExit);
 				if(iExit > MaxClients)
 				{
 					// Check if the teleporter is ready
@@ -8117,15 +8117,15 @@ public void Event_PlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroa
 
 						// Clear them from the tele queue to prevent duplication
 						int iRefClient = EntIndexToEntRef(client);
-						for(int i=GetArraySize(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue])-1; i>=0; i--)
+						for(int i=GetArraySize(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue)-1; i>=0; i--)
 						{
-							if(GetArrayCell(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue], i) == iRefClient)
+							if(GetArrayCell(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue, i) == iRefClient)
 							{
-								RemoveFromArray(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue], i);
+								RemoveFromArray(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue, i);
 							}
 						}
 
-						PushArrayCell(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue], iRefClient);
+						PushArrayCell(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue, iRefClient);
 					}
 				}
 			}
@@ -8211,7 +8211,7 @@ public void OnEntityDestroyed(int entity)
 				StopSound(iTank, SNDCHAN_STATIC, "^mvm/mvm_tank_loop.wav");
 			}
 
-			if(GetEntPropEnt(iTank, Prop_Send, "moveparent") == entity && entity > 0)
+			if(GetEntPropEnt(iTank, Prop_Send, "moveparent") == entity)
 			{
 				// Give the tank godmode to prevent it from being destroyed by players at this point
 				SetEntProp(iTank, Prop_Data, "m_takedamage", DAMAGE_EVENTS_ONLY); // Buddah
@@ -8277,9 +8277,9 @@ public void OnEntityDestroyed(int entity)
 							Buster_Cleanup(team);
 
 							Giant_Cleanup(team);
-							g_nTeamGiant[team][g_bTeamGiantActive] = true;
-							g_nTeamGiant[team][g_flTeamGiantTimeRoundStarts] = GetEngineTime()+12.0; // time when the spawn process should begin
-							g_nTeamGiant[team][g_bTeamGiantNoRageMeter] = true;
+							g_nTeamGiant[team].g_bTeamGiantActive = true;
+							g_nTeamGiant[team].g_flTeamGiantTimeRoundStarts = GetEngineTime() + 12.0; // time when the spawn process should begin
+							g_nTeamGiant[team].g_bTeamGiantNoRageMeter = true;
 						}
 
 						Hell_KillGateTimer();
@@ -8481,7 +8481,7 @@ public Action CritCash_OnTouch(int entity, int client)
 				TFClassType class = TF2_GetPlayerClass(client);
 
 				// Do not let the player's pick up crit cash if the giant has spawned.
-				if(g_nGameMode == GameMode_BombDeploy && g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive] && g_nTeamGiant[TFTeam_Blue][g_bTeamGiantNoCritCash])
+				if(g_nGameMode == GameMode_BombDeploy && g_nTeamGiant[TFTeam_Blue].g_bTeamGiantActive && g_nTeamGiant[TFTeam_Blue].g_bTeamGiantNoCritCash)
 				{
 					return Plugin_Handled;
 				}
@@ -8600,14 +8600,14 @@ public Action Bomb_OnTouch(int iBomb, int iToucher)
 	if(!g_bIsRoundStarted) return Plugin_Handled;
 
 	// No one can pickup the bomb as long as the giant robot is still spawning / still around
-	if(g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive])
+	if(g_nTeamGiant[TFTeam_Blue].g_bTeamGiantActive)
 	{
-		int iGiant = GetClientOfUserId(g_nTeamGiant[TFTeam_Blue][g_iTeamGiantQueuedUserId]);
+		int iGiant = GetClientOfUserId(g_nTeamGiant[TFTeam_Blue].g_iTeamGiantQueuedUserId);
 		if(iGiant >= 1 && iGiant <= MaxClients && IsClientInGame(iGiant) && GetEntProp(iGiant, Prop_Send, "m_bIsMiniBoss"))
 		{
-			if(g_nSpawner[iGiant][g_bSpawnerEnabled] && g_nSpawner[iGiant][g_nSpawnerType] == Spawn_GiantRobot)
+			if(g_nSpawner[iGiant].g_bSpawnerEnabled && g_nSpawner[iGiant].g_nSpawnerType == Spawn_GiantRobot)
 			{
-				if(g_nGiants[g_nSpawner[iGiant][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_CAN_DROP_BOMB) return Plugin_Continue;
+				if(g_nGiants[g_nSpawner[iGiant].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_CAN_DROP_BOMB) return Plugin_Continue;
 
 				if(iGiant == iToucher) return Plugin_Continue;
 			}
@@ -8692,7 +8692,7 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 #if defined DEBUG
 			PrintToServer("(Event_PlayerDeath) Clearing giant: %N!", iVictim);
 #endif	
-			giantWasVictim = (g_nSpawner[iVictim][g_bSpawnerEnabled] && g_nSpawner[iVictim][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[iVictim][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER));
+			giantWasVictim = (g_nSpawner[iVictim].g_bSpawnerEnabled && g_nSpawner[iVictim].g_nSpawnerType == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[iVictim].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER));
 
 			// Catch the giant suicide message when he explodes and block it
 			if(Spawner_HasGiantTag(iVictim, GIANTTAG_SENTRYBUSTER))
@@ -8737,8 +8737,8 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 					PrintToServer("(Event_PlayerDeath) %N dropped the bomb in overtime!", iVictim);
 #endif	 			
 		 			// This will create the explosion effects.
-		 			g_diedWithBomb[g_diedWithBombUserId] = GetClientUserId(iVictim);
-					g_diedWithBomb[g_diedWithBombTime] = GetEngineTime();
+		 			g_diedWithBomb.g_diedWithBombUserId = GetClientUserId(iVictim);
+					g_diedWithBomb.g_diedWithBombTime = GetEngineTime();
 					
 					// Bomb_Think should end the round on the next frame..
 				}
@@ -8841,11 +8841,11 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 			char rank[TANKRANK_NAME_MAXLEN] = "Strange";
 			for(int i=sizeof(g_tankRank)-1; i>=0; i--)
 			{
-				if(numKills >= g_tankRank[i][g_tankRankNumKills])
+				if(numKills >= g_tankRank[i].g_tankRankNumKills)
 				{
-					strcopy(rank, sizeof(rank), g_tankRank[i][g_tankRankName]);
+					strcopy(rank, sizeof(rank), g_tankRank[i].g_tankRankName);
 
-					if(numKills == g_tankRank[i][g_tankRankNumKills])
+					if(numKills == g_tankRank[i].g_tankRankNumKills)
 					{
 						// The tank has reached a new rank
 						rankedUp = true;
@@ -8858,7 +8858,7 @@ public Action Event_PlayerDeath(Handle hEvent, const char[] strEventName, bool b
 
 			int loopKills = 5000;
 			int mark;
-			if(rankIndex == sizeof(g_tankRank)-1 && (mark=((numKills - g_tankRank[rankIndex][g_tankRankNumKills]) / loopKills)) >= 1)
+			if(rankIndex == sizeof(g_tankRank)-1 && (mark=((numKills - g_tankRank[rankIndex].g_tankRankNumKills) / loopKills)) >= 1)
 			{
 				// The tank has reached the final rank, we need to calculate how many times it has leveled up in the final rank
 				// Each 5000 kills will count as a mark
@@ -8980,10 +8980,10 @@ public void Event_PlayerHurt(Handle hEvent, const char[] strEventName, bool bDon
 			RageMeter_OnTookDamage(iVictim);
 
 			// Keep track of damage dealt to the giant robot
-			if(g_nSpawner[iVictim][g_bSpawnerEnabled] && g_nSpawner[iVictim][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(iVictim, Prop_Send, "m_bIsMiniBoss"))
+			if(g_nSpawner[iVictim].g_bSpawnerEnabled && g_nSpawner[iVictim].g_nSpawnerType == Spawn_GiantRobot && GetEntProp(iVictim, Prop_Send, "m_bIsMiniBoss"))
 			{
 				// Don't count damage done to the sentry buster for the Giant MVP
-				if(!(g_nGiants[g_nSpawner[iVictim][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
+				if(!(g_nGiants[g_nSpawner[iVictim].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER))
 				{
 					g_iDamageStatsGiant[iVictim][iAttacker] += iDamage; // Record how much damage the attacker did to this particular giant for the giant mvp.
 
@@ -9046,7 +9046,7 @@ public Action Listener_DropBomb(int client, const char[] command, int argc)
 	// Block the command 'dropitem' on the giant
 	if(client >= 1 && client <= MaxClients && IsClientInGame(client))
 	{
-		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_CAN_DROP_BOMB))
+		if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[client].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_CAN_DROP_BOMB))
 		{
 			return Plugin_Handled;
 		}
@@ -9061,7 +9061,7 @@ public Action Listener_Destroy(int client, const char[] command, int argc)
 	
 	// Block the giant engineer from destroying teleporter entrances
 	if(client >= 1 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) >= 2 && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss")
-		&& g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && TF2_GetPlayerClass(client) == TFClass_Engineer)
+		&& g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && TF2_GetPlayerClass(client) == TFClass_Engineer)
 	{
 		char strArg1[10];
 		char strArg2[10];
@@ -9366,7 +9366,7 @@ public Action Timer_CheckTeams(Handle timer)
 		healingScale[TFTeam_Blue] = Giant_GetScaleForHealing(TFTeam_Red); // Healing scale for Giant Robots on the BLU team.
 		for(int client=1; client<=MaxClients; client++)
 		{
-			if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+			if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && IsClientInGame(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 			{
 				int team = GetClientTeam(client);
 				if(team == TFTeam_Red || team == TFTeam_Blue)
@@ -9662,8 +9662,8 @@ public void NextFrame_Building(int iRef)
 					{
 						if(type == TFObject_Teleporter && GetEntProp(iBuilding, Prop_Send, "m_iObjectMode") == view_as<int>(TFObjectMode_Exit))
 						{
-							g_nGiantTeleporter[team][g_nGiantTeleporterState] = TeleporterState_Unconnected;
-							g_nGiantTeleporter[team][g_iGiantTeleporterRefExit] = EntIndexToEntRef(iBuilding);
+							g_nGiantTeleporter[team].g_nGiantTeleporterState = TeleporterState_Unconnected;
+							g_nGiantTeleporter[team].g_iGiantTeleporterRefExit = EntIndexToEntRef(iBuilding);
 						}
 					}
 
@@ -9685,7 +9685,7 @@ public void NextFrame_Building(int iRef)
 public Action SendProxy_BuildingNotSapped(int entity, char[] propName, int &value, int element)
 {
 	int builder = GetEntPropEnt(entity, Prop_Send, "m_hBuilder");
-	if(builder >= 1 && builder <= MaxClients && g_nSpawner[builder][g_bSpawnerEnabled] && g_nSpawner[builder][g_nSpawnerType] == Spawn_GiantRobot && IsClientInGame(builder))
+	if(builder >= 1 && builder <= MaxClients && g_nSpawner[builder].g_bSpawnerEnabled && g_nSpawner[builder].g_nSpawnerType == Spawn_GiantRobot && IsClientInGame(builder))
 	{
 		int activeWeapon = GetEntPropEnt(builder, Prop_Send, "m_hActiveWeapon");
 		if(activeWeapon > MaxClients && GetEntProp(activeWeapon, Prop_Send, "m_iItemDefinitionIndex") == ITEM_PDA_DESTROY)
@@ -9840,24 +9840,24 @@ void Bomb_Think(int iBomb)
 			StopSound(iBomb, SNDCHAN_AUTO, SOUND_RING);
 			//BroadcastSoundToTeam(TFTeam_Spectator, "Announcer.MVM_Bomb_Reset");
 			
-			if(g_diedWithBomb[g_diedWithBombUserId] != 0 && g_diedWithBomb[g_diedWithBombTime] > 0.0 && GetEngineTime() - g_diedWithBomb[g_diedWithBombTime] < 0.5 && config.LookupBool(g_hCvarBombExplodeOvertime))
+			if(g_diedWithBomb.g_diedWithBombUserId != 0 && g_diedWithBomb.g_diedWithBombTime > 0.0 && GetEngineTime() - g_diedWithBomb.g_diedWithBombTime < 0.5 && config.LookupBool(g_hCvarBombExplodeOvertime))
 			{
-				int victim = GetClientOfUserId(g_diedWithBomb[g_diedWithBombUserId]);
+				int victim = GetClientOfUserId(g_diedWithBomb.g_diedWithBombUserId);
 				if(victim >= 1 && victim <= MaxClients && IsClientInGame(victim) && GetClientTeam(victim) == TFTeam_Blue)
 				{
 					EmitSoundToAll(SOUND_BOMB_EXPLODE);
 
-					if(g_diedWithBomb[g_diedWithBombWasGiant])
+					if(g_diedWithBomb.g_diedWithBombWasGiant)
 					{
 						Buster_Explode(victim, _, "mvm_hatch_destroy");
 					}else{
 						Buster_Explode(victim, 50.0, "mvm_hatch_destroy");
 					}
 				}
-			}
+			}	
 
-			g_diedWithBomb[g_diedWithBombUserId] = 0;
-			g_diedWithBomb[g_diedWithBombTime] = 0.0;
+			g_diedWithBomb.g_diedWithBombUserId = 0;
+			g_diedWithBomb.g_diedWithBombTime = 0.0;
 
 			Bomb_Cleanup();
 			
@@ -10687,7 +10687,7 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 	if(!g_bIsRoundStarted || g_nGameMode != GameMode_BombDeploy) return;
 
 	Giant_Think(TFTeam_Blue); // Update the state of the team giant to deactivate if necessary.
-	if(!g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive])
+	if(!g_nTeamGiant[TFTeam_Blue].g_bTeamGiantActive)
 	{
 		// Set a maximum round time when the team giant is killed.
 		int maxTime = RoundToNearest(config.LookupFloat(g_hCvarBombDroppedMaxTime) * 60.0);
@@ -10798,15 +10798,15 @@ public void Bomb_OnDropped(const char[] output, int caller, int activator, float
 	if(g_flBombGameEnd != 0.0) return; // Don't show this message close to the game ending
 
 	// Don't show the notification if the giant is still alive because the robots aren't able to pick up the bomb at this time
-	if(g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive])
+	if(g_nTeamGiant[TFTeam_Blue].g_bTeamGiantActive)
 	{
 		bool dontSend = true;
-		int iGiant = GetClientOfUserId(g_nTeamGiant[TFTeam_Blue][g_iTeamGiantQueuedUserId]);
+		int iGiant = GetClientOfUserId(g_nTeamGiant[TFTeam_Blue].g_iTeamGiantQueuedUserId);
 		if(iGiant >= 1 && iGiant <= MaxClients && IsClientInGame(iGiant) && GetClientTeam(iGiant) == TFTeam_Blue && IsPlayerAlive(iGiant) && GetEntProp(iGiant, Prop_Send, "m_bIsMiniBoss"))
 		{
-			if(g_nSpawner[iGiant][g_bSpawnerEnabled] && g_nSpawner[iGiant][g_nSpawnerType] == Spawn_GiantRobot)
+			if(g_nSpawner[iGiant].g_bSpawnerEnabled && g_nSpawner[iGiant].g_nSpawnerType == Spawn_GiantRobot)
 			{
-				if(g_nGiants[g_nSpawner[iGiant][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_CAN_DROP_BOMB)
+				if(g_nGiants[g_nSpawner[iGiant].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_CAN_DROP_BOMB)
 				{
 					dontSend = false;
 				}else{
@@ -11024,7 +11024,7 @@ void ApplyBombCarrierEffects(int client)
 		}
 		case 3: // crits, defense buffs
 		{
-			if(!g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive])
+			if(!g_nTeamGiant[TFTeam_Blue].g_bTeamGiantActive)
 			{
 				if(!TF2_IsPlayerInCondition(client, TFCond_CritOnFlagCapture)) TF2_AddCondition(client, TFCond_CritOnFlagCapture, -1.0, client);
 			}else{
@@ -12227,9 +12227,9 @@ public Action Command_MakeGiant(int client, int args)
 			int iNumFound = 0;
 			for(int i=0; i<MAX_NUM_TEMPLATES; i++)
 			{
-				if(g_nGiants[i][g_bGiantTemplateEnabled] && StrContains(g_nGiants[i][g_strGiantName], strGiantName, false) != -1)
+				if(g_nGiants[i].g_bGiantTemplateEnabled && StrContains(g_nGiants[i].g_strGiantName, strGiantName, false) != -1)
 				{
-					if((bMakeBuster && g_nGiants[i][g_iGiantTags] & GIANTTAG_SENTRYBUSTER) || (!bMakeBuster && !(g_nGiants[i][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)))
+					if((bMakeBuster && g_nGiants[i].g_iGiantTags & GIANTTAG_SENTRYBUSTER) || (!bMakeBuster && !(g_nGiants[i].g_iGiantTags & GIANTTAG_SENTRYBUSTER)))
 					{
 						iIndex = i;
 						iNumFound++;
@@ -12268,7 +12268,7 @@ public Action Command_MakeGiant(int client, int args)
 			}
 		}
 
-		if(iIndex < 0 || iIndex >= MAX_NUM_TEMPLATES || !g_nGiants[iIndex][g_bGiantTemplateEnabled] || (bMakeBuster && !(g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)) || (!bMakeBuster && g_nGiants[iIndex][g_iGiantTags] & GIANTTAG_SENTRYBUSTER))
+		if(iIndex < 0 || iIndex >= MAX_NUM_TEMPLATES || !g_nGiants[iIndex].g_bGiantTemplateEnabled || (bMakeBuster && !(g_nGiants[iIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER)) || (!bMakeBuster && g_nGiants[iIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER))
 		{
 			ReplyToCommand(client, "No matching giant was found or template is disabled.");
 			return Plugin_Handled;
@@ -12281,14 +12281,14 @@ public Action Command_MakeGiant(int client, int args)
 			continue;
 		}
 
-		if(g_nSpawner[target_list[i]][g_bSpawnerEnabled])
+		if(g_nSpawner[target_list[i]].g_bSpawnerEnabled)
 		{
 			ReplyToCommand(client, "Failed to make %N a giant: Already being spawned.", target_list[i]);
 			continue;
 		}
 
 		Spawner_Spawn(target_list[i], Spawn_GiantRobot, iIndex);
-		ShowActivity2(client, "[SM] ", "%N was made into a %s!", target_list[i], g_nGiants[iIndex][g_strGiantName]);
+		ShowActivity2(client, "[SM] ", "%N was made into a %s!", target_list[i], g_nGiants[iIndex].g_strGiantName);
 	}	
 
 	return Plugin_Handled;
@@ -12331,8 +12331,8 @@ void ModelOverrides_Clear(int client)
 		SetEntProp(client, Prop_Send, "m_nModelIndexOverrides", 0, _, i);
 	}
 
-	g_nDisguised[client][g_iDisguisedClass] = 0;
-	g_nDisguised[client][g_iDisguisedTeam] = 0;
+	g_nDisguised[client].g_iDisguisedClass = 0;
+	g_nDisguised[client].g_iDisguisedTeam = 0;
 }
 
 void VisionFlags_Update(int client)
@@ -12460,7 +12460,7 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 				}
 			}
 
-			if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] != Spawn_Tank && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+			if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType != Spawn_Tank && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 			{
 				// Makes sure that the giant's taunt prop is properly scaled. Details like this matter.
 				if(g_iOffset_m_tauntProp > 0 && GetEntProp(client, Prop_Send, "m_iTauntItemDefIndex") != -1)
@@ -12468,8 +12468,8 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 					int tauntProp = GetEntDataEnt2(client, g_iOffset_m_tauntProp);
 					if(tauntProp > MaxClients)
 					{
-						int tempIndex = g_nSpawner[client][g_iSpawnerGiantIndex];
-						if(tempIndex >= 0 && tempIndex < MAX_NUM_TEMPLATES && g_nGiants[tempIndex][g_bGiantTemplateEnabled])
+						int tempIndex = g_nSpawner[client].g_iSpawnerGiantIndex;
+						if(tempIndex >= 0 && tempIndex < MAX_NUM_TEMPLATES && g_nGiants[tempIndex].g_bGiantTemplateEnabled)
 						{
 							// Set the appropriate model scale
 							float scale = Giant_GetModelScale(tempIndex);
@@ -12488,10 +12488,10 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 			if(g_nMapHack == MapHack_HightowerEvent)
 			{
 				// Player conditions get removed when the player is teleported to hell so reapply them.
-				if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && IsClientInGame(client) && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+				if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && IsClientInGame(client) && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 				{
-					int template = g_nSpawner[client][g_iSpawnerGiantIndex];
-					if(template >= 0 && template < MAX_NUM_TEMPLATES && g_nGiants[template][g_bGiantTemplateEnabled])
+					int template = g_nSpawner[client].g_iSpawnerGiantIndex;
+					if(template >= 0 && template < MAX_NUM_TEMPLATES && g_nGiants[template].g_bGiantTemplateEnabled)
 					{
 						Giant_ApplyConditions(client, template);
 					}
@@ -12517,11 +12517,11 @@ public void TF2_OnConditionRemoved(int client, TFCond condition)
 		}
 		case TFCond_HalloweenTiny:
 		{
-			if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] != Spawn_Tank && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+			if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType != Spawn_Tank && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 			{
 				// Restore the player's model scale with the value from their template
-				int iIndex = g_nSpawner[client][g_iSpawnerGiantIndex];
-				if(iIndex >= 0 && iIndex < MAX_NUM_TEMPLATES && g_nGiants[iIndex][g_bGiantTemplateEnabled])
+				int iIndex = g_nSpawner[client].g_iSpawnerGiantIndex;
+				if(iIndex >= 0 && iIndex < MAX_NUM_TEMPLATES && g_nGiants[iIndex].g_bGiantTemplateEnabled)
 				{
 					// Set the appropriate model scale
 					float scale = Giant_GetModelScale(iIndex);
@@ -12927,10 +12927,10 @@ public Action Tank_OnGameModeUsesUpgrades(bool &result)
 
 void GiantTeleporter_Cleanup(int team)
 {
-	g_nGiantTeleporter[team][g_iGiantTeleporterRefExit] = 0;
-	g_nGiantTeleporter[team][g_nGiantTeleporterState] = TeleporterState_Unconnected;
-	ClearArray(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue]);
-	g_nGiantTeleporter[team][g_flGiantTeleporterBeamUpdated] = 0.0;
+	g_nGiantTeleporter[team].g_iGiantTeleporterRefExit = 0;
+	g_nGiantTeleporter[team].g_nGiantTeleporterState = TeleporterState_Unconnected;
+	ClearArray(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue);
+	g_nGiantTeleporter[team].g_flGiantTeleporterBeamUpdated = 0.0;
 	GiantTeleporter_RemoveParticle(team);
 }
 
@@ -12974,28 +12974,28 @@ void GiantTeleporter_UpdateBeam(int team, int iTeleporter)
 	TE_WriteVector("m_vecEndPoint", flPosEnd);
 	TE_SendToAll();
 
-	g_nGiantTeleporter[team][g_flGiantTeleporterBeamUpdated] = GetEngineTime();
+	g_nGiantTeleporter[team].g_flGiantTeleporterBeamUpdated = GetEngineTime();
 }
 
 void GiantTeleporter_RemoveParticle(int team)
 {
-	if(g_nGiantTeleporter[team][g_iGiantTeleporterRefParticle] != 0)
+	if(g_nGiantTeleporter[team].g_iGiantTeleporterRefParticle != 0)
 	{
-		int particle = EntRefToEntIndex(g_nGiantTeleporter[team][g_iGiantTeleporterRefParticle]);
+		int particle = EntRefToEntIndex(g_nGiantTeleporter[team].g_iGiantTeleporterRefParticle);
 		if(particle > MaxClients)
 		{
 			AcceptEntityInput(particle, "Kill");
 		}
 
-		g_nGiantTeleporter[team][g_iGiantTeleporterRefParticle] = 0;
+		g_nGiantTeleporter[team].g_iGiantTeleporterRefParticle = 0;
 	}	
 }
 
 void GiantTeleporter_StopParticle(int team)
 {
-	if(g_nGiantTeleporter[team][g_iGiantTeleporterRefParticle] != 0)
+	if(g_nGiantTeleporter[team].g_iGiantTeleporterRefParticle != 0)
 	{
-		int particle = EntRefToEntIndex(g_nGiantTeleporter[team][g_iGiantTeleporterRefParticle]);
+		int particle = EntRefToEntIndex(g_nGiantTeleporter[team].g_iGiantTeleporterRefParticle);
 		if(particle > MaxClients && GetEntProp(particle, Prop_Send, "m_bActive")) AcceptEntityInput(particle, "Stop"); // Check if the particle is started.
 	}
 }
@@ -13003,9 +13003,9 @@ void GiantTeleporter_StopParticle(int team)
 // The MVM particle looks more pleasing so go ahead and use it for pl.
 void GiantTeleporter_UpdateParticle(int team, int teleporter)
 {
-	if(g_nGiantTeleporter[team][g_iGiantTeleporterRefParticle] != 0)
+	if(g_nGiantTeleporter[team].g_iGiantTeleporterRefParticle != 0)
 	{
-		int particle = EntRefToEntIndex(g_nGiantTeleporter[team][g_iGiantTeleporterRefParticle]);
+		int particle = EntRefToEntIndex(g_nGiantTeleporter[team].g_iGiantTeleporterRefParticle);
 		if(particle > MaxClients)
 		{
 			if(!GetEntProp(particle, Prop_Send, "m_bActive")) // Check if the particle is stopped.
@@ -13038,17 +13038,17 @@ void GiantTeleporter_UpdateParticle(int team, int teleporter)
 #if defined DEBUG
 		PrintToServer("(GiantTeleporter_UpdateParticle) Created info_particle_system: %d!", particle);
 #endif
-		g_nGiantTeleporter[team][g_iGiantTeleporterRefParticle] = EntIndexToEntRef(particle);
+		g_nGiantTeleporter[team].g_iGiantTeleporterRefParticle = EntIndexToEntRef(particle);
 	}
 }
 
 void GiantTeleporter_Think(int team)
 {
 	//PrintToServer("m_iState: %d m_bCarried: %d m_bCarryDeploy: %d m_nForceBone: %d", GetEntProp(iTeleporter, Prop_Send, "m_iState"), GetEntProp(iTeleporter, Prop_Send, "m_bCarried"), GetEntProp(iTeleporter, Prop_Send, "m_bCarryDeploy"), GetEntProp(iTeleporter, Prop_Send, "m_nForceBone"));
-	int iTeleporter = EntRefToEntIndex(g_nGiantTeleporter[team][g_iGiantTeleporterRefExit]);
+	int iTeleporter = EntRefToEntIndex(g_nGiantTeleporter[team].g_iGiantTeleporterRefExit);
 	if(iTeleporter > MaxClients)
 	{
-		switch(g_nGiantTeleporter[team][g_nGiantTeleporterState])
+		switch(g_nGiantTeleporter[team].g_nGiantTeleporterState)
 		{
 			case TeleporterState_Unconnected:
 			{
@@ -13068,8 +13068,8 @@ void GiantTeleporter_Think(int team)
 #if defined DEBUG
 					PrintToServer("(GiantTeleporter_Think) Giant teleporter state: connected!");
 #endif
-					g_nGiantTeleporter[team][g_nGiantTeleporterState] = TeleporterState_Connected;
-					ClearArray(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue]);
+					g_nGiantTeleporter[team].g_nGiantTeleporterState = TeleporterState_Connected;
+					ClearArray(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue);
 				}
 			}
 			case TeleporterState_Connected:
@@ -13088,7 +13088,7 @@ void GiantTeleporter_Think(int team)
 #if defined DEBUG
 						PrintToServer("(GiantTeleporter_Think) Giant teleporter state: broken! (m_iState hit 0)");
 #endif
-						g_nGiantTeleporter[team][g_nGiantTeleporterState] = TeleporterState_Unconnected;
+						g_nGiantTeleporter[team].g_nGiantTeleporterState = TeleporterState_Unconnected;
 					}
 				}else{
 					if(teleState >= 2 && !GetEntProp(iTeleporter, Prop_Send, "m_bHasSapper") && !GetEntProp(iTeleporter, Prop_Send, "m_bBuilding"))
@@ -13103,18 +13103,18 @@ void GiantTeleporter_Think(int team)
 						if(g_nGameMode == GameMode_Race)
 						{
 							// Keep the teleporter's beam effect updated
-							if(g_nGiantTeleporter[team][g_flGiantTeleporterBeamUpdated] == 0.0 || flTime - g_nGiantTeleporter[team][g_flGiantTeleporterBeamUpdated] > 5.0)
+							if(g_nGiantTeleporter[team].g_flGiantTeleporterBeamUpdated == 0.0 || flTime - g_nGiantTeleporter[team].g_flGiantTeleporterBeamUpdated > 5.0)
 							{
 								GiantTeleporter_UpdateBeam(team, iTeleporter);
 							}
 						}
 
-						if(g_nGiantTeleporter[team][g_flGiantTeleporterLastTeleport] == 0.0 || flTime - g_nGiantTeleporter[team][g_flGiantTeleporterLastTeleport] > 0.4)
+						if(g_nGiantTeleporter[team].g_flGiantTeleporterLastTeleport == 0.0 || flTime - g_nGiantTeleporter[team].g_flGiantTeleporterLastTeleport > 0.4)
 						{
 							// Teleporter is ready to send players through so work the queue
-							for(int i=GetArraySize(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue])-1; i>=0; i--)
+							for(int i=GetArraySize(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue)-1; i>=0; i--)
 							{
-								int client = EntRefToEntIndex(GetArrayCell(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue], i));
+								int client = EntRefToEntIndex(GetArrayCell(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue, i));
 								if(client >= 1 && client <= MaxClients && IsClientInGame(client) && GetClientTeam(client) == team && IsPlayerAlive(client))
 								{
 									EmitSoundToAll(SOUND_DELIVER, client);
@@ -13134,13 +13134,13 @@ void GiantTeleporter_Think(int team)
 									//PrintToServer("Before=[State: %d Time: %f Time2: %f Flags: %d", GetEntProp(iEntrance, Prop_Send, "m_iState"), GetEntPropFloat(iEntrance, Prop_Send, "m_flCurrentRechargeDuration"), GetEntPropFloat(iEntrance, Prop_Send, "m_flRechargeTime"), GetEntProp(iEntrance, Prop_Send, "m_fObjectFlags"));
 
 									SDK_TeleporterReceive(iTeleporter, client);
-									g_nGiantTeleporter[team][g_flGiantTeleporterLastTeleport] = flTime;
+									g_nGiantTeleporter[team].g_flGiantTeleporterLastTeleport = flTime;
 
-									RemoveFromArray(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue], i);
+									RemoveFromArray(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue, i);
 									break;
 								}
 
-								RemoveFromArray(g_nGiantTeleporter[team][g_hGiantTeleporterTeleQueue], i);
+								RemoveFromArray(g_nGiantTeleporter[team].g_hGiantTeleporterTeleQueue, i);
 							}
 						}
 					}else{
@@ -13160,13 +13160,13 @@ void GiantTeleporter_Think(int team)
 #if defined DEBUG
 		PrintToServer("(GiantTeleporter_Think) Giant teleporter state: destroyed!");
 #endif
-		if(g_nGiantTeleporter[team][g_nGiantTeleporterState] == TeleporterState_Connected)
+		if(g_nGiantTeleporter[team].g_nGiantTeleporterState == TeleporterState_Connected)
 		{
 			BroadcastSoundToTeam(TFTeam_Spectator, "vo/mvm/norm/engineer_mvm_autodestroyedteleporter01.mp3");
 		}
 
-		g_nGiantTeleporter[team][g_iGiantTeleporterRefExit] = 0;
-		g_nGiantTeleporter[team][g_nGiantTeleporterState] = TeleporterState_Unconnected;
+		g_nGiantTeleporter[team].g_iGiantTeleporterRefExit = 0;
+		g_nGiantTeleporter[team].g_nGiantTeleporterState = TeleporterState_Unconnected;
 		GiantTeleporter_RemoveParticle(team);
 	}
 }
@@ -13188,7 +13188,7 @@ void Stats_Reset()
 void Tank_PrintLicense()
 {
 	PrintToServer("======================================================");
-	PrintToServer("Stop that Tank!  Copyright (C) 2014-2017  Alex Kowald");
+	PrintToServer("Stop that Tank!  Copyright (C) 2014-2020  Alex Kowald");
 	PrintToServer("This program comes with ABSOLUTELY NO WARRANTY.");
 	PrintToServer("This is free software, and you are welcome to");
 	PrintToServer("redistribute it under certain conditions.");
@@ -13955,10 +13955,10 @@ public Action TF2_OnPlayerTeleport(int client, int teleporter, bool &result)
 		if(GetEntProp(teleporter, Prop_Send, "m_iObjectMode") != view_as<int>(TFObjectMode_Entrance)) return Plugin_Continue; // This gets called when the player stands on the exit as well
 
 		// Block giants and players that are becoming a giant from taking the teleporter. This lasts around 5 seconds.
-		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot)
+		if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot)
 		{
 			// Allow the Super Spy to take the teleporter after he spawns in.
-			if(!(g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_CAN_DROP_BOMB) || !GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+			if(!(g_nGiants[g_nSpawner[client].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_CAN_DROP_BOMB) || !GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 			{
 				result = false;
 				return Plugin_Handled;
@@ -14083,13 +14083,13 @@ void Settings_Load(int client)
 	GetClientCookie(client, g_cookieInfoPanel, cookie, sizeof(cookie));
 	if(strlen(cookie) > 0)
 	{
-		g_settings[client][g_settingsShowInfoPanel] = StringToInt(cookie);
+		g_settings[client].g_settingsShowInfoPanel = StringToInt(cookie);
 	}
 }
 
 bool Settings_ShouldShowGiantInfoPanel(int client)
 {
-	switch(g_settings[client][g_settingsShowInfoPanel])
+	switch(g_settings[client].g_settingsShowInfoPanel)
 	{
 		case ShowInfoPanel_PayloadOnly: return (g_nGameMode != GameMode_Race);
 		case ShowInfoPanel_PayloadRaceOnly: return (g_nGameMode == GameMode_Race);
@@ -14102,7 +14102,7 @@ bool Settings_ShouldShowGiantInfoPanel(int client)
 void Settings_Clear(int client)
 {
 	// Set the default value for each setting here..
-	g_settings[client][g_settingsShowInfoPanel] = ShowInfoPanel_PayloadOnly;
+	g_settings[client].g_settingsShowInfoPanel = ShowInfoPanel_PayloadOnly;
 }
 
 public void Settings_ItemSelected(int client, CookieMenuAction action, any info, char[] buffer, int maxlen)
@@ -14121,7 +14121,7 @@ void Settings_MainMenu(int client)
 
 	char buffer[256];
 	char trans[64];
-	switch(g_settings[client][g_settingsShowInfoPanel])
+	switch(g_settings[client].g_settingsShowInfoPanel)
 	{
 		case ShowInfoPanel_PayloadOnly: trans = "Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadOnly";
 		case ShowInfoPanel_PayloadRaceOnly: trans = "Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadRaceOnly";
@@ -14152,12 +14152,12 @@ public int MenuHandler_SettingsMain(Menu menu, MenuAction action, int client, in
 			case MainMenu_InfoPanel:
 			{
 				// Toggle the value of the info panel setting.
-				g_settings[client][g_settingsShowInfoPanel]++;
+				g_settings[client].g_settingsShowInfoPanel++;
 
-				if(g_settings[client][g_settingsShowInfoPanel] < 0 || g_settings[client][g_settingsShowInfoPanel] > MAX_SHOW_INFO_PANEL) g_settings[client][g_settingsShowInfoPanel] = ShowInfoPanel_Always;
+				if(g_settings[client].g_settingsShowInfoPanel < 0 || g_settings[client].g_settingsShowInfoPanel > MAX_SHOW_INFO_PANEL) g_settings[client].g_settingsShowInfoPanel = ShowInfoPanel_Always;
 				
 				char cookie[12];
-				IntToString(g_settings[client][g_settingsShowInfoPanel], cookie, sizeof(cookie));
+				IntToString(g_settings[client].g_settingsShowInfoPanel, cookie, sizeof(cookie));
 				SetClientCookie(client, g_cookieInfoPanel, cookie);
 			}
 		}
@@ -14502,7 +14502,7 @@ void Parent_Think(int tank, int team, float distanceToGoal, float distanceParent
 bool Float_AlmostEqual(float one, float two)
 {
 	// FloatCompare returns -1 if the first argument is smaller than the second argument.
-	return (FloatCompare(FloatAbs(FloatSub(one, two)), EPSILON) == -1);
+	return (FloatCompare(FloatAbs(one - two), EPSILON) == -1);
 }
 
 void Timer_KillFailsafe()
@@ -14883,26 +14883,26 @@ int ControlPoint_GetTeam(int controlPoint)
 
 void Announcer_SetEnabled(bool enabled)
 {
-	g_announcer[g_announcerActive] = enabled;
+	g_announcer.g_announcerActive = enabled;
 }
 
 void Announcer_Reset()
 {
-	g_announcer[g_announcerActive] = false;
+	g_announcer.g_announcerActive = false;
 
-	g_announcer[g_announcerCatchingUp] = false;
-	g_announcer[g_announcerCloseGame] = false;
-	g_announcer[g_announcerLargeDifference] = false;
-	for(int i=0; i<ANNOUNCER_MAX_MESSAGES; i++) g_announcer[g_announcerLastMessage][i] = 0.0;
+	g_announcer.g_announcerCatchingUp = false;
+	g_announcer.g_announcerCloseGame = false;
+	g_announcer.g_announcerLargeDifference = false;
+	for(int i=0; i<ANNOUNCER_MAX_MESSAGES; i++) g_announcer.g_announcerLastMessage[i] = 0.0;
 }
 
 void Announcer_Think()
 {
-	if(!g_announcer[g_announcerActive]) return;
+	if(!g_announcer.g_announcerActive) return;
 	if(g_bRaceIntermission) return;
 
 	// Both Tanks are very close to the end. "it's neck and neck" or "this is going to be close"
-	if(!g_announcer[g_announcerCloseGame])
+	if(!g_announcer.g_announcerCloseGame)
 	{
 		bool noProblem = true;
 		bool closeToEnd = false;
@@ -14928,8 +14928,8 @@ void Announcer_Think()
 #if defined DEBUG
 			PrintToServer("(Announcer_Think) Triggered CloseGame with diff: %f!", FloatAbs(diff));
 #endif
-			g_announcer[g_announcerCloseGame] = true;
-			g_announcer[g_announcerLastMessage][AnnouncerMessage_CloseGame] = GetEngineTime();
+			g_announcer.g_announcerCloseGame = true;
+			g_announcer.g_announcerLastMessage[AnnouncerMessage_CloseGame] = GetEngineTime();
 
 			switch(GetRandomInt(0,1))
 			{
@@ -14940,7 +14940,7 @@ void Announcer_Think()
 	}
 
 	// The Tanks are very far apart from each other in terms of progress.
-	if(!g_announcer[g_announcerLargeDifference])
+	if(!g_announcer.g_announcerLargeDifference)
 	{
 		bool noProblem = true;
 		int aheadTeam = -1;
@@ -14971,8 +14971,8 @@ void Announcer_Think()
 #if defined DEBUG
 			PrintToServer("(Announcer_Think) Triggered LargeDifference with diff: %f!", FloatAbs(diff));
 #endif
-			g_announcer[g_announcerLargeDifference] = true;
-			g_announcer[g_announcerLastMessage][AnnouncerMessage_LargeDifference] = GetEngineTime();
+			g_announcer.g_announcerLargeDifference = true;
+			g_announcer.g_announcerLastMessage[AnnouncerMessage_LargeDifference] = GetEngineTime();
 
 			BroadcastSoundToTeam(aheadTeam, "vo/announcer_plr_racegeneral14.mp3");
 			BroadcastSoundToEnemy(aheadTeam, "vo/announcer_plr_racegeneral13.mp3");
@@ -15349,7 +15349,7 @@ public void EntityOutput_TriggerTeleport(const char[] output, int caller, int ac
 	int client = activator;
 	if(client >= 1 && client <= MaxClients && IsClientInGame(client))
 	{
-		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] != Spawn_Tank && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+		if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType != Spawn_Tank && IsPlayerAlive(client) && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 		{
 			// Ensure that player is not stuck after re-scaling.
 			float pos[3];
@@ -15388,7 +15388,7 @@ public MRESReturn CMonsterResource_SetBossHealthPercentage(int pThis, Handle hRe
 {
 	if(g_bEnabled && g_bIsRoundStarted)
 	{
-		if(g_nGameMode == GameMode_Tank || (g_nGameMode == GameMode_BombDeploy && g_nTeamGiant[TFTeam_Blue][g_bTeamGiantActive] && g_nTeamGiant[TFTeam_Blue][g_bTeamGiantNoCritCash]))
+		if(g_nGameMode == GameMode_Tank || (g_nGameMode == GameMode_BombDeploy && g_nTeamGiant[TFTeam_Blue].g_bTeamGiantActive && g_nTeamGiant[TFTeam_Blue].g_bTeamGiantNoCritCash))
 		{
 			// Block anything trying to update the monster_resource health bar.
 			return MRES_Supercede;
@@ -15746,13 +15746,13 @@ void Tank_EnforceRespawnTimes()
 		bool giantOut = false;
 		for(int i=1; i<=MaxClients; i++)
 		{
-			if( g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
-			 && g_nSpawner[i][g_flSpawnerTimeSpawned] > 0.0 && engineTime - g_nSpawner[i][g_flSpawnerTimeSpawned] > config.LookupFloat(g_hCvarBombGiantRespawnDelay)
+			if( g_nSpawner[i].g_bSpawnerEnabled && g_nSpawner[i].g_nSpawnerType == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER)
+			 && g_nSpawner[i].g_flSpawnerTimeSpawned > 0.0 && engineTime - g_nSpawner[i].g_flSpawnerTimeSpawned > config.LookupFloat(g_hCvarBombGiantRespawnDelay)
 			 && IsClientInGame(i) && GetClientTeam(i) == TFTeam_Blue && IsPlayerAlive(i) && GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
 			{
 				giantOut = true;
 
-				if(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_DONT_CHANGE_RESPAWN)
+				if(g_nGiants[g_nSpawner[i].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_DONT_CHANGE_RESPAWN)
 				{
 					giantOut = false;
 
@@ -15794,7 +15794,7 @@ void Tank_EnforceRespawnTimes()
 		int numGiants[MAX_TEAMS];
 		for(int i=1; i<=MaxClients; i++)
 		{
-			if(IsClientInGame(i) && IsPlayerAlive(i) && g_nSpawner[i][g_bSpawnerEnabled] && g_nSpawner[i][g_nSpawnerType] == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i][g_iSpawnerGiantIndex]][g_iGiantTags] & GIANTTAG_SENTRYBUSTER)
+			if(IsClientInGame(i) && IsPlayerAlive(i) && g_nSpawner[i].g_bSpawnerEnabled && g_nSpawner[i].g_nSpawnerType == Spawn_GiantRobot && !(g_nGiants[g_nSpawner[i].g_iSpawnerGiantIndex].g_iGiantTags & GIANTTAG_SENTRYBUSTER)
 				&& GetEntProp(i, Prop_Send, "m_bIsMiniBoss"))
 			{
 				int team = GetClientTeam(i);
@@ -16162,7 +16162,7 @@ public Action Tank_IsChaseable(int client, int headlessHatman, bool &result)
 {
 	if(client >= 1 && client <= MaxClients)
 	{
-		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+		if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 		{
 			if(g_hhhCooldown[client] > 0.0 && g_hhhCooldown[client] > GetEngineTime())
 			{
@@ -16181,12 +16181,12 @@ public Action Tank_OnCalculateMaxSpeed(int client, float &speed)
 
 	if(client >= 1 && client <= MaxClients)
 	{
-		if(g_nSpawner[client][g_bSpawnerEnabled] && g_nSpawner[client][g_nSpawnerType] == Spawn_GiantRobot && g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_flGiantMaxSpeed] > 0.0
-			&& speed > g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_flGiantMaxSpeed] && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
+		if(g_nSpawner[client].g_bSpawnerEnabled && g_nSpawner[client].g_nSpawnerType == Spawn_GiantRobot && g_nGiants[g_nSpawner[client].g_iSpawnerGiantIndex].g_flGiantMaxSpeed > 0.0
+			&& speed > g_nGiants[g_nSpawner[client].g_iSpawnerGiantIndex].g_flGiantMaxSpeed && GetEntProp(client, Prop_Send, "m_bIsMiniBoss"))
 		{
 			// Cap the giant's max speed with the "max-speed" config option in the giant's template.
 			// This bypasses two instances of healing target speed, which we do not want for giants.
-			speed = g_nGiants[g_nSpawner[client][g_iSpawnerGiantIndex]][g_flGiantMaxSpeed];
+			speed = g_nGiants[g_nSpawner[client].g_iSpawnerGiantIndex].g_flGiantMaxSpeed;
 			return Plugin_Handled;
 		}
 	}
