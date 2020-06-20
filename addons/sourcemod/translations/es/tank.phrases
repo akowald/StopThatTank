@@ -1,0 +1,352 @@
+"Phrases"
+{
+	"Tank_Chat_Health_Multiplier"
+	{
+		"#format"		"{1:s},{2:c},{3:c},{4:s}"
+		"es"			"Multiplicador de vida del {1} Tanque{2}: {3}x{4}"
+	}
+	"Tank_Chat_Inbound_Single"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:d},{5:c}"
+		"es"			"{1} Tanque{2} en camino: {3}{4}{5} HP"
+	}
+	"Tank_Chat_Inbound_Multiple"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:c}"
+		"es"			"Varios{1} Tanques{2} en camino: Dispara al {3}Tanque{4} enemigo para retrasarlo."
+	}
+	"Tank_Chat_TeamScramble_Triggered"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"es"			"{1} Se activo un {2}team scramble{3} !"
+	}
+	"Tank_Chat_TankDeploy"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:d},{5:c},{6:d}"
+		"es"			"El{1} Tanque{2} desplego la bomba con {3}{4}{5} de HP restante ({6}%%)!"
+	}
+	"Tank_Chat_Giant_WillSpawnAt_ControlPoint"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c},{7:s},{8:d},{9:c}"
+		"es"			"{1} El proximo {2}Robot Gigante{3} aparecera en {4}{5}{6}s en el {7}Punto de Control {8}{9}."
+	}
+	"Tank_Chat_Giant_WillSpawnAt_Start"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c},{7:s},{8:c}"
+		"es"			"{1} El proximo {2}Robot Gigante{3} aparecera en {4}{5}{6}s en el{7} inicio{8}."
+	}
+	"Tank_Chat_Tank_MVP"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:N},{5:s},{6:d},{7:c},{8:c},{9:d}"
+		"es"			"{1} Tanque{2} MVP: {3}{4} {5}{6}{7} HP {8}{9}%%"
+	}
+	"Tank_Chat_BombSpawned_AtCart"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"es"			"{1} Una {2}Bomba{3} ha aparecido en el carro!"
+	}
+	"Tank_Chat_Tank_PassedCheckpoint_Health"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:c},{5:c},{6:d},{7:c}"
+		"es"			"{1} Tanque{2} paso el {3}checkpoint{4}: {5}+{6}{7} HP"
+	}
+	"Tank_Chat_Tank_PassedCheckpoint"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:c}"
+		"es"			"{1} Tanque{2} paso el {3}checkpoint{4}"
+	}
+	"Tank_Chat_TankKS_Kills_Mk"
+	{
+		"#format"		"{1:s},{2:s},{3:d},{4:c},{5:d}"
+		"es"			"{1} {2} Tank Mk.{3}{4} - Asesinatos: {5}"
+	}
+	"Tank_Chat_TankKS_NewRank_Mk"
+	{
+		"#format"		"{1:c},{2:s},{3:s},{4:d},{5:c}"
+		"es"			"{1} El Tanque ha alcanzado un nuevo rango: {2}{3} Mk.{4}{5}!"
+	}
+	"Tank_GameText_TankKS_NewRank_Mk"
+	{
+		"#format"		"{1:s},{2:d}"
+		"es"			"El Tanque ha alcanzado un nuevo rango: {1} Mk.{2}!"
+	}
+	"Tank_Chat_TankKS_Kills"
+	{
+		"#format"		"{1:s},{2:s},{3:c},{4:d}"
+		"es"			"{1} {2} Tank{3} - Asesinatos: {4}"
+	}
+	"Tank_Chat_TankKS_NewRank"
+	{
+		"#format"		"{1:c},{2:s},{3:s},{4:c}"
+		"es"			"{1} El Tanque ha alcanzado un nuevo rango: {2}{3}{4}!"
+	}
+	"Tank_GameText_TankKS_NewRank"
+	{
+		"#format"		"{1:s}"
+		"es"			"El Tanque ha alcanzado un nuevo rango: {1}!"
+	}
+	"Tank_Chat_RestartingRound"
+	{
+		"#format"		"{1:c}"
+		"es"			"{1} Reiniciando la ronda porque todos se han ido!"
+	}
+	"Tank_Chat_BombDeploy"
+	{
+		"#format"		"{1:s},{2:N},{3:c},{4:s},{5:d},{6:c},{7:d}"
+		"es"			"{1} {2}{3} desplego la bomba con {4}{5}{6} de HP restante ({7}%%)!"
+	}
+	"Tank_Chat_Passed_1"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:s},{5:c}"
+		"es"			"{1} No te convertiras en un {2}Gigante{3} o una {4}Sentry Buster{5}."
+	}
+	"Tank_Chat_Passed_2"
+	{
+		"#format"		"{1:c}"
+		"es"			"{1} Usa /pass para volver a aceptar."
+	}
+	"Tank_Chat_NotPassed_1"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:s},{5:c}"
+		"es"			"{1} Puedes convertirte en un {2}Gigante{3} o una {4}Sentry Buster{5}."
+	}
+	"Tank_Chat_NotPassed_2"
+	{
+		"#format"		"{1:c}"
+		"es"			"{1} Usa /pass para volver a omitir."
+	}
+	"Tank_Chat_UsedTeleporter"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c}"
+		"es"			"{1} Usaste el teleporter de {2}{3}{4}'s!"
+	}
+	"Tank_Chat_UsedTeleporter_NoBuilder"
+	{
+		"#format"		"{1:c}"
+		"es"			"{1} Has sido teletransportado al juego!"
+	}
+	"Tank_Chat_Tip"
+	{
+		"#format"		"{1:s},{2:c},{3:s}"
+		"es"			"{1}Ayuda:{2} {3}"
+	}
+	"Tank_Chat_RareBug_Badwater"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:s},{5:c}"
+		"es"			"{1} El {2}Tanque{3} fue destruido muy cerca del final. Escogiendo un {4}ganador{5}.."
+	}
+	"Tank_Chat_FailSafe_BombDeploy"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"es"			"{1} La ronda ya deberia haber terminado. Escogiendo un {2}ganador{3}.."
+	}
+	"Tank_Chat_Buster_Queued"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:s},{5:N},{6:c}"
+		"es"			"{1} La proxima {2}Sentry Buster{3} sera {4}{5}{6}."
+	}
+	"Tank_Chat_Buster_Next_NoOne"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"es"			"{1} No hay nadie listo para ser la {2}Sentry Buster{3}."
+	}
+	"Tank_Center_Buster_YouAreNext"
+	{
+		"es"			"Te convertiras en la proxima Sentry Buster! Para negarte, usa /pass."
+	}
+	"Tank_Chat_Buster_AutoPassed"
+	{
+		"#format"		"{1:s},{2:c},{3:c},{4:s},{5:c}"
+		"es"			"{1} La Sentry Buster{2} fue transferida a: {3}{4}{5}."
+	}
+	"Tank_Chat_Buster_Warning"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c},{7:c},{8:c}"
+		"es"			"{1} Te convertiras en una {2}Sentry Buster{3} en {4}{5}s{6}! Usa {7}/pass{8} para omitir."
+	}
+	"Tank_Annotation_Buster_Warning"
+	{
+		"#format"		"{1:d}"
+		"es"			"Te convertiras en una Sentry Buster en {1}s!\nUsa /pass para omitir."
+	}
+	"Tank_Chat_Giant_Spawned"
+	{
+		"#format"		"{1:s},{2:N},{3:c},{4:s},{5:s},{6:s},{7:d},{8:c}"
+		"es"			"{1} {2}{3} se convirtio en: {4}{5}  {6}{7}{8} HP"
+	}
+	"Tank_Chat_Giant_Warning"
+	{
+		"#format"		"{1:c},{2:s},{3:c},{4:c},{5:d},{6:c}"
+		"es"			"{1} Te convertiras en {2}Robot Gigante{3} en {4}{5}s{6}.. Usa /pass para omitir."
+	}
+	"Tank_Annotation_Giant_Warning"
+	{
+		"#format"		"{1:d}"
+		"es"			"Te convertiras en un robot Gigante en {1}s..\nUsa /pass para omitir."
+	}
+	"Tank_Chat_Giant_AFK"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c}"
+		"es"			"{1} Gigante {2}{3}{4} parece estar AFK.."
+	}
+	"Tank_Chat_Giant_MVP"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c},{5:s},{6:s},{7:N},{8:s},{9:d},{10:c},{11:c},{12:d}"
+		"es"			"{1} Gigante {2}{3}{4} {5}. MVP: {6}{7} {8}{9}{10} HP {11}{12}%%"
+	}
+	"Tank_Chat_RageMeter_Expired"
+	{
+		"#format"		"{1:c}"
+		"es"			"{1} Tu medidor de ira se ha agotado por no causar ningUn daño a los jugadores!"
+	}
+	"Tank_Center_Backstabbed"
+	{
+		"es"			"!!!!!! TE APUÑALARON !!!!!"
+	}
+	"Tank_Center_SuperSpyHint"
+	{
+		"es"			"OUCH! Recupera algo de salud apuñalando a los enemigos."
+	}
+	"Tank_Annotation_Bomb_Spawned"
+	{
+		"es"			"Una bomba ha entrado en el area!"
+	}
+	"Tank_Annotation_Bomb_MovedBack"
+	{
+		"es"			"La bomba volvio atras."
+	}
+	"Tank_Annotation_Bomb_PickupHint_Giant"
+	{
+		"es"			"Recoge la bomba de nuevo!"
+	}
+	"Tank_Annotation_Bomb_PickupHint"
+	{
+		"es"			"Recoge la bomba antes de que se reinicie!"
+	}
+	"Tank_Annotation_Borneo_Detour"
+	{
+		"es"			"No entras aqui! Usa otro camino.\nSube las escaleras y gira a la derecha. →"
+	}
+	"Tank_Annotation_CactusCanyon_Hint"
+	{
+		"es"			"Espera por el tren aqui.\nDeja que te golpee para detonar la bomba."
+	}
+	"Tank_Annotation_Deploy"
+	{
+		"es"			"Despliega la bomba aqui!"
+	}
+	"Tank_Annotation_Capture"
+	{
+		"es"			"Captura este punto de control"
+	}
+	"Tank_Annotation_Buster_Hint"
+	{
+		"es"			"Ataca o usa una taunt para autodestruirse!"
+	}
+	"Tank_Annotation_Giant_Spawned"
+	{
+		// This message shows when a team giant spawns.
+		// Right now it passes the giant's name from the template file.
+		"#format"		"{1:s}"
+		"es"			"{1}"
+	}
+	"Tank_Annotation_Giant_Spawned_BombDeploy"
+	{
+		"#format"		"{1:s}"
+		"es"			"{1} tiene la bomba!"
+	}
+	"Tank_Annotation_SkippedControlPoint"
+	{
+		"es"			"DATE LA VUELTA.\nCaptura el punto de control primero!"
+	}
+	"Tank_Menu_Settings_Title"
+	{
+		"es"			"Opciones de Stop That Tank"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel"
+	{
+		"#format"		"{1:T}"
+		"es"			"Mostrar panel de informacion sobre Gigantes: {1}"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_AlwaysShow"
+	{
+		"es"			"Siempre mostrar"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadOnly"
+	{
+		"es"			"solo Carga Explosiva"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_PayloadRaceOnly"
+	{
+		"es"			"solo carrera de Carga Explosiva"
+	}
+	"Tank_Menu_Settings_ShowGiantInfoPanel_State_Never"
+	{
+		"es"			"Nunca"
+	}
+	"Tank_Chat_ShowGiantInfo"
+	{
+		"#format"		"{1:c},{2:s},{3:N},{4:c},{5:s},{6:s},{7:c}"
+		"es"			"{1} {2}{3}{4} se convertira en: {5}{6}{7}"
+	}
+	"Tank_Menu_Giant_Main_Title"
+	{
+		"es"			"Aprende mas sobre los Gigantes:"
+	}
+	"Tank_Menu_Giant_Desc_WillBecome"
+	{
+		"#format"		"{1:N}"
+		"es"			"{1} se convertira en:"
+	}
+	"Tank_Dismiss"
+	{
+		"es"			"Salir"
+	}
+	"Tank_GoBack"
+	{
+		"es"			"Volver"
+	}
+	"Tank_Chat_Creators"
+	{
+		"#format"		"{1:s},{2:c},{3:s},{4:s},{5:c},{6:s},{7:c}"
+		"es"			"{1}Stop that Tank!{2} ({3}) por {4}Banshee{5} y {6}linux_lover{7}."
+	}
+	"Tank_Chat_Deploy_LostConnection"
+	{
+		"#format"		"{1:s},{2:N},{3:c}"
+		"es"			"{1} {2}{3} perdio la conexion asi que la bomba se reinicio."
+	}
+	"Tank_Chat_FailToLoad"
+	{
+		"#format"		"{1:c},{2:s},{3:c}"
+		"es"			"{1} Fallo al cargar {2}Stop that Tank!{3}. Revisa los logs para mas informacion. La ronda se reiniciara ahora."
+	}
+	"Tank_Annotation_Giant_SwatBuster"
+	{
+		"es"			"Aleja las Sentry Busters con tu melee!"
+	}
+	"Tank_Annotation_HellHint"
+	{
+		"es"			"Abrete camino hasta la Isla Esqueleto!"
+	}
+	"Tank_GameText_Overtime"
+	{
+		"es"			"El Tanque no volvera hacia atras."
+	}
+	"Tank_Center_CantDeploy"
+	{
+		"es"			"No puedes desplegarla mientras eres INVULNERABLE!"
+	}
+	"Tank_Center_CantMegaHeal"
+	{
+		"es"			"No puedes SOBRECURAR al portador de la bomba una zona de alarma!"
+	}
+	"Tank_Center_CantMegaHealCarrier"
+	{
+		"es"			"No puedes SOBRECURAR al portador de la bomba una zona de alarma!"
+	}
+	"Tank_Center_CantPopUber"
+	{
+		"es"			"No puedes desplegar la UBERCHARGE en una zona de alarma!"
+	}
+}
