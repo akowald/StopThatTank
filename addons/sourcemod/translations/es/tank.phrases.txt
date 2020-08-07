@@ -23,7 +23,7 @@
 	"Tank_Chat_TankDeploy"
 	{
 		"#format"		"{1:s},{2:c},{3:s},{4:d},{5:c},{6:d}"
-		"es"			"El{1} Tanque{2} desplego la bomba con {3}{4}{5} de HP restante ({6}%%)!"
+		"es"			"{1} El Tanque{2} desplego la bomba con {3}{4}{5} de HP restante ({6}%%)!"
 	}
 	"Tank_Chat_Giant_WillSpawnAt_ControlPoint"
 	{
