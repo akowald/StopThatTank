@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2017 Alex Kowald
+ * Copyright (C) 2014-2020 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under

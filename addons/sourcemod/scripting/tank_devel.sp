@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * Stop that Tank!
- * Copyright (C) 2014-2017 Alex Kowald
+ * Copyright (C) 2014-2020 Alex Kowald
  * ==============================================================================
  *
  * This program is free software; you can redistribute it and/or modify it under
@@ -38,17 +38,17 @@
 #define TARGETNAME_TANK_RED				"stt_tank_red"
 #define TARGETNAME_TANK_BLUE			"stt_tank_blu"
 
-enum eMapLogicStruct
+enum struct eMapLogicStruct
 {
-	g_mapLogicParentTank,
-	g_mapLogicGodmodeTank,
-};
-int g_mapLogic[eMapLogicStruct];
+	int g_mapLogicParentTank;
+	int g_mapLogicGodmodeTank;
+}
+eMapLogicStruct g_mapLogic;
 
 void MapLogic_Reset()
 {
-	g_mapLogic[g_mapLogicParentTank] = 0;
-	g_mapLogic[g_mapLogicGodmodeTank] = 0;
+	g_mapLogic.g_mapLogicParentTank = 0;
+	g_mapLogic.g_mapLogicGodmodeTank = 0;
 }
 
 void MapLogic_Init()
@@ -67,7 +67,7 @@ void MapLogic_Init()
 		HookSingleEntityOutput(entity, "OnUser3", EntityOutput_ParentBlue, false);
 		HookSingleEntityOutput(entity, "OnUser4", EntityOutput_UnParentBlue, false);
 
-		g_mapLogic[g_mapLogicParentTank] = entity;
+		g_mapLogic.g_mapLogicParentTank = entity;
 	}
 
 	// This entity allows the map to toggle godmode on both team's Tanks.
@@ -82,7 +82,7 @@ void MapLogic_Init()
 		HookSingleEntityOutput(entity, "OnUser3", EntityOutput_GodmodeBlue, false);
 		HookSingleEntityOutput(entity, "OnUser4", EntityOutput_UnGodmodeBlue, false);
 
-		g_mapLogic[g_mapLogicGodmodeTank] = entity;
+		g_mapLogic.g_mapLogicGodmodeTank = entity;
 	}
 
 	entity = Entity_FindEntityByName(TARGETNAME_STT_ACTIVE, "logic_relay");

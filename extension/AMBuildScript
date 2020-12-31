@@ -205,6 +205,7 @@ class ExtensionConfig(object):
       else:
         cxx.cxxflags += ['-Wno-deprecated']
       cxx.cflags += ['-Wno-sometimes-uninitialized']
+      cxx.cxxflags += ['-Wno-error=expansion-to-defined', '-Wno-expansion-to-defined']
 
     if have_gcc:
       cxx.cflags += ['-mfpmath=sse']

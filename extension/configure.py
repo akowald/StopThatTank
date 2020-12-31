@@ -8,9 +8,9 @@ builder = run.PrepareBuild(sourcePath = sys.path[0])
 
 builder.options.add_option('--hl2sdk-root', type=str, dest='hl2sdk_root', default='../../../alliedmodders',
 		                   help='Root search folder for HL2SDKs')
-builder.options.add_option('--mms-path', type=str, dest='mms_path', default='../../../metamod-source-1.10',
+builder.options.add_option('--mms-path', type=str, dest='mms_path', default='../../../alliedmodders/metamod-source-1.10',
                        help='Path to Metamod:Source')
-builder.options.add_option('--sm-path', type=str, dest='sm_path', default='../../../sourcemod-1.8',
+builder.options.add_option('--sm-path', type=str, dest='sm_path', default='../../../alliedmodders/sourcemod',
                        help='Path to SourceMod')
 builder.options.add_option('--enable-debug', action='store_const', const='1', dest='debug',
                        help='Enable debugging symbols')
